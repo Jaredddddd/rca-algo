@@ -1,0 +1,3 @@
+[submodule "algorithms/detector"]
+	path = algorithms/detector
+	url = git@github.com:CUHK-SE-Group/ts-anomaly-detector.git
