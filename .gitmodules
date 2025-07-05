@@ -10,3 +10,6 @@
 [submodule "algorithms/causalrca"]
 	path = algorithms/causalrca
 	url = git@github.com:LGU-SE-Internal/CausalRCA.git
+[submodule "algorithms/baro"]
+	path = algorithms/baro
+	url = git@github.com:LGU-SE-Internal/baro.git
