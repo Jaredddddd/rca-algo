@@ -1,0 +1,14 @@
+[project]
+name = "rca-algo-contrib"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "marimo[recommended]>=0.14.10",
+    "pandas>=2.3.0",
+    "rcabench>=1.0.27",
+    "ruff>=0.12.2",
+    "sqlalchemy>=2.0.41",
+    "psycopg2-binary>=2.9.10",
+]
