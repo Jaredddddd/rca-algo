@@ -19,11 +19,25 @@ make build
 
 # How to test algo in remote
 
-Submit a algo execution to the remote server and run it.
+Submit a algo execution to the remote server and run it. Env is used to control the environment variables (runtime behavior) for the algorithm execution. 
+
+```bash
+nn@debian ~/w/rca-algo-contrib (main)> uv run run_algo.py submit-execution --help
+                                                                                                                             
+ Usage: run_algo.py submit-execution [OPTIONS]                                                                               
+                                                                                                                             
+╭─ Options ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ *  --algorithm  -a      TEXT  [default: None] [required]                                                                  │
+│ *  --dataset    -d      TEXT  [default: None] [required]                                                                  │
+│    --env                TEXT  [default: None]                                                                             │
+│    --help                     Show this message and exit.                                                                 │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
 
 
 ```bash
-uv run test_run_algo.py submit-execution -a random -d ts2-ts-route-plan-service-request-abort-l264j8
+uv run run_algo.py submit-execution -a random -d ts2-ts-route-plan-service-request-abort-l264j8
 ```
 
 <details>

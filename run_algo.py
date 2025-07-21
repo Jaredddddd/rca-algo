@@ -1,11 +1,6 @@
 from rcabench_platform.v2.cli.online import app
 from rcabench.rcabench import RCABenchSDK
 from rcabench.model.error import ModelHTTPError
-from rcabench.const import TaskStatus, EventType
-from rcabench.model.trace import (
-    AlgorithmItem,
-    InfoPayload,
-)
 from loguru import logger
 
 
