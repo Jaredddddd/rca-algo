@@ -1,6 +1,3 @@
-[submodule "algorithms/detector"]
-	path = algorithms/detector
-	url = git@github.com:CUHK-SE-Group/ts-anomaly-detector.git
 [submodule "algorithms/rcd"]
 	path = algorithms/rcd
 	url = git@github.com:LGU-SE-Internal/rcd.git
