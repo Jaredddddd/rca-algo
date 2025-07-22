@@ -10,3 +10,7 @@
 [submodule "algorithms/baro"]
 	path = algorithms/baro
 	url = git@github.com:LGU-SE-Internal/baro.git
+[submodule "algorithms/diagfusion"]
+	path = algorithms/diagfusion
+	url = git@github.com:LGU-SE-Internal/DiagFusion.git
+	branch = feat/reproduce
