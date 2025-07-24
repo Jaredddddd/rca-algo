@@ -14,3 +14,6 @@
 	path = algorithms/diagfusion
 	url = git@github.com:LGU-SE-Internal/DiagFusion.git
 	branch = feat/reproduce
+[submodule "algorithms/simplerca"]
+	path = algorithms/simplerca
+	url = https://github.com/LGU-SE-Internal/Simple-RCA.git
