@@ -1,4 +1,6 @@
 
+init:
+	git submodule update --init --recursive
 
 upgrade:
 	git submodule update --remote --merge
