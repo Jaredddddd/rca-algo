@@ -10,13 +10,13 @@
 [submodule "algorithms/baro"]
 	path = algorithms/baro
 	url = git@github.com:LGU-SE-Internal/baro.git
-[submodule "algorithms/diagfusion"]
-	path = algorithms/diagfusion
-	url = git@github.com:LGU-SE-Internal/DiagFusion.git
-	branch = feat/reproduce
 [submodule "algorithms/simplerca"]
 	path = algorithms/simplerca
 	url = https://github.com/LGU-SE-Internal/Simple-RCA.git
 [submodule "algorithms/padirca"]
 	path = algorithms/padirca
 	url = git@github.com:LGU-SE-Internal/PaDi-RCA.git
+[submodule "algorithms/diagfusion"]
+	path = algorithms/diagfusion
+	url = git@github.com:LGU-SE-Internal/DiagFusion.git
+	branch = feat/reproduce
