@@ -7,6 +7,17 @@ Use git submodule to add algorithms into this repository.
 
 e.g., `git submodule add git@github.com:CUHK-SE-Group/ts-anomaly-detector.git algorithms/detector`
 
+# How to configure algo
+
+There should be a `Dockerfile`, `entrypoint.sh`, `info.toml` in the algorithm folder.
+
+```toml
+name = "simplerca"
+
+[env_vars]
+AAA=BBB
+```
+
 
 # How to build
 

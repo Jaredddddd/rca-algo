@@ -4,19 +4,19 @@ import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
+
+import tomli
+from loguru import logger
+from typer import Typer, Option
 
 from rcabench_platform.v2.cli.main import app, logger
 from rcabench_platform.v2.logging import timeit
 from rcabench_platform.v2.config import get_config
-from rcabench.openapi.api import ContainerApi
-from rcabench.openapi.api_client import ApiClient, Configuration
+from rcabench_platform.v2.clients.rcabench_ import RCABenchClient
+from rcabench.openapi.api import ContainersApi
 
-
-def get_configuration(host: str) -> Configuration:
-    configuration = Configuration(host=host)
-    configuration.datetime_format = "%Y-%m-%dT%H:%M:%SZ"
-    return configuration
+app = Typer()
 
 
 @app.command()
@@ -28,11 +28,10 @@ def single(
     image: str = "10.10.10.240/library/rca-algo-traceback-test-local-file",
     tag: str = "latest",
     command: str = "bash /entrypoint.sh",
-    env_vars: str | None = None,
+    env_vars: list[str] | None = None,
     filename: str = "traceback.zip",
     context_dir: str = ".",
     dockerfile_path: str = "Dockerfile",
-    force_rebuild: bool = False,
 ):
     """
     Build and upload local file to get container
@@ -62,29 +61,66 @@ def single(
     with open(file_path, "rb") as f:
         file_content = f.read()
 
-    configuration = get_configuration(host=config.base_url)
-    with ApiClient(configuration=configuration) as client:
-        api = ContainerApi(api_client=client)
-        resp = api.api_v1_containers_post(
+    with RCABenchClient() as api_client:
+        api = ContainersApi(api_client=api_client)
+        resp = api.api_v2_containers_post(
             type=container_type,
             name=name,
             image=image,
             tag=tag,
-            source_type="file",
             command=command,
-            env_vars=env_vars.split(",") if env_vars else None,
             file=(filename, file_content),
             context_dir=context_dir,
             dockerfile_path=dockerfile_path,
-            force_rebuild=force_rebuild,
+            env_vars=env_vars
         )
 
     assert resp is not None
 
 
 @app.command()
-def batch(folder: Path = Path("algorithms")):
+def batch(
+    folder: Path = Path("algorithms"), 
+    build_source_type: str = Option(
+        "file",
+        "--build-source-type",
+        "-t",
+        help="Build source type: 'file' (upload source code for backend build) or 'harbor' (use pre-built image from harbor)"
+    )
+):
+    """
+    Batch process all algorithms in the folder
+    
+    Two upload modes are supported:
+    
+    📁 FILE MODE (default): Upload source code files to backend for building
+    - Creates ZIP package from algorithm folder
+    - Uploads source code to backend
+    - Backend builds Docker image from source
+    - Requires: Dockerfile, entrypoint.sh, info.toml
+    
+    🐳 HARBOR MODE: Use pre-built images from Harbor registry
+    - No file upload required
+    - Assumes image is already built and pushed to Harbor
+    - Backend uses existing Harbor image
+    - Requires: Image must exist in Harbor registry
+    
+    Args:
+        folder: Folder containing algorithm directories
+        build_source_type: Build source type - "file" for file upload, "harbor" for harbor image
+    """
+    # Validate build_source_type
+    if build_source_type not in ["file", "harbor"]:
+        logger.error(f"Invalid build_source_type: {build_source_type}. Must be 'file' or 'harbor'")
+        logger.info("📁 FILE MODE: Upload source code for backend build")
+        logger.info("🐳 HARBOR MODE: Use pre-built image from Harbor")
+        return
+    
     logger.info(f"Starting batch processing for folder: {folder}")
+    if build_source_type == "file":
+        logger.info("📁 Using FILE MODE - uploading source code for backend build")
+    else:
+        logger.info("🐳 Using HARBOR MODE - using pre-built image from Harbor")
 
     algorithm_folders = get_algorithm_folders(folder)
     logger.info(f"Found {len(algorithm_folders)} algorithm folders")
@@ -102,14 +138,15 @@ def batch(folder: Path = Path("algorithms")):
                 failed_folders.append((algo_folder, "missing required files"))
                 continue
 
-            # Try local build
-            if not build_local(algo_folder):
-                logger.error(f"Skipping {algo_folder}: local build failed")
-                failed_folders.append((algo_folder, "local build failed"))
-                continue
+            # Try local build (only for file mode)
+            if build_source_type == "file":
+                if not build_local(algo_folder):
+                    logger.error(f"Skipping {algo_folder}: local build failed")
+                    failed_folders.append((algo_folder, "local build failed"))
+                    continue
 
             # Package and upload
-            if upload_algorithm(algo_folder):
+            if upload_algorithm(algo_folder, build_source_type):
                 logger.info(f"Successfully processed {algo_folder}")
                 success_count += 1
             else:
@@ -214,49 +251,88 @@ def create_algorithm_zip(algo_folder: Path) -> Tuple[str, bytes]:
     return zip_filename, zip_content
 
 
-def upload_algorithm(algo_folder: Path) -> bool:
-    """Package and upload algorithm"""
+def parse_toml_config(info_file: Path) -> Tuple[str, Dict[str, str]]:
+    """Parse info.toml file to extract name and env_vars"""
+    algorithm_name = info_file.parent.name
+    env_vars = {}
+    
+    if info_file.exists():
+        try:
+            with open(info_file, "rb") as f:
+                config = tomli.load(f)
+                
+            if "name" in config:
+                algorithm_name = config["name"]
+            if "env_vars" in config:
+                env_vars = config["env_vars"]
+                
+        except Exception as e:
+            logger.warning(f"Failed to parse TOML file {info_file}: {e}")
+    
+    return algorithm_name, env_vars
+
+
+def upload_algorithm(algo_folder: Path, build_source_type: str = "file") -> bool:
+    """Package and upload algorithm
+    
+    Args:
+        algo_folder: Algorithm folder path
+        build_source_type: Build source type - "file" for file upload, "harbor" for harbor image
+    """
+    # Validate build_source_type
+    if build_source_type not in ["file", "harbor"]:
+        logger.error(f"Invalid build_source_type: {build_source_type}")
+        return False
+    
     try:
-        # Read info.toml to get algorithm name
+        # Read info.toml to get algorithm name and env_vars
         info_file = algo_folder / "info.toml"
-        algorithm_name = algo_folder.name
+        algorithm_name, env_vars = parse_toml_config(info_file)
 
-        if info_file.exists():
-            # Simple toml file parsing to get name
-            with open(info_file, "r") as f:
-                content = f.read()
-                for line in content.split("\n"):
-                    if line.strip().startswith("name"):
-                        if "=" in line:
-                            name_part = line.split("=", 1)[1].strip()
-                            algorithm_name = name_part.strip("\"'")
-                            break
+        # Convert env_vars dict to list of keys only
+        env_vars_list = None
+        if env_vars:
+            env_vars_list = list(env_vars.keys())
 
-        # Create zip file
-        zip_filename, zip_content = create_algorithm_zip(algo_folder)
+        logger.info(f"Uploading algorithm: {algorithm_name} with build_source_type: {build_source_type}")
+        if env_vars:
+            logger.info(f"Environment variables: {env_vars}")
 
-        # Call single function to upload
-        logger.info(f"Uploading algorithm: {algorithm_name}")
+        with RCABenchClient(base_url="http://10.10.10.126:8082") as api_client:
+            api = ContainersApi(api_client=api_client)
+            
+            if build_source_type == "harbor":
+                # Harbor mode - only pass image and tag
+                resp = api.api_v2_containers_post(
+                    type="algorithm",
+                    name=algorithm_name,
+                    image=f"10.10.10.240/library/rca-algo-{algorithm_name}",
+                    tag="latest",
+                    command="bash /entrypoint.sh",
+                    env_vars=env_vars_list,
+                    build_source_type="harbor",
+                    harbor_image=f"10.10.10.240/library/rca-algo-{algorithm_name}",
+                    harbor_tag="latest",
+                )
+            elif build_source_type == "file":
+                # File mode - create zip and upload file
+                zip_filename, zip_content = create_algorithm_zip(algo_folder)
+                resp = api.api_v2_containers_post(
+                    type="algorithm",
+                    name=algorithm_name,
+                    image=f"10.10.10.240/library/rca-algo-{algorithm_name}",
+                    tag="latest",
+                    command="bash /entrypoint.sh",
+                    env_vars=env_vars_list,
+                    file=(zip_filename, zip_content),
+                    context_dir=".",
+                    dockerfile_path="Dockerfile",
+                )
+            else:
+                raise ValueError(f"Invalid build_source_type: {build_source_type}")
 
-        config = get_config(env_mode="prod")
-        configuration = get_configuration(host=config.base_url)
-        with ApiClient(configuration=configuration) as client:
-            api = ContainerApi(api_client=client)
-            resp = api.api_v1_containers_post(
-                type="algorithm",
-                name=algorithm_name,
-                image=f"10.10.10.240/library/rca-algo-{algorithm_name}",
-                tag="latest",
-                source_type="file",
-                command="bash /entrypoint.sh",
-                env_vars=None,
-                file=(zip_filename, zip_content),
-                context_dir=".",
-                dockerfile_path="Dockerfile",
-                force_rebuild=False,
-            )
-
-        return resp is not None
+        logger.info(f"resp is {resp}")
+        return resp.code == 200
 
     except Exception as e:
         logger.error(f"Algorithm upload failed {algo_folder}: {e}")
