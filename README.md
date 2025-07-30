@@ -15,9 +15,11 @@ There should be a `Dockerfile`, `entrypoint.sh`, `info.toml` in the algorithm fo
 name = "simplerca"
 
 [env_vars]
-AAA=BBB
+your_env_key1="your_env_value"
+your_env_key2="your_env_value"
 ```
 
+The `build_algo.py` will read the env key to store it in the database. When running the algo in the future, RCABench will check the environment variables.
 
 # How to build
 
