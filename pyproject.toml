@@ -11,6 +11,6 @@ dependencies = [
     "ruff>=0.12.2",
     "sqlalchemy>=2.0.41",
     "psycopg2-binary>=2.9.10",
-    "rcabench-platform>=0.3.10",
+    "rcabench-platform>=0.3.13",
     "tomli>=2.2.1",
 ]
