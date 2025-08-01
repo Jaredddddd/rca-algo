@@ -50,7 +50,7 @@ nn@debian ~/w/rca-algo-contrib (main)> uv run run_algo.py submit-execution --hel
 
 
 ```bash
-uv run run_algo.py submit-execution -a random -d ts2-ts-route-plan-service-request-abort-l264j8
+RCABENCH_USERNAME=admin RCABENCH_PASSWORD=admin123 uv run run_algo.py submit-execution -a random -d ts2-ts-route-plan-service-request-abort-l264j8
 ```
 
 <details>
