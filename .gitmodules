@@ -1,22 +1,22 @@
 [submodule "algorithms/rcd"]
 	path = algorithms/rcd
-	url = git@github.com:LGU-SE-Internal/rcd.git
+	url = https://github.com/LGU-SE-Internal/rcd.git
 [submodule "algorithms/run"]
 	path = algorithms/run
-	url = git@github.com:LGU-SE-Internal/RUN.git
+	url = https://github.com/LGU-SE-Internal/RUN.git
 [submodule "algorithms/causalrca"]
 	path = algorithms/causalrca
-	url = git@github.com:LGU-SE-Internal/CausalRCA.git
+	url = https://github.com/LGU-SE-Internal/CausalRCA.git
 [submodule "algorithms/baro"]
 	path = algorithms/baro
-	url = git@github.com:LGU-SE-Internal/baro.git
+	url = https://github.com/LGU-SE-Internal/baro.git
 [submodule "algorithms/simplerca"]
 	path = algorithms/simplerca
 	url = https://github.com/LGU-SE-Internal/Simple-RCA.git
 [submodule "algorithms/padirca"]
 	path = algorithms/padirca
-	url = git@github.com:LGU-SE-Internal/PaDi-RCA.git
+	url = https://github.com/LGU-SE-Internal/PaDi-RCA.git
 [submodule "algorithms/diagfusion"]
 	path = algorithms/diagfusion
-	url = git@github.com:LGU-SE-Internal/DiagFusion.git
+	url = https://github.com/LGU-SE-Internal/DiagFusion.git
 	branch = feat/reproduce
