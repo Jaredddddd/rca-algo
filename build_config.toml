@@ -1,0 +1,27 @@
+# RCA Algorithm Build Configuration
+# Default values can be set via environment variables or this config file
+
+[docker]
+# Docker registry configuration
+registry = "10.10.10.240"
+namespace = "library"
+default_tag = "latest"
+
+[build]
+# Build configuration
+algorithms_dir = "algorithms"
+no_cache = false
+platform = ""  # Leave empty to use default platform
+
+[push]
+# Push configuration
+auto_push = false
+
+# Algorithm-specific configuration
+[algorithms.random]
+# You can set different configurations for specific algorithms
+# e.g.: tag = "v1.0.0"
+
+[algorithms.baro]
+# Another algorithm configuration example
+# e.g.: platform = "linux/amd64"
