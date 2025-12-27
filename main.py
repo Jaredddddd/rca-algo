@@ -10,6 +10,7 @@ if __name__ == "__main__":
     registry["microrank"] = Algorithm
     registry["microhecl"] = Algorithm
     registry["microrca"] = Algorithm
+    registry["nezha"] = Algorithm
 
     main(enable_builtin_algorithms=False)
 
