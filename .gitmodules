@@ -24,3 +24,13 @@
 	path = algorithms/diagfusion
 	url = https://github.com/LGU-SE-Internal/DiagFusion.git
 	branch = train-0
+[submodule "algorithms/art"]
+	path = algorithms/art
+	url = https://github.com/LGU-SE-Internal/ART.git
+[submodule "algorithms/shapleyiq"]
+	path = algorithms/shapleyiq
+	url = https://github.com/LGU-SE-Internal/ShapleyIQ.git
+[submodule "algorithms/nezha"]
+	path = algorithms/nezha
+	url = https://github.com/LGU-SE-Internal/Nezha.git
+	branch = sampler
