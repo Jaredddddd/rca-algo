@@ -11,6 +11,7 @@ if __name__ == "__main__":
     registry["microhecl"] = Algorithm
     registry["microrca"] = Algorithm
     registry["nezha"] = Algorithm
+    registry["microdig"] = Algorithm
 
     main(enable_builtin_algorithms=False)
 

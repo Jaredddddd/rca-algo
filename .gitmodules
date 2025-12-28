@@ -34,3 +34,6 @@
 	path = algorithms/nezha
 	url = https://github.com/LGU-SE-Internal/Nezha.git
 	branch = sampler
+[submodule "algorithms/microdig"]
+	path = algorithms/microdig
+	url = https://github.com/LGU-SE-Internal/MicroDig.git
