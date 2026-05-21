@@ -13,13 +13,9 @@
 [submodule "algorithms/simplerca"]
 	path = algorithms/simplerca
 	url = https://github.com/LGU-SE-Internal/Simple-RCA.git
-[submodule "algorithms/padirca"]
-	path = algorithms/padirca
-	url = https://github.com/LGU-SE-Internal/PaDi-RCA.git
 [submodule "algorithms/eadro"]
 	path = algorithms/eadro
 	url = https://github.com/LGU-SE-Internal/Eadro.git
-
 [submodule "algorithms/diagfusion"]
 	path = algorithms/diagfusion
 	url = https://github.com/LGU-SE-Internal/DiagFusion.git

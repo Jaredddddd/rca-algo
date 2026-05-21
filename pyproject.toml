@@ -5,7 +5,6 @@ exclude = [
     "algorithms/traceback",
     "algorithms/diagfusion", 
     "algorithms/eadro",
-    "algorithms/padirca",
     "algorithms/art",
 ]
 [project]
