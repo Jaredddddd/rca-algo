@@ -4,4 +4,10 @@ __pycache__
 
 data
 
-output
+output.venv
+.cache
+*.ckpt
+*.pth
+*.pt
+*.pkl
+*.h5

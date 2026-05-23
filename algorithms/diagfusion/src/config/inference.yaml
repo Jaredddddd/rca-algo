@@ -1,0 +1,33 @@
+base_path: .
+dataset: rcabench
+demo_path: data/inference/demo
+fasttext:
+  da_method: w2v
+  dataset: rcabench
+  edit_count: 1
+  epoch: 5
+  fasttext_dir: fasttext
+  minCount: 1
+  nodes: ts-security-service ts-basic-service ts-auth-service mysql ts-ui-dashboard
+    ts-travel2-service ts-assurance-service
+  sample_count: 1000
+  save_path: fasttext/event_embedding.pkl
+  supervised: true
+  temp_dir: fasttext/temp
+  test_path: fasttext/temp/test.txt
+  text_path: parse/stratification_texts.pkl
+  train_da_path: fasttext/temp/train_da.txt
+  train_path: fasttext/temp/train.txt
+  vector_dim: 100
+he_dgl:
+  N_S: 7
+label: demo2
+parse:
+  inference: true
+  log_path: anomalies/stratification_logs.npy
+  metric_path: anomalies/demo_metric.json
+  nodes: ts-security-service ts-basic-service ts-auth-service mysql ts-ui-dashboard
+    ts-travel2-service ts-assurance-service
+  parse_dir: parse
+  save_path: parse/stratification_texts.pkl
+  trace_path: anomalies/demo_trace.json

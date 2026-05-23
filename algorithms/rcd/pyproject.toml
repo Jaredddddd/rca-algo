@@ -1,0 +1,31 @@
+[project]
+name = "rcaeval-rcd"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "YifanYang6", email = "YifanYang6@link.cuhk.edu.cn" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "causal-learn",
+    "rcabench-platform>=0.3.24",
+]
+[build-system]
+requires = ["uv_build>=0.7.12,<0.8.0"]
+build-backend = "uv_build"
+
+[tool.pyright]
+exclude = [ #
+    ".git",
+    "**/__pycache__",
+    ".venv",
+    ".vscode",
+    ".idea",
+    "data/",
+    "output/",
+    "temp/",
+]
+
+[tool.uv.sources]
+causal-learn = { path = "causal-learn", editable = true }

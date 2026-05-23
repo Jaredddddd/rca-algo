@@ -1,0 +1,5 @@
+data
+__pycache__
+.venv
+model.pkl
+analysis.py

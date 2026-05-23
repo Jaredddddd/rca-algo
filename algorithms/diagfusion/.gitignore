@@ -1,0 +1,11 @@
+*.pyc
+*.json
+*.csv
+*.npy
+temp_logs/
+*.pkl
+*.txt
+*.parquet
+*.finished
+*.pt
+*.joblib
