@@ -117,7 +117,7 @@ uv python install 3.13 3.12 3.10.16
 The lightweight v2 eval algorithms mostly use Python 3.13. The trainable or heavier algorithms use separate environments:
 
 ```text
-baro, rcd, run, causalrca, microdig, shapleyiq, simplerca: workspace packages
+baro, rcd, run, causalrca, microdig, shapleyiq, simplerca, evidencerank: workspace packages
 diagfusion: separate uv project, Python 3.10.16
 art:        separate uv project, Python >=3.12
 eadro:      separate uv project, Python >=3.12, CUDA torch/dgl configured
@@ -315,6 +315,7 @@ uv sync --frozen --package rcaeval-rcd
 uv sync --frozen --package rcaeval_causalrca
 uv sync --frozen --package rcaeval_run
 uv sync --frozen --package SimpleRCA
+uv sync --frozen --package evidencerank
 
 uv sync --frozen --directory algorithms/art
 uv sync --frozen --directory algorithms/eadro
@@ -510,6 +511,23 @@ uv run --package SimpleRCA python algorithms/simplerca/main.py \
   eval batch -a simplerca -d rcabench --clear --use-cpus 32
 ```
 
+```bash
+uv run --package SimpleRCA python algorithms/simplerca/main.py eval perf-report rcabench
+```
+
+### EvidenceRank
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch -a evidencerank -d rcabench --clear --use-cpus 32
+```
+
+Report:
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
+```
+
 ## Trainable Algorithms
 
 The trainable algorithms are not part of the root workspace sync because their environments conflict with the lightweight eval packages.
@@ -653,6 +671,16 @@ The expected checkpoint is:
 data/local/eadro/checkpoints/rcabench-local/best_model.ckpt
 ```
 
+Create symlink so the eval CLI can find the test dataset:
+
+> The `rcabench_platform` framework resolves `-d rcabench_test` to
+> `DATA_ROOT/data/rcabench_test/`, but the actual directory on disk is
+> `__dev__rcabench_test_r1`. A symlink bridges this gap.
+
+```bash
+ln -sfn __dev__rcabench_test_r1 ../../data/rcabench-platform-v2/data/rcabench_test
+```
+
 Evaluate:
 
 ```bash
@@ -752,6 +780,35 @@ For train/test evaluation:
 ```bash
 uv run --package baro python algorithms/baro/main.py eval perf-report rcabench_test
 ```
+
+### Batch report all algorithms
+
+To generate perf-report for every algorithm at once:
+
+```bash
+./scripts/batch_report.sh              # default dataset: rcabench
+./scripts/batch_report.sh rcabench_test  # specify dataset
+```
+
+The script iterates over all workspace algorithms (baro, nezha, shapleyiq, microdig, rcd, causalrca, run, simplerca, evidencerank) and standalone algorithms (art, eadro, diagfusion) in sequence.
+
+
+一起打印结果：
+```bash
+# 默认 rcabench 数据集，按 MRR 降序
+./scripts/combined_report.sh
+
+# 指定数据集
+./scripts/combined_report.sh rcabench_test
+
+# 按 AC@1 排序
+uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
+
+# 升序
+uv run --package baro python scripts/combined_report.py rcabench --asc
+```
+核心逻辑：直接扫描 output/rcabench-platform-v2/data/{dataset}/ 下所有算法的 output.parquet，合并后调用 calc_all_perf 计算统一指标，输出一张包含全部算法的汇总表。结果同时保存为 dataset.perf.combined.parquet。
+
 
 Report outputs:
 
