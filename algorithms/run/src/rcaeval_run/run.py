@@ -20,7 +20,8 @@ from tqdm import trange
 
 from ._common import SimpleMetricsAdapter
 
-torch.autograd.set_detect_anomaly(True)
+# NOTE: set_detect_anomaly 会让 autograd 逐 op 检查 NaN/Inf，训练速度慢 20-30%
+# torch.autograd.set_detect_anomaly(True)
 
 
 class moving_avg(nn.Module):
@@ -60,19 +61,20 @@ class series_decomp(nn.Module):
 
 class DLinear(nn.Module):
     """
-    Decomposition-Linear
+    Decomposition-Linear (batched version)
+
+    所有逐通道 ModuleList 循环已替换为 grouped Conv1d batched 操作，
+    消除 Python 级 for 循环，让 GPU 充分并行。
     """
 
     def __init__(self, seq_len, pred_len, enc_in):
         super(DLinear, self).__init__()
         self.seq_len = seq_len
         self.pred_len = pred_len
-
-        # Decompsition Kernel Size
+        self.channels = enc_in
 
         kernel_size = 25
         self.decompsition = series_decomp(kernel_size)
-        self.channels = enc_in
 
         # attention score
         self._attention = torch.ones(self.channels, 1)
@@ -83,86 +85,63 @@ class DLinear(nn.Module):
         self.pretrain = False
         self.project = False
 
-        # encoder
-        self.Linear_Seasonal = nn.ModuleList()
-        self.Linear_Trend = nn.ModuleList()
+        C, S, P = enc_in, seq_len, pred_len
 
-        for i in range(self.channels):
-            self.Linear_Seasonal.append(nn.Linear(self.seq_len, self.pred_len))
-            self.Linear_Trend.append(nn.Linear(self.seq_len, self.pred_len))
+        # encoder: per-channel Linear(S, P) → grouped Conv1d
+        self.Linear_Seasonal = nn.Conv1d(C, C * P, kernel_size=S, groups=C, bias=True)
+        self.Linear_Trend = nn.Conv1d(C, C * P, kernel_size=S, groups=C, bias=True)
 
-        # decoder
-        self.Decoder_Seasonal = nn.ModuleList()
-        self.Decoder_Trend = nn.ModuleList()
+        # decoder: per-channel Linear(P, S) → grouped Conv1d
+        self.Decoder_Seasonal = nn.Conv1d(C, C * S, kernel_size=P, groups=C, bias=True)
+        self.Decoder_Trend = nn.Conv1d(C, C * S, kernel_size=P, groups=C, bias=True)
 
-        for i in range(self.channels):
-            self.Decoder_Seasonal.append(nn.Linear(self.pred_len, self.seq_len))
-            self.Decoder_Trend.append(nn.Linear(self.pred_len, self.seq_len))
+        self.Decoder_Seasonal_pointwise = nn.Linear(S * C, 1)
+        self.Decoder_Trend_pointwise = nn.Linear(S * C, 1)
 
-        self.Decoder_Seasonal_pointwise = nn.Linear(self.seq_len * self.channels, 1)
-        self.Decoder_Trend_pointwise = nn.Linear(self.seq_len * self.channels, 1)
-
-        # projector
-        self.Proj_Seasonal = nn.ModuleList()
-        self.Proj_Trend = nn.ModuleList()
-        self.Proj_Seasonal_2 = nn.ModuleList()
-        self.Proj_Trend_2 = nn.ModuleList()
+        # projector: per-channel Linear(P, P*2) and Linear(P*2, P)
+        self.Proj_Seasonal = nn.Conv1d(C, C * P * 2, kernel_size=P, groups=C, bias=True)
+        self.Proj_Trend = nn.Conv1d(C, C * P * 2, kernel_size=P, groups=C, bias=True)
+        self.Proj_Seasonal_2 = nn.Conv1d(C, C * P, kernel_size=P * 2, groups=C, bias=True)
+        self.Proj_Trend_2 = nn.Conv1d(C, C * P, kernel_size=P * 2, groups=C, bias=True)
         self.activation = nn.PReLU()
-        for i in range(self.channels):
-            self.Proj_Seasonal.append(nn.Linear(self.pred_len, self.pred_len * 2))
-            self.Proj_Trend.append(nn.Linear(self.pred_len, self.pred_len * 2))
-            self.Proj_Seasonal_2.append(nn.Linear(self.pred_len * 2, self.pred_len))
-            self.Proj_Trend_2.append(nn.Linear(self.pred_len * 2, self.pred_len))
+
+    def _apply_enc(self, layer, x):
+        # [B, C, S] → [B, C, P]
+        B = x.size(0)
+        return layer(x).squeeze(-1).view(B, self.channels, self.pred_len)
+
+    def _apply_dec(self, layer, x):
+        # [B, C, P] → [B, C, S]
+        B = x.size(0)
+        return layer(x).squeeze(-1).view(B, self.channels, self.seq_len)
+
+    def _apply_proj(self, proj1, proj2, x):
+        # [B, C, P] → PReLU → [B, C, P]
+        B = x.size(0)
+        h = proj1(x).squeeze(-1).view(B, self.channels, self.pred_len * 2)
+        h = self.activation(h)
+        return proj2(h).squeeze(-1).view(B, self.channels, self.pred_len)
 
     def forward(self, x):
-
+        B = x.size(0)
         device = x.device
-        
+
         if self.pretrain:
             x = x.transpose(1, 2)
 
             seasonal_init, trend_init = self.decompsition(x)
 
-            seasonal_output = torch.zeros(
-                [seasonal_init.size(0), seasonal_init.size(1), self.pred_len],
-                dtype=seasonal_init.dtype,
-                device=device
-            )
-            trend_output = torch.zeros(
-                [trend_init.size(0), trend_init.size(1), self.pred_len],
-                dtype=trend_init.dtype,
-                device=device
-            )
-
             if self.project:
-                for i in range(self.channels):
-                    seasonal_output[:, i, :] = self.Proj_Seasonal_2[i](
-                        self.activation(
-                            self.Proj_Seasonal[i](
-                                self.Linear_Seasonal[i](seasonal_init[:, i, :].clone())
-                            )
-                        )
-                    )
-                    trend_output[:, i, :] = self.Proj_Trend_2[i](
-                        self.activation(
-                            self.Proj_Trend[i](
-                                self.Linear_Trend[i](trend_init[:, i, :].clone())
-                            )
-                        )
-                    )
-
+                enc_s = self._apply_enc(self.Linear_Seasonal, seasonal_init)
+                seasonal_output = self._apply_proj(self.Proj_Seasonal, self.Proj_Seasonal_2, enc_s)
+                enc_t = self._apply_enc(self.Linear_Trend, trend_init)
+                trend_output = self._apply_proj(self.Proj_Trend, self.Proj_Trend_2, enc_t)
                 x = seasonal_output + trend_output
             else:
                 with torch.no_grad():
-                    for i in range(self.channels):
-                        seasonal_output[:, i, :] = self.Linear_Seasonal[i](
-                            seasonal_init[:, i, :].clone()
-                        )
-                        trend_output[:, i, :] = self.Linear_Trend[i](
-                            trend_init[:, i, :].clone()
-                        )
-
-                    x = seasonal_output + trend_output
+                    enc_s = self._apply_enc(self.Linear_Seasonal, seasonal_init)
+                    enc_t = self._apply_enc(self.Linear_Trend, trend_init)
+                    x = enc_s + enc_t
 
             return x.transpose(1, 2)
 
@@ -170,57 +149,20 @@ class DLinear(nn.Module):
         x = x.transpose(1, 2)
 
         seasonal_init, trend_init = self.decompsition(x)
-        seasonal_output = torch.zeros(
-            [seasonal_init.size(0), seasonal_init.size(1), self.pred_len],
-            dtype=seasonal_init.dtype,
-            device=device  # 确保在正确设备上
-        )
-        trend_output = torch.zeros(
-            [trend_init.size(0), trend_init.size(1), self.pred_len],
-            dtype=trend_init.dtype,
-            device=device  # 确保在正确设备上
-        )
 
-        seasonal_output_1 = torch.zeros(
-            [seasonal_init.size(0), seasonal_init.size(1), self.seq_len],
-            dtype=seasonal_init.dtype,
-            device=device  # 确保在正确设备上
-        )
-        trend_output_1 = torch.zeros(
-            [trend_init.size(0), trend_init.size(1), self.seq_len],
-            dtype=trend_init.dtype,
-            device=device  # 确保在正确设备上
-        )
+        seasonal_output = self._apply_enc(self.Linear_Seasonal, seasonal_init)
+        trend_output = self._apply_enc(self.Linear_Trend, trend_init)
 
-        for i in range(self.channels):
-            seasonal_output[:, i, :] = self.Linear_Seasonal[i](
-                seasonal_init[:, i, :].clone()
-            )
-            trend_output[:, i, :] = self.Linear_Trend[i](trend_init[:, i, :].clone())
-
-        # 确保fs_attention在正确设备上
         fs_attention = self.fs_attention.to(device)
         seasonal_output = seasonal_output * F.softmax(fs_attention, dim=0)
         trend_output = trend_output * F.softmax(fs_attention, dim=0)
 
-        for i in range(self.channels):
-            seasonal_output_1[:, i, :] = self.Decoder_Seasonal[i](
-                seasonal_output[:, i, :].clone()
-            )
-            trend_output_1[:, i, :] = self.Decoder_Trend[i](
-                trend_output[:, i, :].clone()
-            )
+        seasonal_output_1 = self._apply_dec(self.Decoder_Seasonal, seasonal_output)
+        trend_output_1 = self._apply_dec(self.Decoder_Trend, trend_output)
 
-        if self.IsTest:
-            reshape_seasonal = torch.reshape(
-                seasonal_output_1, (1, 1, 32 * self.channels)
-            )
-            reshape_trend = torch.reshape(trend_output_1, (1, 1, 32 * self.channels))
-        else:
-            reshape_seasonal = torch.reshape(
-                seasonal_output_1, (128, 1, 32 * self.channels)
-            )
-            reshape_trend = torch.reshape(trend_output_1, (128, 1, 32 * self.channels))
+        # 使用实际 batch size，不硬编码 128
+        reshape_seasonal = seasonal_output_1.reshape(B, 1, self.seq_len * self.channels)
+        reshape_trend = trend_output_1.reshape(B, 1, self.seq_len * self.channels)
 
         y1 = self.Decoder_Seasonal_pointwise(reshape_seasonal)
         y2 = self.Decoder_Trend_pointwise(reshape_trend)
@@ -488,10 +430,9 @@ def take_per_row(A, indx, num_elem):
     return A[torch.arange(all_indx.shape[0])[:, None], all_indx]
 
 
-def GraphConstruct(target, cuda, epochs, lr, optimizername, data, args):
+def GraphConstruct(target, cuda, epochs, lr, optimizername, data, args,
+                   train_loader, test_loader):
     print(f"graph construct for {target}")
-    train_data, train_loader = data_provider(args, flag="train")
-    test_data, test_loader = data_provider(args, flag="test")
 
     df_tmp = data
 
@@ -509,7 +450,7 @@ def GraphConstruct(target, cuda, epochs, lr, optimizername, data, args):
     pbar = trange(1, epochs + 1, desc="pre train")
     for ep in pbar:
         pretrain_loss = pre_train(
-            train_data, train_loader, model, optimizer, args, targetidx, cuda
+            None, train_loader, model, optimizer, args, targetidx, cuda
         )
         pbar.set_postfix(pretrain_loss=pretrain_loss)
 
@@ -517,11 +458,11 @@ def GraphConstruct(target, cuda, epochs, lr, optimizername, data, args):
     pbar = trange(1, epochs + 1, desc="train and test")
     for ep in pbar:
         scores, train_loss = train(
-            train_data, train_loader, model, optimizer, args, targetidx, cuda
+            None, train_loader, model, optimizer, args, targetidx, cuda
         )
         model.setTest(True)
         test_loss = test(
-            test_data, test_loader, model, optimizer, args, targetidx, cuda=cuda
+            None, test_loader, model, optimizer, args, targetidx, cuda=cuda
         )
         model.setTest(False)
         pbar.set_postfix(train_loss=train_loss, test_loss=test_loss)
@@ -631,6 +572,10 @@ def Run(args):
 
     columns = list(df_data)
 
+    # DataLoader 只创建一次，所有列共享 Scaler 和数据
+    _, train_loader = data_provider(args, flag="train")
+    _, test_loader = data_provider(args, flag="test")
+
     for c in columns:
         idx = df_data.columns.get_loc(c)
         edge = GraphConstruct(
@@ -641,10 +586,14 @@ def Run(args):
             optimizername=args.optimizer,
             data=df_data,
             args=args,
+            train_loader=train_loader,
+            test_loader=test_loader,
         )
 
         print(c, idx, edge)
         edges.update(edge)
+        torch.cuda.empty_cache()
+
     return edges, columns
 
 
@@ -710,7 +659,7 @@ def run(data, inject_time=None, dataset=None, with_bg=False, args=None, **kwargs
 
 class RUN(Algorithm):
     def needs_cpu_count(self) -> int | None:
-        return 16
+        return 2
 
     def __call__(self, args: AlgorithmArgs) -> list[AlgorithmAnswer]:
         adapter = SimpleMetricsAdapter(run)
