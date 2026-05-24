@@ -8,7 +8,7 @@ from src.simplerca.aiops_rca import AIOPSRCA
 from src.simplerca.nezha_rca import NezhaRCA
 if __name__ == "__main__":
     registry = global_algorithm_registry()
-    registry["simplerca"] = NezhaRCA
+    registry["simplerca"] = SimpleRCA
 
     main(enable_builtin_algorithms=False)
     #print(get_datapack_list("nezha_tt"))
