@@ -503,6 +503,21 @@ def GraphConstruct(target, cuda, epochs, lr, optimizername, data, args,
     return edge_to_target
 
 
+def _batch_pearson(x_arr, y_arr):
+    """向量化计算多对向量的 Pearson 相关系数。x_arr, y_arr: [N, T]"""
+    n = x_arr.shape[1]
+    sum_x = x_arr.sum(axis=1)
+    sum_y = y_arr.sum(axis=1)
+    sum_xy = (x_arr * y_arr).sum(axis=1)
+    sum_x_sq = (x_arr ** 2).sum(axis=1)
+    sum_y_sq = (y_arr ** 2).sum(axis=1)
+    numerator = n * sum_xy - sum_x * sum_y
+    denominator = np.sqrt((n * sum_x_sq - sum_x ** 2) * (n * sum_y_sq - sum_y ** 2))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        cor = np.where(denominator == 0, 0.0, numerator / denominator)
+    return cor
+
+
 def pearson_correlation(x, y):
     if len(x) != len(y):
         raise ValueError("The lengths of the input variables must be the same.")
@@ -630,16 +645,16 @@ def run(data, inject_time=None, dataset=None, with_bg=False, args=None, **kwargs
 
     G = CreateGraph(edge_pair, columns)
 
+    # 预提取 numpy 列数组，避免 pandas 列索引开销
+    col_arrays = {c: pruning[c].values for c in columns}
+
     while not nx.is_directed_acyclic_graph(G):
-        edge_cor = []
-        edges = G.edges()
-        for edge in edges:
-            source, target = edge
-            edge_cor.append(pearson_correlation(pruning[source], pruning[target]))
-        tmp = np.array(edge_cor)
-        tmp_idx = np.argsort(tmp)
-        edges = list(edges)
-        source, target = edges[tmp_idx[0]][0], edges[tmp_idx[0]][1]
+        edges = list(G.edges())
+        src_vals = np.array([col_arrays[s] for s, _ in edges])
+        tgt_vals = np.array([col_arrays[t] for _, t in edges])
+        edge_cor = _batch_pearson(src_vals, tgt_vals)
+        tmp_idx = int(np.argmin(edge_cor))
+        source, target = edges[tmp_idx]
 
         G.remove_edge(source, target)
 
@@ -659,7 +674,7 @@ def run(data, inject_time=None, dataset=None, with_bg=False, args=None, **kwargs
 
 class RUN(Algorithm):
     def needs_cpu_count(self) -> int | None:
-        return 2
+        return 14
 
     def __call__(self, args: AlgorithmArgs) -> list[AlgorithmAnswer]:
         adapter = SimpleMetricsAdapter(run)

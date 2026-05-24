@@ -1,13 +1,13 @@
 
 # All
 
-ljw@R740-3:~/paper/aegis/rca-algo-contrib$ ./scripts/combined_report.sh 
-发现 15643 个算法输出文件
+ljw@R740-3:~/paper/aegis/rca-algo-contrib$ ./scripts/combined_report.sh
+发现 18698 个算法输出文件
 
-包含算法: baro, causalrca, evidencerank, microdig, microhecl, microrank, microrca, nezha, rcd, shapleyiq, simplerca, ton
-总 datapack 结果: 351123 行
+包含算法: RUN, baro, causalrca, evidencerank, herosas, microdig, microhecl, microrank, microrca, nezha, rcd, shapleyiq, simplerca, ton
+总 datapack 结果: 429771 行
 
-shape: (12, 13)
+shape: (14, 13)
 ┌──────────────┬───────┬───────┬─────────────────────┬──────────┬────────────┬────────────┬────────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
 │ algorithm    ┆ total ┆ error ┆ runtime.seconds:avg ┆      MRR ┆ AC@1.count ┆ AC@3.count ┆ AC@5.count ┆     AC@1 ┆     AC@3 ┆     AC@5 ┆    Avg@3 ┆    Avg@5 │
 │ ---          ┆   --- ┆   --- ┆                 --- ┆      --- ┆        --- ┆        --- ┆        --- ┆      --- ┆      --- ┆      --- ┆      --- ┆      --- │
@@ -18,18 +18,20 @@ shape: (12, 13)
 │ evidencerank ┆ 1,422 ┆     0 ┆            9.736305 ┆ 0.679202 ┆      754.0 ┆    1,107.0 ┆    1,248.0 ┆ 0.530239 ┆ 0.778481 ┆ 0.877637 ┆ 0.673465 ┆ 0.746835 │
 │ microrca     ┆ 1,422 ┆     0 ┆           24.493223 ┆ 0.674339 ┆      750.0 ┆      853.0 ┆    1,011.0 ┆ 0.527426 ┆ 0.599859 ┆  0.71097 ┆ 0.566104 ┆ 0.619831 │
 │ nezha        ┆ 1,422 ┆     0 ┆           35.374271 ┆ 0.656494 ┆       63.0 ┆      143.0 ┆      154.0 ┆ 0.044304 ┆ 0.100563 ┆ 0.108298 ┆ 0.075481 ┆ 0.088186 │
+│ rcd          ┆ 1,422 ┆     0 ┆           30.470458 ┆ 0.648342 ┆       81.0 ┆      178.0 ┆      201.0 ┆ 0.056962 ┆ 0.125176 ┆  0.14135 ┆  0.09564 ┆ 0.113643 │
+│ herosas      ┆ 1,422 ┆     0 ┆           14.043679 ┆  0.61116 ┆      693.0 ┆      961.0 ┆    1,089.0 ┆ 0.487342 ┆ 0.675809 ┆ 0.765823 ┆ 0.588373 ┆ 0.650211 │
 │ simplerca    ┆ 1,422 ┆     0 ┆            1.835725 ┆ 0.604874 ┆      472.0 ┆    1,014.0 ┆    1,272.0 ┆ 0.331927 ┆  0.71308 ┆ 0.894515 ┆ 0.538912 ┆ 0.668214 │
 │ baro         ┆ 1,422 ┆     0 ┆            1.050853 ┆ 0.596204 ┆      586.0 ┆      847.0 ┆      993.0 ┆ 0.412096 ┆  0.59564 ┆ 0.698312 ┆ 0.511955 ┆ 0.578622 │
 │ shapleyiq    ┆ 1,422 ┆     0 ┆           55.681971 ┆ 0.462764 ┆      445.0 ┆      714.0 ┆      950.0 ┆  0.31294 ┆  0.50211 ┆ 0.668073 ┆ 0.406001 ┆ 0.495078 │
 │ microrank    ┆ 1,422 ┆     0 ┆           24.852426 ┆ 0.299484 ┆      192.0 ┆      456.0 ┆      645.0 ┆ 0.135021 ┆ 0.320675 ┆ 0.453586 ┆  0.23699 ┆ 0.311674 │
 │ causalrca    ┆ 1,422 ┆     0 ┆          134.398712 ┆ 0.294025 ┆      233.0 ┆      508.0 ┆      555.0 ┆ 0.163854 ┆ 0.357243 ┆ 0.390295 ┆ 0.276371 ┆ 0.318284 │
 │ ton          ┆ 1,422 ┆     0 ┆            23.40372 ┆ 0.285757 ┆      216.0 ┆      401.0 ┆      582.0 ┆ 0.151899 ┆ 0.281997 ┆ 0.409283 ┆ 0.207923 ┆ 0.274965 │
-│ rcd          ┆     1 ┆     0 ┆           28.256679 ┆      0.0 ┆        0.0 ┆        0.0 ┆        0.0 ┆      0.0 ┆      0.0 ┆      0.0 ┆      0.0 ┆      0.0 │
+│ RUN          ┆   212 ┆   211 ┆        1,175.975883 ┆ 0.028571 ┆        0.0 ┆        0.0 ┆        0.0 ┆      0.0 ┆      0.0 ┆      0.0 ┆      0.0 ┆      0.0 │
 └──────────────┴───────┴───────┴─────────────────────┴──────────┴────────────┴────────────┴────────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
-2026-05-23 18:25:35.091 | DEBUG    | rcabench_platform.v2.utils.serde:save_parquet:89 - saved parquet (len(df)=12) to output/rcabench-platform-v2/meta/rcabench/dataset.perf.combined.parquet
+2026-05-24 12:26:34.979 | DEBUG    | rcabench_platform.v2.utils.serde:save_parquet:89 - saved parquet (len(df)=14) to output/rcabench-platform-v2/meta/rcabench/dataset.perf.combined.parquet
 
 合并报告已保存: output/rcabench-platform-v2/meta/rcabench/dataset.perf.combined.parquet
-ljw@R740-3:~/paper/aegis/rca-algo-contrib$ 
+ljw@R740-3:~/paper/aegis/rca-algo-contrib$
 
 # Test（train-ratio 0.7）
 

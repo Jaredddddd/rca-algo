@@ -80,6 +80,13 @@ export TEMP_ROOT=$PWD/temp
 export LOGURU_COLORIZE=0
 ```
 
+如果觉得运行是 debug 日志太多，可以:
+
+```bash
+export LOGURU_LEVEL=INFO
+```
+
+
 The explicit exports are optional when running from the repository root, but they make scripts safer when launched from `tmux`, `nohup`, or another working directory.
 
 ## Fresh Clone Setup
@@ -117,7 +124,7 @@ uv python install 3.13 3.12 3.10.16
 The lightweight v2 eval algorithms mostly use Python 3.13. The trainable or heavier algorithms use separate environments:
 
 ```text
-baro, rcd, run, causalrca, microdig, shapleyiq, simplerca, evidencerank: workspace packages
+baro, rcd, run, causalrca, microdig, shapleyiq, simplerca, evidencerank, herosas: workspace packages
 diagfusion: separate uv project, Python 3.10.16
 art:        separate uv project, Python >=3.12
 eadro:      separate uv project, Python >=3.12, CUDA torch/dgl configured
@@ -316,6 +323,7 @@ uv sync --frozen --package rcaeval_causalrca
 uv sync --frozen --package rcaeval_run
 uv sync --frozen --package SimpleRCA
 uv sync --frozen --package evidencerank
+uv sync --frozen --package herosas
 
 uv sync --frozen --directory algorithms/art
 uv sync --frozen --directory algorithms/eadro
@@ -495,6 +503,12 @@ This package also depends on torch:
 uv sync --frozen --package rcaeval_run
 ```
 
+RUN 中日志太多，运行前可以：
+
+```bash
+export LOGURU_LEVEL=INFO
+```
+
 Run:
 
 ```bash
@@ -526,6 +540,24 @@ Report:
 
 ```bash
 uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
+```
+
+### HeroSAS
+
+HeroSAS is adapted from the original Bank metric tool in `algorithms/herosas/metric_tools.py`.
+The RCABench version reads `normal_metrics*.parquet` and `abnormal_metrics*.parquet`,
+detects stable-to-anomalous metric shifts per service, applies the original per-metric
+noise reduction and time-cluster filtering, then returns service-level rankings.
+
+```bash
+uv run --package herosas python algorithms/herosas/main.py \
+  eval batch -a herosas -d rcabench --clear --use-cpus 32
+```
+
+Report:
+
+```bash
+uv run --package herosas python algorithms/herosas/main.py eval perf-report rcabench
 ```
 
 ## Trainable Algorithms
