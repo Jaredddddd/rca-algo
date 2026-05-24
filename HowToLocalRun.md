@@ -1,3 +1,20 @@
+# 直接展示已有算法结果(除了 DiagFusion 和 RUN 外都有了)
+
+```bash
+# 默认 rcabench 数据集，按 MRR 降序
+./scripts/combined_report.sh
+
+# 指定数据集
+./scripts/combined_report.sh rcabench_test
+
+# 按 AC@1 排序
+uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
+
+# 升序
+uv run --package baro python scripts/combined_report.py rcabench --asc
+```
+
+
 # How to Run RCA Algorithms Locally
 
 This document explains how to reproduce the algorithms in this repository on a local GPU server without building Docker images.
@@ -540,6 +557,54 @@ Report:
 
 ```bash
 uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
+```
+
+#### EvidenceRank Ablation (消融实验)
+
+EvidenceRank 默认融合三模态（metric + trace + log）的 15 维特征。以下 6 个变体用于消融实验，覆盖所有单模态和双模态组合：
+
+| 变体名 | 使用模态 | 特征维度 |
+|--------|---------|---------|
+| `evidencerank_metric` | metric only | 5 |
+| `evidencerank_log` | log only | 3 |
+| `evidencerank_trace` | trace + topology | 7 |
+| `evidencerank_metric_log` | metric + log | 8 |
+| `evidencerank_metric_trace` | metric + trace + topology | 12 |
+| `evidencerank_log_trace` | log + trace + topology | 10 |
+
+一次运行全部消融变体：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch \
+  -a evidencerank_metric \
+  -a evidencerank_log \
+  -a evidencerank_trace \
+  -a evidencerank_metric_log \
+  -a evidencerank_metric_trace \
+  -a evidencerank_log_trace \
+  -d rcabench --clear --use-cpus 32
+```
+
+Report：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
+```
+
+也可以与完整 EvidenceRank 一起运行对比：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch \
+  -a evidencerank \
+  -a evidencerank_metric \
+  -a evidencerank_log \
+  -a evidencerank_trace \
+  -a evidencerank_metric_log \
+  -a evidencerank_metric_trace \
+  -a evidencerank_log_trace \
+  -d rcabench --clear --use-cpus 32
 ```
 
 ### HeroSAS

@@ -37,6 +37,23 @@ BASE_FEATURE_NAMES = (
 
 LOG_ERROR_KEYWORDS = ["error", "exception", "fail", "timeout", "critical", "fatal"]
 
+MODALITY_FEATURES = {
+    "metric": frozenset({
+        "metric_max_z", "metric_mean_z", "metric_anomaly_count",
+        "metric_value_delta", "abnormal_metric_rows",
+    }),
+    "trace": frozenset({
+        "trace_duration_z", "trace_duration_delta", "trace_count_delta",
+        "trace_error_rate", "abnormal_trace_rows",
+        "topology_in_degree", "topology_out_degree",
+    }),
+    "log": frozenset({
+        "log_count_delta", "log_error_rate", "log_template_delta",
+    }),
+}
+
+ALL_MODALITIES = frozenset(MODALITY_FEATURES.keys())
+
 
 def _safe_read_parquet(path: Path) -> pd.DataFrame:
     if not path.exists():
@@ -254,7 +271,7 @@ def _merge_feature_maps(*maps: dict[str, dict[str, float]]) -> dict[str, dict[st
 def _build_feature_matrix(
     input_folder: Path,
     services: list[str],
-    feature_dim: int,
+    enabled_features: tuple[str, ...],
     normalize: bool = True,
 ) -> tuple[np.ndarray, list[tuple[str, str]]]:
     normal_metrics = _safe_read_parquet(input_folder / "normal_metrics.parquet")
@@ -275,14 +292,14 @@ def _build_feature_matrix(
         if target_service in features_by_service:
             features_by_service[target_service]["topology_in_degree"] += 1.0
 
+    feature_dim = len(enabled_features)
     service_to_id = {service: idx for idx, service in enumerate(services)}
     matrix = np.zeros((len(services), feature_dim), dtype=np.float32)
     for service, row_idx in service_to_id.items():
-        values = [float(features_by_service.get(service, {}).get(name, 0.0)) for name in BASE_FEATURE_NAMES]
+        values = [float(features_by_service.get(service, {}).get(name, 0.0)) for name in enabled_features]
         if normalize:
             values = [math.log1p(max(value, 0.0)) for value in values]
-        clipped = values[:feature_dim] + [0.0] * max(0, feature_dim - len(values))
-        matrix[row_idx] = np.asarray(clipped[:feature_dim], dtype=np.float32)
+        matrix[row_idx] = np.asarray(values, dtype=np.float32)
 
     return matrix, trace_edges
 
@@ -296,6 +313,14 @@ def _heuristic_scores(services: list[str], matrix: np.ndarray) -> dict[str, floa
 
 
 class EvidenceRank(Algorithm):
+    _modalities: frozenset[str] = ALL_MODALITIES
+
+    def __init__(self):
+        all_enabled = frozenset().union(*(MODALITY_FEATURES[m] for m in self._modalities))
+        self._enabled_features = tuple(
+            name for name in BASE_FEATURE_NAMES if name in all_enabled
+        )
+
     def needs_cpu_count(self) -> int | None:
         return 1
 
@@ -307,8 +332,7 @@ class EvidenceRank(Algorithm):
         if not services:
             return []
 
-        feature_dim = len(BASE_FEATURE_NAMES)
-        matrix, _ = _build_feature_matrix(input_folder, services, feature_dim)
+        matrix, _ = _build_feature_matrix(input_folder, services, self._enabled_features)
         scores = _heuristic_scores(services, matrix)
         sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
 
@@ -317,3 +341,27 @@ class EvidenceRank(Algorithm):
             for rank, (name, _score) in enumerate(sorted_scores, start=1)
         ]
         return answers
+
+
+class EvidenceRankMetric(EvidenceRank):
+    _modalities = frozenset({"metric"})
+
+
+class EvidenceRankLog(EvidenceRank):
+    _modalities = frozenset({"log"})
+
+
+class EvidenceRankTrace(EvidenceRank):
+    _modalities = frozenset({"trace"})
+
+
+class EvidenceRankMetricLog(EvidenceRank):
+    _modalities = frozenset({"metric", "log"})
+
+
+class EvidenceRankMetricTrace(EvidenceRank):
+    _modalities = frozenset({"metric", "trace"})
+
+
+class EvidenceRankLogTrace(EvidenceRank):
+    _modalities = frozenset({"log", "trace"})
