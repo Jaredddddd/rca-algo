@@ -4,6 +4,7 @@ __pycache__
 
 data
 data_csv
+!algorithms/diagfusion/src/diagfusion/data
 
 output.venv
 .cache
@@ -12,3 +13,4 @@ output.venv
 *.pt
 *.pkl
 *.h5
+output/rcabench-platform-v2/rca_algo_outcomt_data_0601.zip
