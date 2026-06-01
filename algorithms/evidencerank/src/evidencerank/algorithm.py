@@ -54,6 +54,26 @@ MODALITY_FEATURES = {
 
 ALL_MODALITIES = frozenset(MODALITY_FEATURES.keys())
 
+FEATURE_WEIGHTS = {
+    "metric_max_z": 0.75,
+    "metric_mean_z": 0.75,
+    "metric_anomaly_count": 0.75,
+    "metric_value_delta": 0.75,
+    "trace_duration_z": 1.0,
+    "trace_duration_delta": 1.0,
+    "trace_count_delta": 1.0,
+    "trace_error_rate": 1.0,
+    "log_count_delta": 0.75,
+    "log_error_rate": 0.75,
+    "log_template_delta": 0.75,
+    "topology_in_degree": 0.0,
+    "topology_out_degree": 0.0,
+    "abnormal_metric_rows": 1.25,
+    "abnormal_trace_rows": 1.25,
+}
+
+PARENT_CONTEXT_WEIGHT = 0.05
+
 
 def _safe_read_parquet(path: Path) -> pd.DataFrame:
     if not path.exists():
@@ -268,6 +288,16 @@ def _merge_feature_maps(*maps: dict[str, dict[str, float]]) -> dict[str, dict[st
     return merged
 
 
+def _finite_nonnegative(value: Any) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(numeric) or numeric <= 0.0:
+        return 0.0
+    return numeric
+
+
 def _build_feature_matrix(
     input_folder: Path,
     services: list[str],
@@ -296,20 +326,61 @@ def _build_feature_matrix(
     service_to_id = {service: idx for idx, service in enumerate(services)}
     matrix = np.zeros((len(services), feature_dim), dtype=np.float32)
     for service, row_idx in service_to_id.items():
-        values = [float(features_by_service.get(service, {}).get(name, 0.0)) for name in enabled_features]
+        values = [
+            _finite_nonnegative(features_by_service.get(service, {}).get(name, 0.0))
+            for name in enabled_features
+        ]
         if normalize:
-            values = [math.log1p(max(value, 0.0)) for value in values]
+            values = [math.log1p(value) for value in values]
         matrix[row_idx] = np.asarray(values, dtype=np.float32)
 
     return matrix, trace_edges
 
 
-def _heuristic_scores(services: list[str], matrix: np.ndarray) -> dict[str, float]:
-    totals = matrix.sum(axis=1)
+def _heuristic_scores(
+    services: list[str],
+    matrix: np.ndarray,
+    feature_weights: np.ndarray | None = None,
+    trace_edges: list[tuple[str, str]] | None = None,
+    parent_context_weight: float = 0.0,
+) -> dict[str, float]:
+    clean_matrix = np.nan_to_num(matrix, nan=0.0, posinf=0.0, neginf=0.0)
+    if feature_weights is not None:
+        clean_matrix = clean_matrix * feature_weights
+    totals = clean_matrix.sum(axis=1)
+    if trace_edges and parent_context_weight > 0.0:
+        totals = _apply_parent_context(services, totals, trace_edges, parent_context_weight)
     cleaned = [0.0 if not math.isfinite(float(total)) else max(float(total), 0.0) for total in totals]
     if max(cleaned, default=0.0) <= 0:
         return {service: 0.0 for service in services}
     return {service: cleaned[idx] for idx, service in enumerate(services)}
+
+
+def _apply_parent_context(
+    services: list[str],
+    scores: np.ndarray,
+    trace_edges: list[tuple[str, str]],
+    weight: float,
+) -> np.ndarray:
+    service_to_idx = {service: idx for idx, service in enumerate(services)}
+    parent_totals = np.zeros(len(services), dtype=np.float64)
+    parent_counts = np.zeros(len(services), dtype=np.float64)
+
+    for parent, child in trace_edges:
+        parent_idx = service_to_idx.get(parent)
+        child_idx = service_to_idx.get(child)
+        if parent_idx is None or child_idx is None or parent_idx == child_idx:
+            continue
+        parent_totals[child_idx] += float(scores[parent_idx])
+        parent_counts[child_idx] += 1.0
+
+    adjusted = scores.astype(np.float64, copy=True)
+    has_parent = parent_counts > 0.0
+    adjusted[has_parent] = (
+        (1.0 - weight) * adjusted[has_parent]
+        + weight * (parent_totals[has_parent] / parent_counts[has_parent])
+    )
+    return adjusted
 
 
 class EvidenceRank(Algorithm):
@@ -320,6 +391,11 @@ class EvidenceRank(Algorithm):
         self._enabled_features = tuple(
             name for name in BASE_FEATURE_NAMES if name in all_enabled
         )
+        self._feature_weights = np.asarray(
+            [FEATURE_WEIGHTS.get(name, 1.0) for name in self._enabled_features],
+            dtype=np.float32,
+        )
+        self._parent_context_weight = PARENT_CONTEXT_WEIGHT if "trace" in self._modalities else 0.0
 
     def needs_cpu_count(self) -> int | None:
         return 1
@@ -332,8 +408,14 @@ class EvidenceRank(Algorithm):
         if not services:
             return []
 
-        matrix, _ = _build_feature_matrix(input_folder, services, self._enabled_features)
-        scores = _heuristic_scores(services, matrix)
+        matrix, trace_edges = _build_feature_matrix(input_folder, services, self._enabled_features)
+        scores = _heuristic_scores(
+            services,
+            matrix,
+            self._feature_weights,
+            trace_edges,
+            self._parent_context_weight,
+        )
         sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
 
         answers = [

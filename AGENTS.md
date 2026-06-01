@@ -86,11 +86,12 @@ output/rcabench-platform-v2/data/rcabench/<datapack>/evidencerank/
 - 硬编码 datapack 名称，例如 `ts0-mysql-container-kill-9t6n24`。
 - 硬编码 label、case id、随机后缀、RCABench 专属 split。
 - 在算法运行路径中读取 `labels.csv`、`injection.json`、评估输出、历史排行榜或任何 ground truth。
+- 不要读取 `conclusion.parquet` 作为算法实现或离线 false case 证据。该文件属于已加工诊断结论；只允许研究其生成思路，并从 raw traces 反向构造通用端点异常信号。
 - 针对具体服务名写分支，例如 `if service == "mysql"`、`if name.startswith("ts-order")`。
 - 针对具体故障名写分支，例如 `if "container-kill" in datapack`。
 - 为了提升当前数据集分数而堆叠不可解释的 if/else、查表、黑名单、白名单。
 
-允许在离线研究工具和文档中使用 label，只能用于分析错误模式、生成报告、比较版本和提出通用假设。任何进入 `algorithms/evidencerank` 的逻辑必须能解释为跨微服务系统通用的 RCA 方法。
+允许在离线研究工具和文档中使用 label，只能用于分析错误模式、生成报告、比较版本和提出通用假设。`conclusion.parquet` 不得被读取为证据或特征；若研究其生成机制，只能把思路转化为 raw traces 上的通用信号。任何进入 `algorithms/evidencerank` 的逻辑必须能解释为跨微服务系统通用的 RCA 方法。
 
 ## 推荐迭代流程
 
@@ -209,7 +210,7 @@ uv run --package evidencerank python VibeResearchTools/evidrank_lab.py compare -
 
 ### `case`
 
-功能：查看一个 datapack 的 GT、预测 top-k、注入信息和输入数据概况，用于人工归因。
+功能：查看一个 datapack 的 GT、预测 top-k、注入信息和输入数据概况，用于人工归因。输入数据概况会跳过 `conclusion.parquet`。
 
 示例：
 
@@ -217,7 +218,7 @@ uv run --package evidencerank python VibeResearchTools/evidrank_lab.py compare -
 uv run --package evidencerank python VibeResearchTools/evidrank_lab.py case --datapack ts0-mysql-container-kill-9t6n24 --source V1 --algorithm evidencerank --dataset rcabench --top-k 20
 ```
 
-注意：`case` 可以读取 `injection.json`，但这只允许用于离线分析和文档。算法实现不能读取它。
+注意：`case` 可以读取 `injection.json`，但这只允许用于离线分析和文档。算法实现不能读取它。`case` 不读取 `conclusion.parquet`；端点类想法必须从 raw traces 重建。
 
 ### `guard`
 
@@ -227,6 +228,7 @@ uv run --package evidencerank python VibeResearchTools/evidrank_lab.py case --da
 
 - datapack id；
 - label / injection / ground truth 读取；
+- 读取 `conclusion.parquet` 作为证据或特征；
 - service name 字面量；
 - dataset name 字面量。
 
@@ -255,6 +257,8 @@ uv run --package evidencerank python VibeResearchTools/evidrank_lab.py new-note 
 - 当前版本的 `docs/EvidRank_evolve/<VERSION>_summary.md`
 
 启动 prompt 的核心要求是：只允许用 label / injection 做离线 false case 分析，不允许把它们读入算法；任何算法改动都必须能解释为跨微服务系统通用的 RCA 机制。
+
+额外要求：验证算法需要较长时间是完全可以接受的。目标是通过最终 ACC 提升算法质量，而非缩短开发验证周期。不要因为全量 eval 运行慢就中止实验、跳过验证或改用已有输出做"快速分析"——这种做法可能导致真正能涨点的优化方向没有得到充分验证。例如，以下行为是被禁止的："这次离线脚本是顺序读全量 parquet，速度太慢，不适合拿来做快速研究。我会停掉这个当前启动的实验，改用已有 V2 输出和更小的抽样/并行分析来收敛候选信号。"
 
 ### False Case 研究 Prompt
 

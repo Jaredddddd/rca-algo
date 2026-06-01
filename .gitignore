@@ -6,6 +6,10 @@ data
 data_csv
 !algorithms/diagfusion/src/diagfusion/data
 
+
+output/rcabench-platform-v2/evolve_reports
+output/rcabench-platform-v2/evolve_snapshots
+
 output.venv
 .cache
 *.ckpt

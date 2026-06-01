@@ -42,4 +42,4 @@ uv run --package evidencerank python VibeResearchTools/evidrank_lab.py summarize
 uv run --package evidencerank python VibeResearchTools/evidrank_lab.py compare --old V1 --new V2 --algorithm evidencerank --dataset rcabench
 ```
 
-注意：`labels.csv` 和 `injection.json` 只能用于离线分析和文档，不能进入算法运行路径。
+注意：`labels.csv` 和 `injection.json` 只能用于离线分析和文档，不能进入算法运行路径。`conclusion.parquet` 不要使用，包括离线分析和算法实现。

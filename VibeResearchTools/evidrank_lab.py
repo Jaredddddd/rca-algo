@@ -856,6 +856,8 @@ def _service_counts(df: pd.DataFrame) -> str:
 def _input_file_summary(case_dir: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for path in sorted(case_dir.glob("*.parquet")):
+        if path.name == "conclusion.parquet":
+            continue
         try:
             df = pd.read_parquet(path)
         except Exception as exc:  # noqa: BLE001 - report bad input files.
@@ -982,7 +984,10 @@ def cmd_guard(args: argparse.Namespace) -> None:
         ),
         (
             "HIGH",
-            re.compile(r"labels\.csv|injection\.json|ground[_ -]?truth|gt\.name", re.I),
+            re.compile(
+                r"labels\.csv|injection\.json|conclusion\.parquet|ground[_ -]?truth|gt\.name",
+                re.I,
+            ),
             "label leakage",
         ),
         (
