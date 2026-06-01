@@ -604,7 +604,7 @@ uv run --package evidencerank python algorithms/evidencerank/main.py \
   -a evidencerank_metric_log \
   -a evidencerank_metric_trace \
   -a evidencerank_log_trace \
-  -d rcabench --clear --use-cpus 32
+  -d rcabench --clear --use-cpus 45
 ```
 
 ### HeroSAS
