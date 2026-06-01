@@ -4,6 +4,11 @@
 
 用法:
     python scripts/combined_report.py [dataset] [--sort-by COLUMN] [--desc]
+    # 按 AC@1 排序
+    uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
+
+    # 升序
+    uv run --package baro python scripts/combined_report.py rcabench --asc
 
 读取 output/rcabench-platform-v2/data/{dataset}/*/output.parquet 下所有算法的结果，
 计算统一指标，输出一张包含全部算法的汇总表。
@@ -11,6 +16,10 @@
 import argparse
 import sys
 from pathlib import Path
+
+# 修复 rcabench_platform MRR 计算缺陷（未命中查询被排除导致分数虚高）
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import patches.rcabench_mrr_fix  # noqa: F401
 
 import polars as pl
 

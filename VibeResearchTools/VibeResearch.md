@@ -142,3 +142,47 @@ _Last refreshed: 2026-06-01T15:43:53+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V3_vs_V4` |
 
 <!-- VIBE-INDEX:END -->
+
+
+# Next Step
+
+V4 之后给出的建议：
+
+下一步最有希望继续冲 AC@1 的方向是：从 raw traces/logs 重构 endpoint-level 的 path/method/status/body/error shift 信号，做 confidence gating 和拓扑抑制；仍然不直接使用 conclusion.parquet。
+
+
+
+已完成一轮到 V4 的迭代，当前接受版本是 **V4**。
+
+核心代码改动在 [algorithm.py](/home/ljw/paper/aegis/rca-algo-contrib/algorithms/evidencerank/src/evidencerank/algorithm.py:57)：
+
+- V2: 非有限/缺失特征按“该特征无证据”处理，避免一个 NaN 抹掉整个服务分数。
+- V3: 加入通用 feature-family weights，降低 metric/log 量纲支配，提高 row coverage 支持。
+- V4: 不再把 topology degree 作为正/负硬证据，改成 trace 方向上的 `5%` 上游调用方上下文传递，见 [algorithm.py](/home/ljw/paper/aegis/rca-algo-contrib/algorithms/evidencerank/src/evidencerank/algorithm.py:340) 和 [algorithm.py](/home/ljw/paper/aegis/rca-algo-contrib/algorithms/evidencerank/src/evidencerank/algorithm.py:359)。
+
+没有在算法里读取 `labels.csv`、`injection.json`、`output`、perf report 或 `conclusion.parquet`；也没有加入 datapack/service/fault hardcode。`rg` 检查算法文件没有 `conclusion/labels/injection/ground/datapack` 命中。
+
+**指标进展**
+
+| version | AC@1 | MRR | AC@3 | AC@5 | error |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| V1 baseline | 0.530239 | 0.679202 | 0.778481 | 0.877637 | 0 |
+| V2 | 0.531646 | 0.684448 | 0.786920 | 0.886779 | 0 |
+| V3 | 0.559072 | 0.698007 | 0.789030 | 0.888186 | 0 |
+| V4 accepted | 0.571730 | 0.706323 | 0.791139 | 0.888889 | 0 |
+
+V4 相比 V1：AC@1 从 `754/1422` 到 `813/1422`，净增 59 个 Hit@1。还没达到你希望的 65-70%，但已经是一个干净、可解释、全指标正向的版本。
+
+**验证完成**
+
+- `python -m compileall algorithms/evidencerank/src/evidencerank`
+- `uv run --package evidencerank python VibeResearchTools/evidrank_lab.py guard`
+  - 无 high-risk，仅有原有 medium 提示。
+- full eval：1422/1422，`error=0`
+- snapshot/summary/compare 已生成：
+  - [V4_iteration.md](/home/ljw/paper/aegis/rca-algo-contrib/docs/EvidRank_evolve/V4_iteration.md)
+  - [V4_summary.md](/home/ljw/paper/aegis/rca-algo-contrib/docs/EvidRank_evolve/V4_summary.md)
+  - [compare_V3_vs_V4.md](/home/ljw/paper/aegis/rca-algo-contrib/docs/EvidRank_evolve/compare_V3_vs_V4.md)
+- VibeResearch 索引已刷新。
+
+下一步最有希望继续冲 AC@1 的方向是：从 raw traces/logs 重构 endpoint-level 的 path/method/status/body/error shift 信号，做 confidence gating 和拓扑抑制；仍然不直接使用 `conclusion.parquet`。

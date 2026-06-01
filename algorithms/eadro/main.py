@@ -1,4 +1,9 @@
-from rcabench_platform.v2.cli.main import main
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
+from patches.rcabench_cli import main
 from rcabench_platform.v2.algorithms.spec import (
     global_algorithm_registry,
     Algorithm,
