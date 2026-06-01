@@ -87,13 +87,52 @@ Use the following prompt to start an analysis-focused LLM or coding agent for Ev
 - improved / regressed case 已在 docs/EvidRank_evolve 中记录；
 - VibeResearchTools/VibeResearch.md 索引已刷新。
 
-现在初始evidencerank的结果如下，我希望最终evidencerank的AC@1能至少达到 65-70%
+现在经过之前优化到 V4 的结果如下，我希望最终evidencerank的AC@1能至少达到 65-70%
 
-
-┌───────────────────────────┬───────┬───────┬─────────────────────┬──────────┬────────────┬────────────┬────────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
 │ algorithm                 ┆ total ┆ error ┆ runtime.seconds:avg ┆      MRR ┆ AC@1.count ┆ AC@3.count ┆ AC@5.count ┆     AC@1 ┆     AC@3 ┆     AC@5 ┆    Avg@3 ┆    Avg@5 │
-│ evidencerank              ┆ 1,422 ┆     0 ┆            8.669303 ┆ 0.679202 ┆      754.0 ┆    1,107.0 ┆    1,248.0 ┆ 0.530239 ┆ 0.778481 ┆ 0.877637 ┆ 0.673465 ┆ 0.746835 │
-│ microrca                  ┆ 1,422 ┆     0 ┆           24.493223 ┆ 0.674339 ┆      750.0 ┆      853.0 ┆    1,011.0 ┆ 0.527426 ┆ 0.599859 ┆  0.71097 ┆ 0.566104 ┆ 0.619831 │
+│ evidencerank              ┆ 1,422 ┆     0 ┆            7.365646 ┆ 0.706323 ┆      813.0 ┆    1,125.0 ┆    1,264.0 ┆  0.57173 ┆ 0.791139 ┆ 0.888889 ┆ 0.696906 ┆ 0.764135 │
+│ microrca                  ┆ 1,422 ┆     0 ┆           24.493223 ┆ 0.609371 ┆      750.0 ┆      853.0 ┆    1,011.0 ┆ 0.527426 ┆ 0.599859 ┆  0.71097 ┆ 0.566104 ┆ 0.619831 │
+
+我的小建议：其实可以集各家之所长，来把优点融合到 EvidRank 中，例如分析为什么现在 MircoHECL对的都在 AC@1 ，从而看有什么事可以应用到 EvidRank的
+
+V4 之后给出的建议：
+
+下一步最有希望继续冲 AC@1 的方向是：从 raw traces/logs 重构 endpoint-level 的 path/method/status/body/error shift 信号，做 confidence gating 和拓扑抑制；仍然不直接使用 conclusion.parquet。
+
+已完成一轮到 V4 的迭代，当前接受版本是 **V4**。
+
+核心代码改动在 [algorithm.py](/home/ljw/paper/aegis/rca-algo-contrib/algorithms/evidencerank/src/evidencerank/algorithm.py:57)：
+
+- V2: 非有限/缺失特征按“该特征无证据”处理，避免一个 NaN 抹掉整个服务分数。
+- V3: 加入通用 feature-family weights，降低 metric/log 量纲支配，提高 row coverage 支持。
+- V4: 不再把 topology degree 作为正/负硬证据，改成 trace 方向上的 `5%` 上游调用方上下文传递，见 [algorithm.py](/home/ljw/paper/aegis/rca-algo-contrib/algorithms/evidencerank/src/evidencerank/algorithm.py:340) 和 [algorithm.py](/home/ljw/paper/aegis/rca-algo-contrib/algorithms/evidencerank/src/evidencerank/algorithm.py:359)。
+
+没有在算法里读取 `labels.csv`、`injection.json`、`output`、perf report 或 `conclusion.parquet`；也没有加入 datapack/service/fault hardcode。`rg` 检查算法文件没有 `conclusion/labels/injection/ground/datapack` 命中。
+
+**指标进展**
+
+| version | AC@1 | MRR | AC@3 | AC@5 | error |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| V1 baseline | 0.530239 | 0.679202 | 0.778481 | 0.877637 | 0 |
+| V2 | 0.531646 | 0.684448 | 0.786920 | 0.886779 | 0 |
+| V3 | 0.559072 | 0.698007 | 0.789030 | 0.888186 | 0 |
+| V4 accepted | 0.571730 | 0.706323 | 0.791139 | 0.888889 | 0 |
+
+V4 相比 V1：AC@1 从 `754/1422` 到 `813/1422`，净增 59 个 Hit@1。还没达到你希望的 65-70%，但已经是一个干净、可解释、全指标正向的版本。
+
+**验证完成**
+
+- `python -m compileall algorithms/evidencerank/src/evidencerank`
+- `uv run --package evidencerank python VibeResearchTools/evidrank_lab.py guard`
+  - 无 high-risk，仅有原有 medium 提示。
+- full eval：1422/1422，`error=0`
+- snapshot/summary/compare 已生成：
+  - [V4_iteration.md](/home/ljw/paper/aegis/rca-algo-contrib/docs/EvidRank_evolve/V4_iteration.md)
+  - [V4_summary.md](/home/ljw/paper/aegis/rca-algo-contrib/docs/EvidRank_evolve/V4_summary.md)
+  - [compare_V3_vs_V4.md](/home/ljw/paper/aegis/rca-algo-contrib/docs/EvidRank_evolve/compare_V3_vs_V4.md)
+- VibeResearch 索引已刷新。
+
+
 
 ```
 
@@ -105,23 +144,26 @@ Use the following prompt to start an analysis-focused LLM or coding agent for Ev
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-01T15:43:53+08:00_
+_Last refreshed: 2026-06-01T21:03:58+08:00_
 
 ## EvidenceRank Document Index
 
 | type | document | updated |
 | --- | --- | --- |
-| guide | [docs/EvidRank_evolve/README.md](../docs/EvidRank_evolve/README.md) | 2026-06-01T14:12:37+08:00 |
-| summary | [docs/EvidRank_evolve/V1_summary.md](../docs/EvidRank_evolve/V1_summary.md) | 2026-06-01T14:00:24+08:00 |
-| iteration | [docs/EvidRank_evolve/V2_iteration.md](../docs/EvidRank_evolve/V2_iteration.md) | 2026-06-01T14:44:25+08:00 |
-| summary | [docs/EvidRank_evolve/V2_summary.md](../docs/EvidRank_evolve/V2_summary.md) | 2026-06-01T14:44:42+08:00 |
-| iteration | [docs/EvidRank_evolve/V3_iteration.md](../docs/EvidRank_evolve/V3_iteration.md) | 2026-06-01T15:31:50+08:00 |
-| summary | [docs/EvidRank_evolve/V3_summary.md](../docs/EvidRank_evolve/V3_summary.md) | 2026-06-01T15:32:07+08:00 |
-| iteration | [docs/EvidRank_evolve/V4_iteration.md](../docs/EvidRank_evolve/V4_iteration.md) | 2026-06-01T15:42:52+08:00 |
-| summary | [docs/EvidRank_evolve/V4_summary.md](../docs/EvidRank_evolve/V4_summary.md) | 2026-06-01T15:43:16+08:00 |
-| compare | [docs/EvidRank_evolve/compare_V1_vs_V2.md](../docs/EvidRank_evolve/compare_V1_vs_V2.md) | 2026-06-01T14:44:36+08:00 |
-| compare | [docs/EvidRank_evolve/compare_V2_vs_V3.md](../docs/EvidRank_evolve/compare_V2_vs_V3.md) | 2026-06-01T15:31:59+08:00 |
-| compare | [docs/EvidRank_evolve/compare_V3_vs_V4.md](../docs/EvidRank_evolve/compare_V3_vs_V4.md) | 2026-06-01T15:43:06+08:00 |
+| guide | [docs/EvidRank_evolve/README.md](../docs/EvidRank_evolve/README.md) | 2026-06-01T18:29:32+08:00 |
+| summary | [docs/EvidRank_evolve/V1_summary.md](../docs/EvidRank_evolve/V1_summary.md) | 2026-06-01T18:29:32+08:00 |
+| iteration | [docs/EvidRank_evolve/V2_iteration.md](../docs/EvidRank_evolve/V2_iteration.md) | 2026-06-01T18:29:32+08:00 |
+| summary | [docs/EvidRank_evolve/V2_summary.md](../docs/EvidRank_evolve/V2_summary.md) | 2026-06-01T18:29:32+08:00 |
+| iteration | [docs/EvidRank_evolve/V3_iteration.md](../docs/EvidRank_evolve/V3_iteration.md) | 2026-06-01T18:29:32+08:00 |
+| summary | [docs/EvidRank_evolve/V3_summary.md](../docs/EvidRank_evolve/V3_summary.md) | 2026-06-01T18:29:32+08:00 |
+| iteration | [docs/EvidRank_evolve/V4_iteration.md](../docs/EvidRank_evolve/V4_iteration.md) | 2026-06-01T18:29:32+08:00 |
+| summary | [docs/EvidRank_evolve/V4_summary.md](../docs/EvidRank_evolve/V4_summary.md) | 2026-06-01T18:29:32+08:00 |
+| iteration | [docs/EvidRank_evolve/V5_iteration.md](../docs/EvidRank_evolve/V5_iteration.md) | 2026-06-01T21:03:28+08:00 |
+| summary | [docs/EvidRank_evolve/V5_summary.md](../docs/EvidRank_evolve/V5_summary.md) | 2026-06-01T21:03:40+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V1_vs_V2.md](../docs/EvidRank_evolve/compare_V1_vs_V2.md) | 2026-06-01T18:29:32+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V2_vs_V3.md](../docs/EvidRank_evolve/compare_V2_vs_V3.md) | 2026-06-01T18:29:32+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V3_vs_V4.md](../docs/EvidRank_evolve/compare_V3_vs_V4.md) | 2026-06-01T18:29:32+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V4_vs_V5.md](../docs/EvidRank_evolve/compare_V4_vs_V5.md) | 2026-06-01T21:03:50+08:00 |
 
 ## Versioned Artifacts
 
@@ -131,26 +173,28 @@ _Last refreshed: 2026-06-01T15:43:53+08:00_
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V2` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V3` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V4` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V5` |
 | report | `output/rcabench-platform-v2/evolve_reports/V1` |
 | report | `output/rcabench-platform-v2/evolve_reports/V2` |
 | report | `output/rcabench-platform-v2/evolve_reports/V3` |
 | report | `output/rcabench-platform-v2/evolve_reports/V3_research` |
 | report | `output/rcabench-platform-v2/evolve_reports/V4` |
 | report | `output/rcabench-platform-v2/evolve_reports/V4_research` |
+| report | `output/rcabench-platform-v2/evolve_reports/V5` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V1_vs_V2` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V2_vs_V3` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V3_vs_V4` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V4_vs_V5` |
 
 <!-- VIBE-INDEX:END -->
 
-
 # Next Step
+
+我的小建议：其实可以集各家之所长，来把优点融合到 EvidRank 中，例如分析为什么现在 MircoHECL对的都在 AC@1 ，从而看有什么事可以应用到 EvidRank的
 
 V4 之后给出的建议：
 
 下一步最有希望继续冲 AC@1 的方向是：从 raw traces/logs 重构 endpoint-level 的 path/method/status/body/error shift 信号，做 confidence gating 和拓扑抑制；仍然不直接使用 conclusion.parquet。
-
-
 
 已完成一轮到 V4 的迭代，当前接受版本是 **V4**。
 

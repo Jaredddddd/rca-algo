@@ -26,6 +26,7 @@ BASE_FEATURE_NAMES = (
     "trace_duration_delta",
     "trace_count_delta",
     "trace_error_rate",
+    "trace_status_code_shift",
     "log_count_delta",
     "log_error_rate",
     "log_template_delta",
@@ -44,7 +45,7 @@ MODALITY_FEATURES = {
     }),
     "trace": frozenset({
         "trace_duration_z", "trace_duration_delta", "trace_count_delta",
-        "trace_error_rate", "abnormal_trace_rows",
+        "trace_error_rate", "trace_status_code_shift", "abnormal_trace_rows",
         "topology_in_degree", "topology_out_degree",
     }),
     "log": frozenset({
@@ -63,6 +64,7 @@ FEATURE_WEIGHTS = {
     "trace_duration_delta": 1.0,
     "trace_count_delta": 1.0,
     "trace_error_rate": 1.0,
+    "trace_status_code_shift": 16.0,
     "log_count_delta": 0.75,
     "log_error_rate": 0.75,
     "log_template_delta": 0.75,
@@ -187,6 +189,67 @@ def _trace_edges(df: pd.DataFrame) -> list[tuple[str, str]]:
     return edges
 
 
+def _distribution_shift_by_service(
+    normal: pd.DataFrame,
+    abnormal: pd.DataFrame,
+    key_columns: list[str],
+) -> dict[str, float]:
+    key_columns = [
+        column for column in key_columns
+        if column in normal.columns or column in abnormal.columns
+    ]
+    if not key_columns or normal.empty or abnormal.empty:
+        return {}
+
+    counts_by_phase = {}
+    totals_by_phase = {}
+    for phase, frame in (("normal", normal), ("abnormal", abnormal)):
+        columns = ["service_name"] + [column for column in key_columns if column in frame.columns]
+        data = frame[columns].copy()
+        data = data.dropna(subset=["service_name"])
+        if data.empty:
+            return {}
+        for column in key_columns:
+            if column not in data.columns:
+                data[column] = "<missing>"
+            data[column] = data[column].astype("string").fillna("<missing>")
+        counts_by_phase[phase] = data.groupby(["service_name"] + key_columns, dropna=False).size()
+        totals_by_phase[phase] = data.groupby("service_name", dropna=False).size()
+
+    counts = pd.concat(
+        [
+            counts_by_phase["normal"].rename("normal"),
+            counts_by_phase["abnormal"].rename("abnormal"),
+        ],
+        axis=1,
+    ).fillna(0.0)
+    services = counts.index.get_level_values("service_name")
+    normal_totals = services.map(totals_by_phase["normal"]).astype(float)
+    abnormal_totals = services.map(totals_by_phase["abnormal"]).astype(float)
+    enough_samples = (normal_totals >= 5.0) & (abnormal_totals >= 5.0)
+    if not enough_samples.any():
+        return {}
+
+    counts = counts.loc[enough_samples]
+    services = counts.index.get_level_values("service_name")
+    normal_totals = services.map(totals_by_phase["normal"]).astype(float)
+    abnormal_totals = services.map(totals_by_phase["abnormal"]).astype(float)
+    normal_share = counts["normal"].to_numpy(dtype=np.float64) / normal_totals
+    abnormal_share = counts["abnormal"].to_numpy(dtype=np.float64) / abnormal_totals
+    diffs = pd.DataFrame({
+        "service_name": services,
+        "absdiff": np.abs(abnormal_share - normal_share),
+    })
+    shifts = diffs.groupby("service_name")["absdiff"].sum() / 2.0
+    return {
+        str(service): float(shift) * math.log1p(min(
+            float(totals_by_phase["normal"].get(service, 0.0)),
+            float(totals_by_phase["abnormal"].get(service, 0.0)),
+        ))
+        for service, shift in shifts.items()
+    }
+
+
 def _trace_features(
     normal_df: pd.DataFrame,
     abnormal_df: pd.DataFrame,
@@ -220,11 +283,31 @@ def _trace_features(
     normal_counts = normal.groupby("service_name").size()
     abnormal_counts = abnormal.groupby("service_name").size()
     status_cols = [col for col in ("status_code", "http.status_code", "status") if col in abnormal.columns]
+    trace_status_cols = [
+        col for col in (
+            "attr.http.response.status_code",
+            "http.status_code",
+            "status_code",
+            "attr.status_code",
+            "status",
+        )
+        if col in normal.columns or col in abnormal.columns
+    ]
+    status_shift = {}
+    if trace_status_cols:
+        endpoint_shift = _distribution_shift_by_service(normal, abnormal, ["span_name"])
+        status_key_columns = ["span_name", *trace_status_cols]
+        full_status_shift = _distribution_shift_by_service(normal, abnormal, status_key_columns)
+        status_shift = {
+            service: max(0.0, value - endpoint_shift.get(service, 0.0))
+            for service, value in full_status_shift.items()
+        }
     for service in services:
         normal_count = float(normal_counts.get(service, 0.0))
         abnormal_count = float(abnormal_counts.get(service, 0.0))
         features[service]["trace_count_delta"] = abs(abnormal_count - normal_count)
         features[service]["abnormal_trace_rows"] = max(features[service]["abnormal_trace_rows"], abnormal_count)
+        features[service]["trace_status_code_shift"] = status_shift.get(service, 0.0)
         if status_cols:
             status = abnormal.loc[abnormal["service_name"] == service, status_cols[0]].astype(str).str.lower()
             features[service]["trace_error_rate"] = float(status.str.contains("error|fail|5\\d\\d|true").mean() or 0.0)
