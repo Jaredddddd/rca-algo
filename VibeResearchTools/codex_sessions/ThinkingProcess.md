@@ -3,3 +3,6 @@
 
 # V4到V5的思考过程
 ![alt text](V4_V5.png)
+
+# V5到V6的思考过程
+![alt text](V5_V6.png)

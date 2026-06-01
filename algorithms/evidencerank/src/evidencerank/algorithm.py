@@ -25,8 +25,10 @@ BASE_FEATURE_NAMES = (
     "trace_duration_z",
     "trace_duration_delta",
     "trace_count_delta",
+    "trace_count_rise_shift",
     "trace_error_rate",
     "trace_status_code_shift",
+    "trace_self_duration_relative_shift",
     "log_count_delta",
     "log_error_rate",
     "log_template_delta",
@@ -45,7 +47,8 @@ MODALITY_FEATURES = {
     }),
     "trace": frozenset({
         "trace_duration_z", "trace_duration_delta", "trace_count_delta",
-        "trace_error_rate", "trace_status_code_shift", "abnormal_trace_rows",
+        "trace_count_rise_shift", "trace_error_rate", "trace_status_code_shift",
+        "trace_self_duration_relative_shift", "abnormal_trace_rows",
         "topology_in_degree", "topology_out_degree",
     }),
     "log": frozenset({
@@ -63,8 +66,10 @@ FEATURE_WEIGHTS = {
     "trace_duration_z": 1.0,
     "trace_duration_delta": 1.0,
     "trace_count_delta": 1.0,
+    "trace_count_rise_shift": 6.0,
     "trace_error_rate": 1.0,
     "trace_status_code_shift": 16.0,
+    "trace_self_duration_relative_shift": 1.5,
     "log_count_delta": 0.75,
     "log_error_rate": 0.75,
     "log_template_delta": 0.75,
@@ -250,6 +255,90 @@ def _distribution_shift_by_service(
     }
 
 
+def _trace_self_duration_stats(df: pd.DataFrame) -> dict[str, tuple[float, float]]:
+    required_columns = {"trace_id", "span_id", "parent_span_id", "service_name", "duration", "time"}
+    if df.empty or not required_columns.issubset(df.columns):
+        return {}
+
+    data = df[list(required_columns)].copy()
+    data["service_name"] = _series_service(data)
+    data = data.dropna(subset=["trace_id", "span_id", "service_name", "duration", "time"])
+    if data.empty:
+        return {}
+
+    times = pd.to_datetime(data["time"], utc=True, errors="coerce")
+    data = data.loc[times.notna()].copy()
+    if data.empty:
+        return {}
+
+    durations = pd.to_numeric(data["duration"], errors="coerce")
+    data = data.loc[durations.notna()].copy()
+    if data.empty:
+        return {}
+
+    times = times.loc[data.index]
+    durations = durations.loc[data.index].astype("float64").clip(lower=0.0)
+    data["_start"] = times.astype("int64").astype("float64")
+    data["_duration"] = durations
+    data["_end"] = data["_start"] + data["_duration"]
+
+    parent_bounds = {
+        (trace_id, span_id): (float(start), float(end))
+        for trace_id, span_id, start, end in data[["trace_id", "span_id", "_start", "_end"]].itertuples(
+            index=False,
+            name=None,
+        )
+    }
+    child_intervals: dict[tuple[Any, Any], list[tuple[float, float]]] = defaultdict(list)
+    for trace_id, parent_span_id, child_start, child_end in data[
+        ["trace_id", "parent_span_id", "_start", "_end"]
+    ].itertuples(index=False, name=None):
+        parent_id = _clean_service(parent_span_id)
+        if parent_id is None:
+            continue
+        parent_key = (trace_id, parent_id)
+        parent_window = parent_bounds.get(parent_key)
+        if parent_window is None:
+            continue
+        start = max(float(child_start), parent_window[0])
+        end = min(float(child_end), parent_window[1])
+        if end > start:
+            child_intervals[parent_key].append((start, end))
+
+    covered_by_parent: dict[tuple[Any, Any], float] = {}
+    for parent_key, intervals in child_intervals.items():
+        intervals.sort()
+        total = 0.0
+        current_start: float | None = None
+        current_end: float | None = None
+        for start, end in intervals:
+            if current_start is None or current_end is None:
+                current_start, current_end = start, end
+            elif start <= current_end:
+                current_end = max(current_end, end)
+            else:
+                total += current_end - current_start
+                current_start, current_end = start, end
+        if current_start is not None and current_end is not None:
+            total += current_end - current_start
+        covered_by_parent[parent_key] = total
+
+    self_durations = []
+    for trace_id, span_id, duration in data[["trace_id", "span_id", "_duration"]].itertuples(
+        index=False,
+        name=None,
+    ):
+        child_covered = min(float(duration), covered_by_parent.get((trace_id, span_id), 0.0))
+        self_durations.append(max(0.0, float(duration) - child_covered))
+
+    data["_self_duration"] = self_durations
+    stats = data.groupby("service_name")["_self_duration"].agg(["mean", "count"])
+    return {
+        str(service): (float(row["mean"]), float(row["count"]))
+        for service, row in stats.iterrows()
+    }
+
+
 def _trace_features(
     normal_df: pd.DataFrame,
     abnormal_df: pd.DataFrame,
@@ -282,6 +371,8 @@ def _trace_features(
             features[service]["abnormal_trace_rows"] = float(row["count"])
     normal_counts = normal.groupby("service_name").size()
     abnormal_counts = abnormal.groupby("service_name").size()
+    normal_self_duration = _trace_self_duration_stats(normal)
+    abnormal_self_duration = _trace_self_duration_stats(abnormal)
     status_cols = [col for col in ("status_code", "http.status_code", "status") if col in abnormal.columns]
     trace_status_cols = [
         col for col in (
@@ -306,8 +397,22 @@ def _trace_features(
         normal_count = float(normal_counts.get(service, 0.0))
         abnormal_count = float(abnormal_counts.get(service, 0.0))
         features[service]["trace_count_delta"] = abs(abnormal_count - normal_count)
+        features[service]["trace_count_rise_shift"] = (
+            max(0.0, abnormal_count - normal_count)
+            / max(abnormal_count, 1.0)
+            * math.log1p(abnormal_count)
+        )
         features[service]["abnormal_trace_rows"] = max(features[service]["abnormal_trace_rows"], abnormal_count)
         features[service]["trace_status_code_shift"] = status_shift.get(service, 0.0)
+        normal_self_mean, normal_self_count = normal_self_duration.get(service, (0.0, 0.0))
+        abnormal_self_mean, abnormal_self_count = abnormal_self_duration.get(service, (0.0, 0.0))
+        sample_count = min(normal_self_count, abnormal_self_count)
+        if sample_count >= 5.0:
+            features[service]["trace_self_duration_relative_shift"] = (
+                max(0.0, abnormal_self_mean - normal_self_mean)
+                / (abs(normal_self_mean) + 1.0)
+                * math.log1p(sample_count)
+            )
         if status_cols:
             status = abnormal.loc[abnormal["service_name"] == service, status_cols[0]].astype(str).str.lower()
             features[service]["trace_error_rate"] = float(status.str.contains("error|fail|5\\d\\d|true").mean() or 0.0)
