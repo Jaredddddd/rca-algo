@@ -9,7 +9,14 @@
     from patches.rcabench_cli import main
 
 这样可以确保 uv run --package <algo> 的子环境中也能找到 patches 包。
+
+日志级别控制：
+    默认 WARNING，仅保留 tqdm 进度条。设置 LOGURU_LEVEL=DEBUG/INFO 可按需开启日志。
 """
+
+import os
+
+os.environ.setdefault("LOGURU_LEVEL", "WARNING")
 
 import patches.rcabench_mrr_fix  # noqa: F401 — 应用 MRR 计算修复
 
