@@ -22,10 +22,12 @@ BASE_FEATURE_NAMES = (
     "metric_mean_z",
     "metric_anomaly_count",
     "metric_value_delta",
+    "metric_count_drop_shift",
     "trace_duration_z",
     "trace_duration_delta",
     "trace_count_delta",
     "trace_count_rise_shift",
+    "trace_count_drop_shift",
     "trace_endpoint_shift",
     "trace_error_rate",
     "trace_status_code_shift",
@@ -44,12 +46,12 @@ LOG_ERROR_KEYWORDS = ["error", "exception", "fail", "timeout", "critical", "fata
 MODALITY_FEATURES = {
     "metric": frozenset({
         "metric_max_z", "metric_mean_z", "metric_anomaly_count",
-        "metric_value_delta", "abnormal_metric_rows",
+        "metric_value_delta", "metric_count_drop_shift", "abnormal_metric_rows",
     }),
     "trace": frozenset({
         "trace_duration_z", "trace_duration_delta", "trace_count_delta",
-        "trace_count_rise_shift", "trace_endpoint_shift", "trace_error_rate",
-        "trace_status_code_shift", "trace_self_duration_relative_shift", "abnormal_trace_rows",
+        "trace_count_rise_shift", "trace_count_drop_shift", "trace_endpoint_shift",
+        "trace_error_rate", "trace_status_code_shift", "trace_self_duration_relative_shift", "abnormal_trace_rows",
         "topology_in_degree", "topology_out_degree",
     }),
     "log": frozenset({
@@ -64,10 +66,12 @@ FEATURE_WEIGHTS = {
     "metric_mean_z": 0.75,
     "metric_anomaly_count": 0.75,
     "metric_value_delta": 0.75,
+    "metric_count_drop_shift": 10.0,
     "trace_duration_z": 1.0,
     "trace_duration_delta": 1.0,
     "trace_count_delta": 1.0,
     "trace_count_rise_shift": 6.0,
+    "trace_count_drop_shift": 0.85,
     "trace_endpoint_shift": 6.0,
     "trace_error_rate": 1.0,
     "trace_status_code_shift": 16.0,
@@ -85,6 +89,7 @@ PARENT_CONTEXT_WEIGHT = 0.05
 TRACE_ENDPOINT_SUPPORT_STATUS_FACTOR = 2.0
 TRACE_ENDPOINT_SUPPORT_RISE_FACTOR = 1.5
 TRACE_ENDPOINT_UNSUPPORTED_PENALTY = 0.5
+TRACE_ENDPOINT_POST_GATE_FACTOR = 1.75
 
 
 def _safe_read_parquet(path: Path) -> pd.DataFrame:
@@ -120,6 +125,15 @@ def _series_service(df: pd.DataFrame) -> pd.Series:
     return pd.Series([None] * len(df), index=df.index)
 
 
+def _count_drop_shift(normal_count: float, abnormal_count: float) -> float:
+    if normal_count < 5.0:
+        return 0.0
+    drop = max(0.0, normal_count - abnormal_count)
+    if drop <= 0.0:
+        return 0.0
+    return drop / max(normal_count, 1.0) * math.log1p(normal_count)
+
+
 def _collect_services(input_folder: Path) -> list[str]:
     services: set[str] = set()
     for name in (
@@ -144,7 +158,7 @@ def _metric_features(
     services: list[str],
 ) -> dict[str, dict[str, float]]:
     features = {service: defaultdict(float) for service in services}
-    if abnormal_df.empty or "value" not in abnormal_df.columns:
+    if normal_df.empty and abnormal_df.empty:
         return features
 
     normal = normal_df.copy()
@@ -153,6 +167,18 @@ def _metric_features(
     abnormal["service_name"] = _series_service(abnormal)
     normal = normal.dropna(subset=["service_name"])
     abnormal = abnormal.dropna(subset=["service_name"])
+    normal_counts = normal.groupby("service_name").size()
+    abnormal_counts = abnormal.groupby("service_name").size()
+    for service in services:
+        normal_count = float(normal_counts.get(service, 0.0))
+        abnormal_count = float(abnormal_counts.get(service, 0.0))
+        features[service]["metric_count_drop_shift"] = _count_drop_shift(normal_count, abnormal_count)
+        features[service]["abnormal_metric_rows"] = abnormal_count
+
+    if abnormal.empty or "value" not in abnormal.columns:
+        return features
+    if "value" not in normal.columns:
+        normal["value"] = np.nan
     if "metric" not in normal.columns:
         normal["metric"] = "value"
     if "metric" not in abnormal.columns:
@@ -351,7 +377,7 @@ def _trace_features(
 ) -> tuple[dict[str, dict[str, float]], list[tuple[str, str]]]:
     features = {service: defaultdict(float) for service in services}
     edges = _trace_edges(abnormal_df)
-    if abnormal_df.empty:
+    if normal_df.empty and abnormal_df.empty:
         return features, edges
 
     normal = normal_df.copy()
@@ -360,7 +386,7 @@ def _trace_features(
     abnormal["service_name"] = _series_service(abnormal)
     normal = normal.dropna(subset=["service_name"])
     abnormal = abnormal.dropna(subset=["service_name"])
-    duration_col = "duration" if "duration" in abnormal.columns else None
+    duration_col = "duration" if "duration" in normal.columns and "duration" in abnormal.columns else None
     if duration_col:
         normal_duration = normal.groupby("service_name")[duration_col].agg(["mean", "std", "count"])
         abnormal_duration = abnormal.groupby("service_name")[duration_col].agg(["mean", "count"])
@@ -407,6 +433,7 @@ def _trace_features(
             / max(abnormal_count, 1.0)
             * math.log1p(abnormal_count)
         )
+        features[service]["trace_count_drop_shift"] = _count_drop_shift(normal_count, abnormal_count)
         features[service]["abnormal_trace_rows"] = max(features[service]["abnormal_trace_rows"], abnormal_count)
         features[service]["trace_endpoint_shift"] = endpoint_shift.get(service, 0.0)
         features[service]["trace_status_code_shift"] = status_shift.get(service, 0.0)
@@ -572,14 +599,12 @@ def _apply_trace_endpoint_support_gate(
     supported_by_status = TRACE_ENDPOINT_SUPPORT_STATUS_FACTOR * weighted_matrix[:, status_idx]
     supported_by_rise = TRACE_ENDPOINT_SUPPORT_RISE_FACTOR * weighted_matrix[:, rise_idx]
     unsupported_endpoint = np.maximum(0.0, endpoint - supported_by_status - supported_by_rise)
-    if np.max(unsupported_endpoint, initial=0.0) <= 0.0:
-        return weighted_matrix
 
     adjusted = weighted_matrix.copy()
     adjusted[:, endpoint_idx] = np.maximum(
         0.0,
         endpoint - TRACE_ENDPOINT_UNSUPPORTED_PENALTY * unsupported_endpoint,
-    )
+    ) * TRACE_ENDPOINT_POST_GATE_FACTOR
     return adjusted
 
 
