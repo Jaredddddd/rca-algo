@@ -26,6 +26,7 @@ BASE_FEATURE_NAMES = (
     "trace_duration_delta",
     "trace_count_delta",
     "trace_count_rise_shift",
+    "trace_endpoint_shift",
     "trace_error_rate",
     "trace_status_code_shift",
     "trace_self_duration_relative_shift",
@@ -47,8 +48,8 @@ MODALITY_FEATURES = {
     }),
     "trace": frozenset({
         "trace_duration_z", "trace_duration_delta", "trace_count_delta",
-        "trace_count_rise_shift", "trace_error_rate", "trace_status_code_shift",
-        "trace_self_duration_relative_shift", "abnormal_trace_rows",
+        "trace_count_rise_shift", "trace_endpoint_shift", "trace_error_rate",
+        "trace_status_code_shift", "trace_self_duration_relative_shift", "abnormal_trace_rows",
         "topology_in_degree", "topology_out_degree",
     }),
     "log": frozenset({
@@ -67,6 +68,7 @@ FEATURE_WEIGHTS = {
     "trace_duration_delta": 1.0,
     "trace_count_delta": 1.0,
     "trace_count_rise_shift": 6.0,
+    "trace_endpoint_shift": 6.0,
     "trace_error_rate": 1.0,
     "trace_status_code_shift": 16.0,
     "trace_self_duration_relative_shift": 1.5,
@@ -80,6 +82,9 @@ FEATURE_WEIGHTS = {
 }
 
 PARENT_CONTEXT_WEIGHT = 0.05
+TRACE_ENDPOINT_SUPPORT_STATUS_FACTOR = 2.0
+TRACE_ENDPOINT_SUPPORT_RISE_FACTOR = 1.5
+TRACE_ENDPOINT_UNSUPPORTED_PENALTY = 0.5
 
 
 def _safe_read_parquet(path: Path) -> pd.DataFrame:
@@ -384,9 +389,9 @@ def _trace_features(
         )
         if col in normal.columns or col in abnormal.columns
     ]
+    endpoint_shift = _distribution_shift_by_service(normal, abnormal, ["span_name"])
     status_shift = {}
     if trace_status_cols:
-        endpoint_shift = _distribution_shift_by_service(normal, abnormal, ["span_name"])
         status_key_columns = ["span_name", *trace_status_cols]
         full_status_shift = _distribution_shift_by_service(normal, abnormal, status_key_columns)
         status_shift = {
@@ -403,6 +408,7 @@ def _trace_features(
             * math.log1p(abnormal_count)
         )
         features[service]["abnormal_trace_rows"] = max(features[service]["abnormal_trace_rows"], abnormal_count)
+        features[service]["trace_endpoint_shift"] = endpoint_shift.get(service, 0.0)
         features[service]["trace_status_code_shift"] = status_shift.get(service, 0.0)
         normal_self_mean, normal_self_count = normal_self_duration.get(service, (0.0, 0.0))
         abnormal_self_mean, abnormal_self_count = abnormal_self_duration.get(service, (0.0, 0.0))
@@ -528,6 +534,7 @@ def _build_feature_matrix(
 def _heuristic_scores(
     services: list[str],
     matrix: np.ndarray,
+    enabled_features: tuple[str, ...],
     feature_weights: np.ndarray | None = None,
     trace_edges: list[tuple[str, str]] | None = None,
     parent_context_weight: float = 0.0,
@@ -535,6 +542,7 @@ def _heuristic_scores(
     clean_matrix = np.nan_to_num(matrix, nan=0.0, posinf=0.0, neginf=0.0)
     if feature_weights is not None:
         clean_matrix = clean_matrix * feature_weights
+    clean_matrix = _apply_trace_endpoint_support_gate(enabled_features, clean_matrix)
     totals = clean_matrix.sum(axis=1)
     if trace_edges and parent_context_weight > 0.0:
         totals = _apply_parent_context(services, totals, trace_edges, parent_context_weight)
@@ -542,6 +550,37 @@ def _heuristic_scores(
     if max(cleaned, default=0.0) <= 0:
         return {service: 0.0 for service in services}
     return {service: cleaned[idx] for idx, service in enumerate(services)}
+
+
+def _apply_trace_endpoint_support_gate(
+    enabled_features: tuple[str, ...],
+    weighted_matrix: np.ndarray,
+) -> np.ndarray:
+    required = (
+        "trace_endpoint_shift",
+        "trace_status_code_shift",
+        "trace_count_rise_shift",
+    )
+    if not all(name in enabled_features for name in required):
+        return weighted_matrix
+
+    endpoint_idx = enabled_features.index("trace_endpoint_shift")
+    status_idx = enabled_features.index("trace_status_code_shift")
+    rise_idx = enabled_features.index("trace_count_rise_shift")
+
+    endpoint = weighted_matrix[:, endpoint_idx]
+    supported_by_status = TRACE_ENDPOINT_SUPPORT_STATUS_FACTOR * weighted_matrix[:, status_idx]
+    supported_by_rise = TRACE_ENDPOINT_SUPPORT_RISE_FACTOR * weighted_matrix[:, rise_idx]
+    unsupported_endpoint = np.maximum(0.0, endpoint - supported_by_status - supported_by_rise)
+    if np.max(unsupported_endpoint, initial=0.0) <= 0.0:
+        return weighted_matrix
+
+    adjusted = weighted_matrix.copy()
+    adjusted[:, endpoint_idx] = np.maximum(
+        0.0,
+        endpoint - TRACE_ENDPOINT_UNSUPPORTED_PENALTY * unsupported_endpoint,
+    )
+    return adjusted
 
 
 def _apply_parent_context(
@@ -600,6 +639,7 @@ class EvidenceRank(Algorithm):
         scores = _heuristic_scores(
             services,
             matrix,
+            self._enabled_features,
             self._feature_weights,
             trace_edges,
             self._parent_context_weight,

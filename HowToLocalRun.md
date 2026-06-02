@@ -14,6 +14,13 @@ uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
 uv run --package baro python scripts/combined_report.py rcabench --asc
 ```
 
+如果是希望打印output/rcabench-platform-v2/evolve_snapshots中的数据：
+
+```bash
+OUTPUT_ROOT=output/rcabench-platform-v2/evolve_snapshots/V7 \
+  uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
+```
+
 
 # How to Run RCA Algorithms Locally
 
