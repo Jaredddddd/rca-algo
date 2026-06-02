@@ -13,3 +13,6 @@
 
 # V8到V10的思考过程
 ![alt text](V8_V10.png)
+
+# V10到V11
+![alt text](V10_V11.png)

@@ -61,6 +61,15 @@ MODALITY_FEATURES = {
 
 ALL_MODALITIES = frozenset(MODALITY_FEATURES.keys())
 
+INPUT_FRAME_NAMES = (
+    "normal_metrics",
+    "abnormal_metrics",
+    "normal_traces",
+    "abnormal_traces",
+    "normal_logs",
+    "abnormal_logs",
+)
+
 FEATURE_WEIGHTS = {
     "metric_max_z": 0.75,
     "metric_mean_z": 0.75,
@@ -90,12 +99,22 @@ TRACE_ENDPOINT_SUPPORT_STATUS_FACTOR = 2.0
 TRACE_ENDPOINT_SUPPORT_RISE_FACTOR = 1.5
 TRACE_ENDPOINT_UNSUPPORTED_PENALTY = 0.5
 TRACE_ENDPOINT_POST_GATE_FACTOR = 1.75
+ADAPTIVE_MODALITY_SPAN = 0.08
+ADAPTIVE_MODALITY_MIN_FACTOR = 0.92
+ADAPTIVE_MODALITY_MAX_FACTOR = 1.08
 
 
 def _safe_read_parquet(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
     return pd.read_parquet(path)
+
+
+def _load_input_frames(input_folder: Path) -> dict[str, pd.DataFrame]:
+    return {
+        name: _safe_read_parquet(input_folder / f"{name}.parquet")
+        for name in INPUT_FRAME_NAMES
+    }
 
 
 def _clean_service(value: Any) -> str | None:
@@ -134,22 +153,18 @@ def _count_drop_shift(normal_count: float, abnormal_count: float) -> float:
     return drop / max(normal_count, 1.0) * math.log1p(normal_count)
 
 
-def _collect_services(input_folder: Path) -> list[str]:
+def _collect_services_from_frames(frames: dict[str, pd.DataFrame]) -> list[str]:
     services: set[str] = set()
-    for name in (
-        "normal_metrics.parquet",
-        "abnormal_metrics.parquet",
-        "normal_traces.parquet",
-        "abnormal_traces.parquet",
-        "normal_logs.parquet",
-        "abnormal_logs.parquet",
-    ):
-        df = _safe_read_parquet(input_folder / name)
+    for df in frames.values():
         if not df.empty:
             services.update(service for service in _series_service(df).dropna().unique())
             if "parent_service" in df.columns:
                 services.update(service for service in df["parent_service"].map(_clean_service).dropna().unique())
     return sorted(services)
+
+
+def _collect_services(input_folder: Path) -> list[str]:
+    return _collect_services_from_frames(_load_input_frames(input_folder))
 
 
 def _metric_features(
@@ -203,7 +218,7 @@ def _metric_features(
         count = features[service].pop("metric_count", 0.0)
         total = features[service].pop("metric_mean_z_sum", 0.0)
         features[service]["metric_mean_z"] = total / count if count else 0.0
-        features[service]["abnormal_metric_rows"] = float((abnormal["service_name"] == service).sum())
+        features[service]["abnormal_metric_rows"] = float(abnormal_counts.get(service, 0.0))
     return features
 
 
@@ -405,6 +420,11 @@ def _trace_features(
     normal_self_duration = _trace_self_duration_stats(normal)
     abnormal_self_duration = _trace_self_duration_stats(abnormal)
     status_cols = [col for col in ("status_code", "http.status_code", "status") if col in abnormal.columns]
+    status_error_rates = pd.Series(dtype="float64")
+    if status_cols:
+        status_text = abnormal[status_cols[0]].astype(str).str.lower()
+        is_error = status_text.str.contains("error|fail|5\\d\\d|true", regex=True)
+        status_error_rates = is_error.groupby(abnormal["service_name"]).mean()
     trace_status_cols = [
         col for col in (
             "attr.http.response.status_code",
@@ -447,8 +467,7 @@ def _trace_features(
                 * math.log1p(sample_count)
             )
         if status_cols:
-            status = abnormal.loc[abnormal["service_name"] == service, status_cols[0]].astype(str).str.lower()
-            features[service]["trace_error_rate"] = float(status.str.contains("error|fail|5\\d\\d|true").mean() or 0.0)
+            features[service]["trace_error_rate"] = float(status_error_rates.get(service, 0.0) or 0.0)
     return features, edges
 
 
@@ -487,12 +506,12 @@ def _log_features(
     abnormal_counts = abnormal.groupby("service_name").size()
     normal_templates = normal.groupby("service_name")["_template"].nunique()
     abnormal_templates = abnormal.groupby("service_name")["_template"].nunique()
+    log_error_rates = abnormal.groupby("service_name")["_is_error"].mean()
     for service in services:
         normal_count = float(normal_counts.get(service, 0.0))
         abnormal_count = float(abnormal_counts.get(service, 0.0))
-        rows = abnormal["service_name"] == service
         features[service]["log_count_delta"] = abs(abnormal_count - normal_count)
-        features[service]["log_error_rate"] = float(abnormal.loc[rows, "_is_error"].mean() or 0.0)
+        features[service]["log_error_rate"] = float(log_error_rates.get(service, 0.0) or 0.0)
         features[service]["log_template_delta"] = abs(
             float(abnormal_templates.get(service, 0.0)) - float(normal_templates.get(service, 0.0))
         )
@@ -520,22 +539,41 @@ def _finite_nonnegative(value: Any) -> float:
 
 
 def _build_feature_matrix(
-    input_folder: Path,
+    frames: dict[str, pd.DataFrame],
     services: list[str],
     enabled_features: tuple[str, ...],
+    enabled_modalities: frozenset[str] = ALL_MODALITIES,
     normalize: bool = True,
 ) -> tuple[np.ndarray, list[tuple[str, str]]]:
-    normal_metrics = _safe_read_parquet(input_folder / "normal_metrics.parquet")
-    abnormal_metrics = _safe_read_parquet(input_folder / "abnormal_metrics.parquet")
-    normal_traces = _safe_read_parquet(input_folder / "normal_traces.parquet")
-    abnormal_traces = _safe_read_parquet(input_folder / "abnormal_traces.parquet")
-    normal_logs = _safe_read_parquet(input_folder / "normal_logs.parquet")
-    abnormal_logs = _safe_read_parquet(input_folder / "abnormal_logs.parquet")
+    feature_maps: list[dict[str, dict[str, float]]] = []
+    trace_edges: list[tuple[str, str]] = []
+    empty = pd.DataFrame()
 
-    metric_map = _metric_features(normal_metrics, abnormal_metrics, services)
-    trace_map, trace_edges = _trace_features(normal_traces, abnormal_traces, services)
-    log_map = _log_features(normal_logs, abnormal_logs, services)
-    features_by_service = _merge_feature_maps(metric_map, trace_map, log_map)
+    if "metric" in enabled_modalities:
+        feature_maps.append(
+            _metric_features(
+                frames.get("normal_metrics", empty),
+                frames.get("abnormal_metrics", empty),
+                services,
+            )
+        )
+    if "trace" in enabled_modalities:
+        trace_map, trace_edges = _trace_features(
+            frames.get("normal_traces", empty),
+            frames.get("abnormal_traces", empty),
+            services,
+        )
+        feature_maps.append(trace_map)
+    if "log" in enabled_modalities:
+        feature_maps.append(
+            _log_features(
+                frames.get("normal_logs", empty),
+                frames.get("abnormal_logs", empty),
+                services,
+            )
+        )
+
+    features_by_service = _merge_feature_maps(*feature_maps)
 
     for source, target_service in trace_edges:
         if source in features_by_service:
@@ -556,6 +594,72 @@ def _build_feature_matrix(
         matrix[row_idx] = np.asarray(values, dtype=np.float32)
 
     return matrix, trace_edges
+
+
+def _modality_reliability(scores: np.ndarray) -> float | None:
+    positive = scores[np.isfinite(scores) & (scores > 0.0)]
+    if positive.size == 0:
+        return None
+
+    total = float(positive.sum())
+    if not math.isfinite(total) or total <= 0.0:
+        return None
+
+    if positive.size == 1:
+        concentration = 1.0
+    else:
+        probabilities = positive / total
+        entropy = -float(np.sum(probabilities * np.log(probabilities + 1e-12)))
+        concentration = 1.0 - entropy / math.log(float(positive.size))
+        concentration = min(1.0, max(0.0, concentration))
+
+    p95 = float(np.percentile(positive, 95))
+    median = float(np.median(positive))
+    contrast = (p95 - median) / (p95 + median + 1e-6)
+    contrast = min(1.0, max(0.0, contrast))
+    support = min(1.0, math.sqrt(float(positive.size) / 3.0))
+    return 0.45 * concentration + 0.35 * contrast + 0.20 * support
+
+
+def _adaptive_feature_weights(
+    matrix: np.ndarray,
+    enabled_features: tuple[str, ...],
+    base_weights: np.ndarray,
+) -> np.ndarray:
+    clean_matrix = np.nan_to_num(matrix, nan=0.0, posinf=0.0, neginf=0.0)
+    reliabilities: dict[str, float] = {}
+    modality_indices: dict[str, list[int]] = {}
+
+    for modality, feature_names in MODALITY_FEATURES.items():
+        indices = [
+            idx
+            for idx, name in enumerate(enabled_features)
+            if name in feature_names and base_weights[idx] > 0.0
+        ]
+        if not indices:
+            continue
+        modality_scores = (clean_matrix[:, indices] * base_weights[indices]).sum(axis=1)
+        reliability = _modality_reliability(modality_scores)
+        if reliability is None:
+            continue
+        reliabilities[modality] = reliability
+        modality_indices[modality] = indices
+
+    if len(reliabilities) < 2:
+        return base_weights
+
+    center = float(np.mean(list(reliabilities.values())))
+    adjusted = base_weights.astype(np.float32, copy=True)
+    for modality, reliability in reliabilities.items():
+        factor = 1.0 + ADAPTIVE_MODALITY_SPAN * (reliability - center)
+        factor = min(ADAPTIVE_MODALITY_MAX_FACTOR, max(ADAPTIVE_MODALITY_MIN_FACTOR, factor))
+        adjusted[modality_indices[modality]] = base_weights[modality_indices[modality]] * factor
+    return adjusted
+
+
+def _top_ranked_service(scores: dict[str, float]) -> str | None:
+    ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    return ranked[0][0] if ranked else None
 
 
 def _heuristic_scores(
@@ -656,11 +760,22 @@ class EvidenceRank(Algorithm):
     def __call__(self, args: AlgorithmArgs) -> list[AlgorithmAnswer]:
         input_folder = args.input_folder
 
-        services = _collect_services(input_folder)
+        frames = _load_input_frames(input_folder)
+        services = _collect_services_from_frames(frames)
         if not services:
             return []
 
-        matrix, trace_edges = _build_feature_matrix(input_folder, services, self._enabled_features)
+        matrix, trace_edges = _build_feature_matrix(
+            frames,
+            services,
+            self._enabled_features,
+            self._modalities,
+        )
+        feature_weights = _adaptive_feature_weights(
+            matrix,
+            self._enabled_features,
+            self._feature_weights,
+        )
         scores = _heuristic_scores(
             services,
             matrix,
@@ -669,6 +784,17 @@ class EvidenceRank(Algorithm):
             trace_edges,
             self._parent_context_weight,
         )
+        if not np.array_equal(feature_weights, self._feature_weights):
+            adaptive_scores = _heuristic_scores(
+                services,
+                matrix,
+                self._enabled_features,
+                feature_weights,
+                trace_edges,
+                self._parent_context_weight,
+            )
+            if _top_ranked_service(adaptive_scores) == _top_ranked_service(scores):
+                scores = adaptive_scores
         sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
 
         answers = [
