@@ -8,7 +8,7 @@ ln -s /mnt/jfs/rcabench-platform-v2 ./data/
 ```
 
 ```sh
-export LOGURU_LEVEL=INFO
+export LOGURU_LEVEL=WARNING
 uv run python main.py  eval batch -a nezha -d metis-ts --clear
 uv run python main.py  eval batch -a nezha -d metis-ob --clear
 uv run python main.py  eval perf-report metis-ts

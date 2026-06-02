@@ -382,4 +382,16 @@ guard 已通过：无 high-risk 过拟合告警；`algorithm.py` 没有残留实
 
 适用范围：所有尝试把固定 RCA 权重解释为“可由无标签数据自动形成”的实验。结论是形成权重的算法方向可行，但作为完全替代默认权重暂不可行；论文中应把它用于校准/正则化/消融，而不是声称单独的无标签学习已经达到 V11。
 
+### 无标签 family multiplier 是比 per-feature replacement 更稳的权重形成方式
+
+触发信号：V20 继续回应固定权重的鲁棒性/可迁移性质疑，不再让无标签目标自由学习每个 feature weight，而是以 V11 语义先验为中心，只学习 8 个 feature-family multiplier。
+
+根因 / 约束：完全无监督 individual-feature replacement 自由度太高，会把 synthetic objective 的偏好直接变成 per-feature 权重，导致 V19 类似的过度校准。family-level multiplier 把学习自由度降到语义组，并用窄边界和 L2 正则限制偏移，能保留 V11 的稳定语义，同时给权重来源一个可复现的无标签算法。
+
+正确做法：将在线算法表达为 `SEMANTIC_FEATURE_PRIOR * CALIBRATED_FAMILY_MULTIPLIERS`。离线校准脚本只能读取 raw incident frames 和拓扑，不能读取 label、injection、output、perf report 或 conclusion。接受前必须比较 V11/V20 和 V19/V20，而不是只看合成 pair accuracy。
+
+验证方式：V20 narrow calibration 使用 `center_l2=4.0`、multiplier bounds `0.92..1.08`；full eval 1422 case、error 0。相对 V11，AC@1 `0.802391 -> 0.789030`，MRR `0.875337 -> 0.869097`，AC@5 `0.975387 -> 0.976793`；相对 V19，AC@1 `0.658931 -> 0.789030`。guard 无 high-risk。
+
+适用范围：所有需要把 RCA 权重从“手工常数”转化为“可解释语义先验 + 无标签自动校准”的算法版本。该经验不证明完全无监督权重学习已经足够，而是支持把无标签学习限制在 family-level multiplier/regularizer。
+
 目前尝试自适应权重最好的是 V13 和 V19。

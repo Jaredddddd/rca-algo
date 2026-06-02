@@ -29,7 +29,7 @@
 ## Commands
 
 ```bash
-export LOGURU_LEVEL=INFO
+export LOGURU_LEVEL=WARNING
 python -m compileall algorithms/evidencerank/src/evidencerank
 uv run --package evidencerank python VibeResearchTools/evidrank_lab.py guard
 uv run --package evidencerank python algorithms/evidencerank/main.py eval batch -a evidencerank -d rcabench --clear --use-cpus 48

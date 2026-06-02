@@ -1,0 +1,314 @@
+{
+  "created": "2026-06-02T23:32:06+08:00",
+  "data_root": "data/rcabench-platform-v2/data/rcabench",
+  "diagnostics": {
+    "epoch_trace": [
+      {
+        "base_pair_accuracy": 0.7694700544582196,
+        "epoch": 1.0,
+        "max_abs_multiplier_delta": 0.08000000000000007,
+        "mean_loss": 4.0136174395840225,
+        "pair_accuracy": 0.7728249319835216,
+        "pairs": 116456.0
+      },
+      {
+        "base_pair_accuracy": 0.7709107161771896,
+        "epoch": 2.0,
+        "max_abs_multiplier_delta": 0.07999999999999996,
+        "mean_loss": 3.9980791443583983,
+        "pair_accuracy": 0.7740667748637516,
+        "pairs": 116393.0
+      },
+      {
+        "base_pair_accuracy": 0.771254139112409,
+        "epoch": 3.0,
+        "max_abs_multiplier_delta": 0.08000000000000007,
+        "mean_loss": 3.9750175491093187,
+        "pair_accuracy": 0.7743625978017542,
+        "pairs": 116049.0
+      },
+      {
+        "base_pair_accuracy": 0.777544624768849,
+        "epoch": 4.0,
+        "max_abs_multiplier_delta": 0.07999999999999996,
+        "mean_loss": 3.9393092042664617,
+        "pair_accuracy": 0.780306726083616,
+        "pairs": 115418.0
+      },
+      {
+        "base_pair_accuracy": 0.7760202393338584,
+        "epoch": 5.0,
+        "max_abs_multiplier_delta": 0.08000000000000007,
+        "mean_loss": 3.9221105279608826,
+        "pair_accuracy": 0.7790089404501092,
+        "pairs": 115542.0
+      },
+      {
+        "base_pair_accuracy": 0.7696301151021352,
+        "epoch": 6.0,
+        "max_abs_multiplier_delta": 0.07999999999999996,
+        "mean_loss": 4.025448203032404,
+        "pair_accuracy": 0.7728527926551005,
+        "pairs": 115949.0
+      },
+      {
+        "base_pair_accuracy": 0.7692902195762695,
+        "epoch": 7.0,
+        "max_abs_multiplier_delta": 0.08000000000000007,
+        "mean_loss": 4.029811395551608,
+        "pair_accuracy": 0.7722915428370324,
+        "pairs": 116049.0
+      },
+      {
+        "base_pair_accuracy": 0.775252024034325,
+        "epoch": 8.0,
+        "max_abs_multiplier_delta": 0.08000000000000007,
+        "mean_loss": 3.9503615720748617,
+        "pair_accuracy": 0.7779300284849573,
+        "pairs": 115410.0
+      }
+    ],
+    "total_pairs": 927266
+  },
+  "family_multipliers": {
+    "availability_drop": 1.08,
+    "log_evidence": 0.92,
+    "metric_magnitude": 1.08,
+    "observability_volume": 0.92,
+    "topology_context": 1.0,
+    "trace_latency": 0.92,
+    "trace_protocol": 0.92,
+    "trace_traffic": 0.92
+  },
+  "feature_stats": [
+    {
+      "base_weight": 0.75,
+      "calibrated_weight": 0.81,
+      "family": "metric_magnitude",
+      "feature": "metric_max_z",
+      "multiplier": 1.08
+    },
+    {
+      "base_weight": 0.75,
+      "calibrated_weight": 0.81,
+      "family": "metric_magnitude",
+      "feature": "metric_mean_z",
+      "multiplier": 1.08
+    },
+    {
+      "base_weight": 0.75,
+      "calibrated_weight": 0.81,
+      "family": "metric_magnitude",
+      "feature": "metric_anomaly_count",
+      "multiplier": 1.08
+    },
+    {
+      "base_weight": 0.75,
+      "calibrated_weight": 0.81,
+      "family": "metric_magnitude",
+      "feature": "metric_value_delta",
+      "multiplier": 1.08
+    },
+    {
+      "base_weight": 10.0,
+      "calibrated_weight": 10.8,
+      "family": "availability_drop",
+      "feature": "metric_count_drop_shift",
+      "multiplier": 1.08
+    },
+    {
+      "base_weight": 1.0,
+      "calibrated_weight": 0.92,
+      "family": "trace_latency",
+      "feature": "trace_duration_z",
+      "multiplier": 0.92
+    },
+    {
+      "base_weight": 1.0,
+      "calibrated_weight": 0.92,
+      "family": "trace_latency",
+      "feature": "trace_duration_delta",
+      "multiplier": 0.92
+    },
+    {
+      "base_weight": 1.0,
+      "calibrated_weight": 0.92,
+      "family": "trace_traffic",
+      "feature": "trace_count_delta",
+      "multiplier": 0.92
+    },
+    {
+      "base_weight": 6.0,
+      "calibrated_weight": 5.5200000000000005,
+      "family": "trace_traffic",
+      "feature": "trace_count_rise_shift",
+      "multiplier": 0.92
+    },
+    {
+      "base_weight": 0.85,
+      "calibrated_weight": 0.918,
+      "family": "availability_drop",
+      "feature": "trace_count_drop_shift",
+      "multiplier": 1.08
+    },
+    {
+      "base_weight": 6.0,
+      "calibrated_weight": 5.5200000000000005,
+      "family": "trace_protocol",
+      "feature": "trace_endpoint_shift",
+      "multiplier": 0.92
+    },
+    {
+      "base_weight": 1.0,
+      "calibrated_weight": 0.92,
+      "family": "trace_protocol",
+      "feature": "trace_error_rate",
+      "multiplier": 0.92
+    },
+    {
+      "base_weight": 16.0,
+      "calibrated_weight": 14.72,
+      "family": "trace_protocol",
+      "feature": "trace_status_code_shift",
+      "multiplier": 0.92
+    },
+    {
+      "base_weight": 1.5,
+      "calibrated_weight": 1.3800000000000001,
+      "family": "trace_latency",
+      "feature": "trace_self_duration_relative_shift",
+      "multiplier": 0.92
+    },
+    {
+      "base_weight": 0.75,
+      "calibrated_weight": 0.6900000000000001,
+      "family": "log_evidence",
+      "feature": "log_count_delta",
+      "multiplier": 0.92
+    },
+    {
+      "base_weight": 0.75,
+      "calibrated_weight": 0.6900000000000001,
+      "family": "log_evidence",
+      "feature": "log_error_rate",
+      "multiplier": 0.92
+    },
+    {
+      "base_weight": 0.75,
+      "calibrated_weight": 0.6900000000000001,
+      "family": "log_evidence",
+      "feature": "log_template_delta",
+      "multiplier": 0.92
+    },
+    {
+      "base_weight": 0.0,
+      "calibrated_weight": 0.0,
+      "family": "topology_context",
+      "feature": "topology_in_degree",
+      "multiplier": 1.0
+    },
+    {
+      "base_weight": 0.0,
+      "calibrated_weight": 0.0,
+      "family": "topology_context",
+      "feature": "topology_out_degree",
+      "multiplier": 1.0
+    },
+    {
+      "base_weight": 1.25,
+      "calibrated_weight": 1.1500000000000001,
+      "family": "observability_volume",
+      "feature": "abnormal_metric_rows",
+      "multiplier": 0.92
+    },
+    {
+      "base_weight": 1.25,
+      "calibrated_weight": 1.1500000000000001,
+      "family": "observability_volume",
+      "feature": "abnormal_trace_rows",
+      "multiplier": 0.92
+    }
+  ],
+  "incident_count": 1422,
+  "method": {
+    "base_prior": "EvidenceRank semantic feature weights",
+    "family_features": {
+      "availability_drop": [
+        "metric_count_drop_shift",
+        "trace_count_drop_shift"
+      ],
+      "log_evidence": [
+        "log_count_delta",
+        "log_error_rate",
+        "log_template_delta"
+      ],
+      "metric_magnitude": [
+        "metric_max_z",
+        "metric_mean_z",
+        "metric_anomaly_count",
+        "metric_value_delta"
+      ],
+      "observability_volume": [
+        "abnormal_metric_rows",
+        "abnormal_trace_rows"
+      ],
+      "topology_context": [
+        "topology_in_degree",
+        "topology_out_degree"
+      ],
+      "trace_latency": [
+        "trace_duration_z",
+        "trace_duration_delta",
+        "trace_self_duration_relative_shift"
+      ],
+      "trace_protocol": [
+        "trace_endpoint_shift",
+        "trace_error_rate",
+        "trace_status_code_shift"
+      ],
+      "trace_traffic": [
+        "trace_count_delta",
+        "trace_count_rise_shift"
+      ]
+    },
+    "ground_truth_used": false,
+    "labels_used": false,
+    "name": "self_supervised_causal_family_multiplier_calibration",
+    "objective": "learn bounded family multipliers so synthetic pseudo-roots outrank topology-propagated victims while staying close to the base prior"
+  },
+  "parameters": {
+    "background_factor": 0.18,
+    "center_l2": 4.0,
+    "epochs": 8,
+    "learning_rate": 0.04,
+    "max_multiplier": 1.08,
+    "min_multiplier": 0.92,
+    "propagation_decay": 0.58,
+    "samples_per_case": 10,
+    "seed": 20260602
+  },
+  "usable_incident_count": 1422,
+  "weights": {
+    "abnormal_metric_rows": 1.1500000000000001,
+    "abnormal_trace_rows": 1.1500000000000001,
+    "log_count_delta": 0.6900000000000001,
+    "log_error_rate": 0.6900000000000001,
+    "log_template_delta": 0.6900000000000001,
+    "metric_anomaly_count": 0.81,
+    "metric_count_drop_shift": 10.8,
+    "metric_max_z": 0.81,
+    "metric_mean_z": 0.81,
+    "metric_value_delta": 0.81,
+    "topology_in_degree": 0.0,
+    "topology_out_degree": 0.0,
+    "trace_count_delta": 0.92,
+    "trace_count_drop_shift": 0.918,
+    "trace_count_rise_shift": 5.5200000000000005,
+    "trace_duration_delta": 0.92,
+    "trace_duration_z": 0.92,
+    "trace_endpoint_shift": 5.5200000000000005,
+    "trace_error_rate": 0.92,
+    "trace_self_duration_relative_shift": 1.3800000000000001,
+    "trace_status_code_shift": 14.72
+  }
+}

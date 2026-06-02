@@ -107,7 +107,7 @@ export LOGURU_COLORIZE=0
 如果觉得运行是 debug 日志太多，可以:
 
 ```bash
-export LOGURU_LEVEL=INFO
+export LOGURU_LEVEL=WARNING
 ```
 
 
@@ -530,7 +530,7 @@ uv sync --frozen --package rcaeval_run
 RUN 中日志太多，运行前可以：
 
 ```bash
-export LOGURU_LEVEL=INFO
+export LOGURU_LEVEL=WARNING
 ```
 
 Run:
