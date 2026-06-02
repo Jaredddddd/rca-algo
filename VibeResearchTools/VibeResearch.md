@@ -594,6 +594,90 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 现在经过之前优化到 V11 的结果的AC@1能已经基本达到我的预期0.8，接下来优化方向是鲁棒性和可迁移性，前提是 AC@1等指标不变，或者为了鲁棒性运行 AC@1小幅下降（例如下降到 75% 左右）：
 现在算法中使用先验权重的方法会让人质疑是针对数据集特化的，能不能保持无监督的方法来自适应权重，权重现在是 fix 的，可不可以自学习？不然有点针对数据集优化的感觉。我的目的是让审稿人不要认为我的固定权重是通过过拟合数据集得出来的结果，所以即使性能数据 AC@1 有所下降也是可以接受的，我更希望这是一个通用鲁棒的算法。或者至少需要一种方法，可以自动化无监督的得出这些权重，而不是手工硬编码。
 
+```
+
+### 第七次迭代：
+
+```
+
+你是一个微服务根因定位 RCA 算法研究员兼谨慎的 coding agent。你当前在仓库 /home/ljw/paper/aegis/rca-algo-contrib 中工作，目标是基于 RCABench 当前 false cases 迭代优化 EvidenceRank，但必须保持算法跨系统通用，严禁把 RCABench label、case id、服务名或故障名写进算法逻辑。
+
+背景：
+- EvidenceRank 是当前研究算法，路径为 algorithms/evidencerank。
+- 主实现为 algorithms/evidencerank/src/evidencerank/algorithm.py。
+- 当前评估结果已在 results.md 和 output/rcabench-platform-v2 中。
+- RCABench label 位于 data/rcabench-platform-v2/meta/rcabench-csv/labels.csv。
+- 单 case 注入和 GT 元信息位于 data/rcabench-platform-v2/data/rcabench/<datapack>/injection.json。
+- label 和 injection 只能用于离线分析、报告和验证，不能被 algorithms/evidencerank 的运行逻辑读取。
+- conclusion.parquet 属于已加工诊断结论，不要用于算法实现，也不要用于离线 false case 归因；可以研究其生成思路，并只从 raw traces 反向构造通用端点异常信号。
+
+总体目标：
+从 EvidenceRank 的 false cases 中归纳可迁移的 RCA 机制，提出并实现最小充分的通用算法改动，提升 AC@1 / MRR / AC@3 / AC@5，同时控制退化。
+
+强约束：
+1. 禁止硬编码 datapack、case id、随机后缀、服务名、故障名、dataset split。
+2. 禁止在算法实现中读取 labels.csv、injection.json、output、perf report 或任何 ground truth。
+3. 禁止读取 conclusion.parquet 参与算法实现或离线 false case 证据；允许研究生成思路，并只从 raw traces 构造可迁移信号。
+4. 禁止为了当前数据集堆叠不可解释的 if/else、黑名单、白名单或查表逻辑。
+5. 任何进入算法的改动必须能解释为跨微服务系统通用的 RCA 信号、归一化、证据融合或拓扑推理。
+6. 每轮实验必须保留版本化输出，不覆盖旧结果。
+7. 所有研究计划、假设、结果、经验和索引都要同步到文档；Vibe Research 主页面是 VibeResearchTools/VibeResearch.md，详细迭代文档在 docs/EvidRank_evolve/。
+8. 验证算法需要较长时间是完全可以接受的。目标是通过最终 ACC 提升算法质量，而非缩短开发验证周期。不要因为全量 eval 运行慢就中止实验、跳过验证或改用已有输出做"快速分析"——这种做法可能导致真正能涨点的优化方向没有得到充分验证。例如，以下行为是被禁止的："这次离线脚本是顺序读全量 parquet，速度太慢，不适合拿来做快速研究。我会停掉这个当前启动的实验，改用已有 V2 输出和更小的抽样/并行分析来收敛候选信号。"
+
+推荐工作流：
+1. 先阅读 AGENTS.md、VibeResearchTools/VibeResearch.md、results.md、algorithms/evidencerank/src/evidencerank/algorithm.py。
+2. 如果还没有 baseline snapshot，先运行：
+   uv run --package evidencerank python VibeResearchTools/evidrank_lab.py snapshot --version V1 --algorithm evidencerank --dataset rcabench
+   uv run --package evidencerank python VibeResearchTools/evidrank_lab.py summarize --version V1 --source V1 --algorithm evidencerank --dataset rcabench
+3. 研究 false cases：
+   - 阅读 docs/EvidRank_evolve/<VERSION>_summary.md。
+   - 对代表性 case 运行 VibeResearchTools/evidrank_lab.py case。
+   - 聚合 fault_type、case_service、GT rank、top5、输入数据概况，寻找通用失败机制；不要读取 conclusion.parquet，可研究如何从 raw traces 构造类似端点异常信号。
+4. 在改代码前创建迭代笔记：
+   uv run --package evidencerank python VibeResearchTools/evidrank_lab.py new-note --version V<N> --hypothesis "<一句话通用算法假设>"
+5. 只修改 algorithms/evidencerank 中与通用 RCA 排序有关的逻辑，例如：
+   - robust scaling / rank fusion；
+   - modality confidence；
+   - evidence concentration；
+   - topology-aware rerank；
+   - neighbor contrast；
+   - 多 ground truth 排序友好性。
+1. 修改后运行以下指令：
+    注意，默认输出 debug 信息，为了减少无用输出，最好提前使用export LOGURU_LEVEL=INFO限制输出log 的打印
+   uv run --package evidencerank python VibeResearchTools/evidrank_lab.py guard
+   uv run --package evidencerank python algorithms/evidencerank/main.py eval batch -a evidencerank -d rcabench --clear --use-cpus 48
+   uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
+2. 评估后保存新版本：
+   uv run --package evidencerank python VibeResearchTools/evidrank_lab.py snapshot --version V<N> --algorithm evidencerank --dataset rcabench
+   uv run --package evidencerank python VibeResearchTools/evidrank_lab.py summarize --version V<N> --source V<N> --algorithm evidencerank --dataset rcabench
+   uv run --package evidencerank python VibeResearchTools/evidrank_lab.py compare --old V<N-1> --new V<N> --algorithm evidencerank --dataset rcabench
+   uv run --package evidencerank python VibeResearchTools/evidrank_lab.py index
+
+每个改进建议必须输出：
+1. 失败机制；
+2. 当前 EvidenceRank 为什么会错；
+3. 可泛化的新信号或组合方式；
+4. 可能改善的 case 类型；
+5. 可能退化的 case 类型；
+6. 最小代码改动位置；
+7. 验证指标和 ablation 方式；
+8. 是否接受该版本以及理由。
+
+接受标准：
+- VibeResearchTools guard 无 high-risk 告警；
+- full eval error == 0；
+- AC@1 或 MRR 至少一个提升，或者运行时间下降或达到用户要求的优化方向；
+- 如果是优化效率和鲁棒性，要求 AC@1 / AC@3 / AC@5 没有不可解释的大幅退化，可以有小幅下降；
+- improved / regressed case 已在 docs/EvidRank_evolve 中记录；
+- VibeResearchTools/VibeResearch.md 索引已刷新。
+
+现在经过之前优化到 V11 的结果的AC@1能已经基本达到我的预期0.8，接下来优化方向是鲁棒性和可迁移性，前提是 AC@1等指标不变，或者为了鲁棒性运行 AC@1小幅下降（例如下降到 75% 左右）：
+现在算法中使用先验权重的方法会让人质疑是针对数据集特化的，能不能保持无监督的方法来自适应权重，权重现在是 fix 的，可不可以自学习？不然有点针对数据集优化的感觉。我的目的是让审稿人不要认为我的固定权重是通过过拟合数据集得出来的结果，所以即使性能数据 AC@1 有所下降也是可以接受的，我更希望这是一个通用鲁棒的算法。或者至少需要一种方法，可以自动化无监督的得出这些权重，而不是手工硬编码。
+
+之前已经尝试了很多次修改，不要是 fix weight，可见V13-V17，之前是尝试 case by case 的自适应权重，经验如下：对论文/审稿的建议结论是：单 case 内部的完全无监督权重学习目前不够稳，容易把传播节点、入口流量或局部日志尖峰当成根因。更 defensible 的下一步不是继续手调 per-case 权重，而是做“无标签离线全局校准”：用大量未标注 incident 的特征分布、跨模态一致性和拓扑稳定性学习全局 prior，再在单 case 内做轻量自适应。这样可以避免“RCABench label 拟合”的质疑，同时保留 V11 这类 domain prior 的稳定性。
+
+接下来帮我尝试从“无标签离线全局校准“角度，看看怎么获得这份已有的固定阈值，或者有什么办法得到这份阈值，总之我的目的就是让这份算法看起来并不是只是在这份数据集上经过紧密的微调后才有用的，而是一种鲁棒的通用方法。
+
 
 ```
 
@@ -607,7 +691,7 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-02T19:03:36+08:00_
+_Last refreshed: 2026-06-02T21:23:30+08:00_
 
 ## EvidenceRank Document Index
 
@@ -629,6 +713,8 @@ _Last refreshed: 2026-06-02T19:03:36+08:00_
 | summary | [docs/EvidRank_evolve/V16_summary.md](../docs/EvidRank_evolve/V16_summary.md) | 2026-06-02T18:45:07+08:00 |
 | iteration | [docs/EvidRank_evolve/V17_iteration.md](../docs/EvidRank_evolve/V17_iteration.md) | 2026-06-02T18:56:12+08:00 |
 | summary | [docs/EvidRank_evolve/V17_summary.md](../docs/EvidRank_evolve/V17_summary.md) | 2026-06-02T18:54:41+08:00 |
+| iteration | [docs/EvidRank_evolve/V18_iteration.md](../docs/EvidRank_evolve/V18_iteration.md) | 2026-06-02T21:22:59+08:00 |
+| summary | [docs/EvidRank_evolve/V18_summary.md](../docs/EvidRank_evolve/V18_summary.md) | 2026-06-02T21:15:00+08:00 |
 | summary | [docs/EvidRank_evolve/V1_summary.md](../docs/EvidRank_evolve/V1_summary.md) | 2026-06-01T18:29:32+08:00 |
 | iteration | [docs/EvidRank_evolve/V2_iteration.md](../docs/EvidRank_evolve/V2_iteration.md) | 2026-06-01T18:29:32+08:00 |
 | summary | [docs/EvidRank_evolve/V2_summary.md](../docs/EvidRank_evolve/V2_summary.md) | 2026-06-01T18:29:32+08:00 |
@@ -653,10 +739,12 @@ _Last refreshed: 2026-06-02T19:03:36+08:00_
 | compare | [docs/EvidRank_evolve/compare_V11_vs_V15.md](../docs/EvidRank_evolve/compare_V11_vs_V15.md) | 2026-06-02T18:34:01+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V11_vs_V16.md](../docs/EvidRank_evolve/compare_V11_vs_V16.md) | 2026-06-02T18:45:17+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V11_vs_V17.md](../docs/EvidRank_evolve/compare_V11_vs_V17.md) | 2026-06-02T18:54:52+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V11_vs_V18.md](../docs/EvidRank_evolve/compare_V11_vs_V18.md) | 2026-06-02T21:15:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V13_vs_V14.md](../docs/EvidRank_evolve/compare_V13_vs_V14.md) | 2026-06-02T18:22:01+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V14_vs_V15.md](../docs/EvidRank_evolve/compare_V14_vs_V15.md) | 2026-06-02T18:34:03+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V15_vs_V16.md](../docs/EvidRank_evolve/compare_V15_vs_V16.md) | 2026-06-02T18:45:17+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V16_vs_V17.md](../docs/EvidRank_evolve/compare_V16_vs_V17.md) | 2026-06-02T18:54:51+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V17_vs_V18.md](../docs/EvidRank_evolve/compare_V17_vs_V18.md) | 2026-06-02T21:15:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V1_vs_V2.md](../docs/EvidRank_evolve/compare_V1_vs_V2.md) | 2026-06-01T18:29:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V2_vs_V3.md](../docs/EvidRank_evolve/compare_V2_vs_V3.md) | 2026-06-01T18:29:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V3_vs_V4.md](../docs/EvidRank_evolve/compare_V3_vs_V4.md) | 2026-06-01T18:29:32+08:00 |
@@ -681,6 +769,7 @@ _Last refreshed: 2026-06-02T19:03:36+08:00_
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V15` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V16` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V17` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V18` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V2` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V3` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V4` |
@@ -699,6 +788,7 @@ _Last refreshed: 2026-06-02T19:03:36+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/V15` |
 | report | `output/rcabench-platform-v2/evolve_reports/V16` |
 | report | `output/rcabench-platform-v2/evolve_reports/V17` |
+| report | `output/rcabench-platform-v2/evolve_reports/V18` |
 | report | `output/rcabench-platform-v2/evolve_reports/V2` |
 | report | `output/rcabench-platform-v2/evolve_reports/V3` |
 | report | `output/rcabench-platform-v2/evolve_reports/V3_research` |
@@ -717,10 +807,12 @@ _Last refreshed: 2026-06-02T19:03:36+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V15` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V16` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V17` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V18` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V13_vs_V14` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V14_vs_V15` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V15_vs_V16` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V16_vs_V17` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V17_vs_V18` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V1_vs_V2` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V2_vs_V3` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V3_vs_V4` |

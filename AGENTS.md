@@ -357,3 +357,15 @@ guard 已通过：无 high-risk 过拟合告警；`algorithm.py` 没有残留实
 对论文/审稿的建议结论是：单 case 内部的完全无监督权重学习目前不够稳，容易把传播节点、入口流量或局部日志尖峰当成根因。更 defensible 的下一步不是继续手调 per-case 权重，而是做“无标签离线全局校准”：用大量未标注 incident 的特征分布、跨模态一致性和拓扑稳定性学习全局 prior，再在单 case 内做轻量自适应。这样可以避免“RCABench label 拟合”的质疑，同时保留 V11 这类 domain prior 的稳定性。
 
 工作区目前留下了研究文档、compare 文档、`AGENTS.md` 经验补充和评估输出 parquet；默认算法源码没有被改成被拒绝版本。
+
+### 无标签离线全局校准不能只优化症状一致性
+
+触发信号：为了回应固定 feature weight 可能被质疑为数据集特化，V18 尝试用无标签 incident corpus 的 feature 覆盖、集中度、top gap、逆尺度和跨模态一致性生成全局 prior。
+
+根因 / 约束：无标签统计能发现“哪些症状尖锐且经常和其他症状共现”，但这不等价于“哪些症状更接近根因”。日志错误率和 trace duration 这类传播/受害者症状可能同时具备高集中度和高一致性；status/endpoint 这类协议级 mutation 信号虽然数值尺度较小，却更有因果特异性。朴素全局校准会高估前者、低估后者。
+
+正确做法：保留 `calibrate_feature_weights.py` 这类离线工具作为论文中的无标签 prior 生成和诊断流程，但不要直接用“集中度 + 一致性 + 逆尺度”替换 V11 默认权重。下一步若继续做无标签校准，应加入 causality-aware 约束，例如拓扑方向、root-vs-victim neighbor contrast、log-only cap、status/endpoint 支持门控、family-level 而非 individual-feature 的先验学习。
+
+验证方式：V18 generated prior 完整跑了 guard、full eval、perf-report、snapshot、summary、V11/V18 compare、V17/V18 compare。结果 AC@1 从 V11 的 `0.802391` 降到 `0.506329`，MRR 从 `0.875337` 降到 `0.684853`，并产生 467 个 `regressed_from_hit1`，因此拒绝；恢复 V11 后重新 full eval，AC@1/MRR/AC@3/AC@5 回到 `0.802391/0.875337/0.943741/0.975387`。
+
+适用范围：所有试图用无标签统计、self-supervised agreement 或 global calibration 替代 RCA feature prior 的实验。该经验不禁止无标签校准，但要求 calibration objective 显式区分根因特异信号和传播症状。
