@@ -1,0 +1,300 @@
+{
+  "created": "2026-06-02T21:56:44+08:00",
+  "data_root": "data/rcabench-platform-v2/data/rcabench",
+  "diagnostics": {
+    "epoch_trace": [
+      {
+        "epoch": 1.0,
+        "mean_loss": 0.04464074691235117,
+        "pair_accuracy": 0.9926742978213913,
+        "pairs": 116456.0
+      },
+      {
+        "epoch": 2.0,
+        "mean_loss": 0.0048567519090379286,
+        "pair_accuracy": 0.9996847776199483,
+        "pairs": 116393.0
+      },
+      {
+        "epoch": 3.0,
+        "mean_loss": 0.004791351597958453,
+        "pair_accuracy": 0.9997737481980836,
+        "pairs": 116049.0
+      },
+      {
+        "epoch": 4.0,
+        "mean_loss": 0.004908693905349936,
+        "pair_accuracy": 0.9998044854112823,
+        "pairs": 115418.0
+      },
+      {
+        "epoch": 5.0,
+        "mean_loss": 0.005177817624172944,
+        "pair_accuracy": 0.9998630693135614,
+        "pairs": 115542.0
+      },
+      {
+        "epoch": 6.0,
+        "mean_loss": 0.005439451618969319,
+        "pair_accuracy": 0.9998355214916775,
+        "pairs": 115949.0
+      },
+      {
+        "epoch": 7.0,
+        "mean_loss": 0.005430389192350013,
+        "pair_accuracy": 0.9997553980190667,
+        "pairs": 116049.0
+      },
+      {
+        "epoch": 8.0,
+        "mean_loss": 0.0056719788198461825,
+        "pair_accuracy": 0.9996562090729677,
+        "pairs": 115410.0
+      }
+    ],
+    "total_pairs": 927266
+  },
+  "feature_stats": [
+    {
+      "calibrated_weight": 0.990042516218629,
+      "feature": "metric_max_z",
+      "feature_scale": 4.044489908218383,
+      "raw_weight": 0.6424899702332773
+    },
+    {
+      "calibrated_weight": 0.041666666666666664,
+      "feature": "metric_mean_z",
+      "feature_scale": 1.9676985502243016,
+      "raw_weight": 1.580903193483767e-05
+    },
+    {
+      "calibrated_weight": 1.2672409508897018,
+      "feature": "metric_anomaly_count",
+      "feature_scale": 2.645956683158875,
+      "raw_weight": 0.8223784206007964
+    },
+    {
+      "calibrated_weight": 0.16101455379088844,
+      "feature": "metric_value_delta",
+      "feature_scale": 12.0,
+      "raw_weight": 0.1044907003260329
+    },
+    {
+      "calibrated_weight": 0.8599509377436235,
+      "feature": "metric_count_drop_shift",
+      "feature_scale": 0.1317453384399414,
+      "raw_weight": 0.5580667934375557
+    },
+    {
+      "calibrated_weight": 0.041666666666666664,
+      "feature": "trace_duration_z",
+      "feature_scale": 0.9246545061469076,
+      "raw_weight": 0.0
+    },
+    {
+      "calibrated_weight": 0.041666666666666664,
+      "feature": "trace_duration_delta",
+      "feature_scale": 12.0,
+      "raw_weight": 0.0
+    },
+    {
+      "calibrated_weight": 0.041666666666666664,
+      "feature": "trace_count_delta",
+      "feature_scale": 8.815169954299927,
+      "raw_weight": 0.0
+    },
+    {
+      "calibrated_weight": 1.8991490503520934,
+      "feature": "trace_count_rise_shift",
+      "feature_scale": 1.5493629842996595,
+      "raw_weight": 1.2324563812568858
+    },
+    {
+      "calibrated_weight": 2.0447256633340687,
+      "feature": "trace_count_drop_shift",
+      "feature_scale": 2.042094039916992,
+      "raw_weight": 1.3269286005901375
+    },
+    {
+      "calibrated_weight": 1.8465324731145065,
+      "feature": "trace_endpoint_shift",
+      "feature_scale": 1.0122468635439867,
+      "raw_weight": 1.1983107535799338
+    },
+    {
+      "calibrated_weight": 0.8432464910182762,
+      "feature": "trace_error_rate",
+      "feature_scale": 1.0,
+      "raw_weight": 0.5472264110261787
+    },
+    {
+      "calibrated_weight": 1.9735582856453606,
+      "feature": "trace_status_code_shift",
+      "feature_scale": 0.531396797299385,
+      "raw_weight": 1.2807443957466544
+    },
+    {
+      "calibrated_weight": 1.3953298458678967,
+      "feature": "trace_self_duration_relative_shift",
+      "feature_scale": 3.702788233757019,
+      "raw_weight": 0.905501952139699
+    },
+    {
+      "calibrated_weight": 0.041666666666666664,
+      "feature": "log_count_delta",
+      "feature_scale": 8.37371368408203,
+      "raw_weight": 0.0
+    },
+    {
+      "calibrated_weight": 0.6068749085020092,
+      "feature": "log_error_rate",
+      "feature_scale": 0.48378374353051135,
+      "raw_weight": 0.39383262386347406
+    },
+    {
+      "calibrated_weight": 1.0099574837813707,
+      "feature": "log_template_delta",
+      "feature_scale": 7.196000623703002,
+      "raw_weight": 0.6554138262364038
+    },
+    {
+      "calibrated_weight": 0.0,
+      "feature": "topology_in_degree",
+      "feature_scale": 1.8842498540878292,
+      "raw_weight": 0.0
+    },
+    {
+      "calibrated_weight": 0.0,
+      "feature": "topology_out_degree",
+      "feature_scale": 2.1251342058181746,
+      "raw_weight": 0.0
+    },
+    {
+      "calibrated_weight": 0.07082414393583027,
+      "feature": "abnormal_metric_rows",
+      "feature_scale": 7.183111667633057,
+      "raw_weight": 0.04596146264801462
+    },
+    {
+      "calibrated_weight": 0.041666666666666664,
+      "feature": "abnormal_trace_rows",
+      "feature_scale": 8.734732007980346,
+      "raw_weight": 0.0
+    }
+  ],
+  "incident_count": 1422,
+  "method": {
+    "downstream_propagation_profile": {
+      "abnormal_metric_rows": 0.15,
+      "abnormal_trace_rows": 0.9,
+      "log_count_delta": 0.75,
+      "log_error_rate": 0.25,
+      "log_template_delta": 0.45,
+      "trace_count_delta": 1.2,
+      "trace_count_rise_shift": 1.1,
+      "trace_duration_delta": 0.85,
+      "trace_duration_z": 1.0,
+      "trace_endpoint_shift": 0.9
+    },
+    "ground_truth_used": false,
+    "labels_used": false,
+    "name": "self_supervised_causal_pairwise_calibration",
+    "objective": "learn non-negative weights so synthetic pseudo-roots outrank topology-propagated victims and high-background services",
+    "root_profiles": {
+      "availability_loss": {
+        "metric_anomaly_count": 0.7,
+        "metric_count_drop_shift": 5.5,
+        "metric_max_z": 0.5,
+        "trace_count_drop_shift": 2.2
+      },
+      "endpoint_mix_shift": {
+        "abnormal_trace_rows": 0.35,
+        "trace_count_delta": 0.55,
+        "trace_count_rise_shift": 2.1,
+        "trace_endpoint_shift": 2.8,
+        "trace_status_code_shift": 1.5
+      },
+      "local_latency": {
+        "trace_duration_delta": 0.8,
+        "trace_duration_z": 1.35,
+        "trace_endpoint_shift": 0.55,
+        "trace_self_duration_relative_shift": 3.0
+      },
+      "log_template_shift": {
+        "log_count_delta": 0.65,
+        "log_error_rate": 0.8,
+        "log_template_delta": 1.7,
+        "trace_status_code_shift": 0.55
+      },
+      "metric_shift": {
+        "abnormal_metric_rows": 0.35,
+        "metric_anomaly_count": 1.4,
+        "metric_max_z": 2.2,
+        "metric_mean_z": 1.7,
+        "metric_value_delta": 1.0
+      },
+      "protocol_shift": {
+        "trace_count_rise_shift": 1.2,
+        "trace_endpoint_shift": 1.7,
+        "trace_error_rate": 0.8,
+        "trace_self_duration_relative_shift": 0.45,
+        "trace_status_code_shift": 4.6
+      },
+      "volume_saturation": {
+        "abnormal_metric_rows": 0.35,
+        "abnormal_trace_rows": 0.55,
+        "metric_max_z": 0.9,
+        "trace_count_delta": 0.8,
+        "trace_count_rise_shift": 2.6,
+        "trace_endpoint_shift": 1.15
+      }
+    },
+    "upstream_propagation_profile": {
+      "abnormal_trace_rows": 0.75,
+      "log_count_delta": 0.45,
+      "trace_count_delta": 0.95,
+      "trace_count_rise_shift": 0.9,
+      "trace_duration_delta": 0.45,
+      "trace_duration_z": 0.55,
+      "trace_endpoint_shift": 0.85
+    },
+    "weightless_feature_prefixes": [
+      "topology_"
+    ]
+  },
+  "parameters": {
+    "background_factor": 0.18,
+    "epochs": 8,
+    "l2": 0.002,
+    "learning_rate": 0.04,
+    "max_ratio": 24.0,
+    "median_weight": 1.0,
+    "propagation_decay": 0.58,
+    "samples_per_case": 10,
+    "seed": 20260602
+  },
+  "usable_incident_count": 1422,
+  "weights": {
+    "abnormal_metric_rows": 0.07082414393583027,
+    "abnormal_trace_rows": 0.041666666666666664,
+    "log_count_delta": 0.041666666666666664,
+    "log_error_rate": 0.6068749085020092,
+    "log_template_delta": 1.0099574837813707,
+    "metric_anomaly_count": 1.2672409508897018,
+    "metric_count_drop_shift": 0.8599509377436235,
+    "metric_max_z": 0.990042516218629,
+    "metric_mean_z": 0.041666666666666664,
+    "metric_value_delta": 0.16101455379088844,
+    "topology_in_degree": 0.0,
+    "topology_out_degree": 0.0,
+    "trace_count_delta": 0.041666666666666664,
+    "trace_count_drop_shift": 2.0447256633340687,
+    "trace_count_rise_shift": 1.8991490503520934,
+    "trace_duration_delta": 0.041666666666666664,
+    "trace_duration_z": 0.041666666666666664,
+    "trace_endpoint_shift": 1.8465324731145065,
+    "trace_error_rate": 0.8432464910182762,
+    "trace_self_duration_relative_shift": 1.3953298458678967,
+    "trace_status_code_shift": 1.9735582856453606
+  }
+}

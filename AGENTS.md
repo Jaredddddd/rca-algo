@@ -369,3 +369,17 @@ guard 已通过：无 high-risk 过拟合告警；`algorithm.py` 没有残留实
 验证方式：V18 generated prior 完整跑了 guard、full eval、perf-report、snapshot、summary、V11/V18 compare、V17/V18 compare。结果 AC@1 从 V11 的 `0.802391` 降到 `0.506329`，MRR 从 `0.875337` 降到 `0.684853`，并产生 467 个 `regressed_from_hit1`，因此拒绝；恢复 V11 后重新 full eval，AC@1/MRR/AC@3/AC@5 回到 `0.802391/0.875337/0.943741/0.975387`。
 
 适用范围：所有试图用无标签统计、self-supervised agreement 或 global calibration 替代 RCA feature prior 的实验。该经验不禁止无标签校准，但要求 calibration objective 显式区分根因特异信号和传播症状。
+
+### 自监督 causal calibration 可学习权重但暂不足以完全替代 V11
+
+触发信号：V19 为回应固定权重的审稿质疑，尝试用无标签 incident、拓扑伪根因、通用 root perturbation profile、上下游传播负例和非负 pairwise ranking 学习 EvidenceRank feature prior。
+
+根因 / 约束：causal pairwise objective 比 V18 的症状一致性目标更接近 RCA，但 synthetic profile 本身仍是先验假设。它容易把 availability drop、status mutation、endpoint shift 学得过强，同时压低 duration/count/self-duration/log-template 这类 delay、高扇出和入口服务 case 仍需要的信号。
+
+正确做法：保留 `calibrate_causal_feature_weights.py` 作为无标签离线校准和论文 ablation 工具，但不要直接用 V19 individual-feature weights 替换 V11。更稳的下一步是学习 family-level calibration multiplier 或 regularizer：以 V11 的可解释语义先验为中心，用 V19 的无标签 causal objective 自动给出校准、置信区间或偏移约束。
+
+验证方式：V19 guard 无 high-risk；full eval 1422 case、error 0。相对 V18，AC@1 从 `0.506329` 升到 `0.658931`，MRR 从 `0.684853` 升到 `0.776972`；相对 V11，AC@1 从 `0.802391` 降到 `0.658931`，产生 277 个 `regressed_from_hit1`。恢复 V11 后 full eval/perf-report 回到 `0.802391/0.875337/0.943741/0.975387`。
+
+适用范围：所有尝试把固定 RCA 权重解释为“可由无标签数据自动形成”的实验。结论是形成权重的算法方向可行，但作为完全替代默认权重暂不可行；论文中应把它用于校准/正则化/消融，而不是声称单独的无标签学习已经达到 V11。
+
+目前尝试自适应权重最好的是 V13 和 V19。
