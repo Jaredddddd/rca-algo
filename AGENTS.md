@@ -327,3 +327,33 @@ uv run --package evidencerank python VibeResearchTools/evidrank_lab.py new-note 
 - 当前输出已 snapshot，历史输出未被覆盖。
 
 如果指标下降但发现了清晰失败机制，也可以保留为研究记录，但不要把算法改动作为默认版本接受。
+
+## 经验沉淀
+
+### 尝试 case by case 的无监督自适应权重
+
+完成了这一轮“去固定权重 / 无监督自适应权重”的实验闭环。
+
+核心结论：我实现并完整评估了 V13-V17 多个无标签自学习权重方案，但都没有达到可接受的鲁棒性-性能折中。最好的无固定权重版本是 V13，`AC@1=0.679325, MRR=0.804981`，低于你希望的约 `0.75` 容忍线；V17 进一步降到 `AC@1=0.563291`。因此这些版本都已记录为负向实验，没有接受进默认算法。
+
+当前默认实现已恢复到已接受的 V11。恢复后重新跑了 full eval 和 perf-report，主行指标回到：
+
+```text
+total=1422, error=0
+AC@1=0.802391
+MRR=0.875337
+AC@3=0.943741
+AC@5=0.975387
+runtime.avg=9.753871s
+```
+
+guard 已通过：无 high-risk 过拟合告警；`algorithm.py` 没有残留实验 diff。VibeResearch 索引也已刷新。
+
+这轮研究沉淀在V13-V17：
+- [V13_iteration.md](/home/ljw/paper/aegis/rca-algo-contrib/docs/EvidRank_evolve/V13_iteration.md)
+- [V17_iteration.md](/home/ljw/paper/aegis/rca-algo-contrib/docs/EvidRank_evolve/V17_iteration.md)
+- [VibeResearch.md](/home/ljw/paper/aegis/rca-algo-contrib/VibeResearchTools/VibeResearch.md)
+
+对论文/审稿的建议结论是：单 case 内部的完全无监督权重学习目前不够稳，容易把传播节点、入口流量或局部日志尖峰当成根因。更 defensible 的下一步不是继续手调 per-case 权重，而是做“无标签离线全局校准”：用大量未标注 incident 的特征分布、跨模态一致性和拓扑稳定性学习全局 prior，再在单 case 内做轻量自适应。这样可以避免“RCABench label 拟合”的质疑，同时保留 V11 这类 domain prior 的稳定性。
+
+工作区目前留下了研究文档、compare 文档、`AGENTS.md` 经验补充和评估输出 parquet；默认算法源码没有被改成被拒绝版本。

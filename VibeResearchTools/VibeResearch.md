@@ -587,19 +587,13 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 - VibeResearchTools guard 无 high-risk 告警；
 - full eval error == 0；
 - AC@1 或 MRR 至少一个提升，或者运行时间下降或达到用户要求的优化方向；
-- 如果是优化效率和鲁棒性，要求 AC@1 / AC@3 / AC@5 没有不可解释的大幅退化；
+- 如果是优化效率和鲁棒性，要求 AC@1 / AC@3 / AC@5 没有不可解释的大幅退化，可以有小幅下降；
 - improved / regressed case 已在 docs/EvidRank_evolve 中记录；
 - VibeResearchTools/VibeResearch.md 索引已刷新。
 
-现在经过之前优化到 V10 的结果如下，现在evidencerank的AC@1能已经基本达到我的预期0.8，接下来你有 2 个优化方向，前提是 AC@1等指标不变：
-第一是帮我优化性能，减少单个 case 的运行时间。
-第二是能不能保持无监督的方法来自适应权重，权重现在是 fix 的，可不可以自学习？不然有点针对数据集优化的感觉。
+现在经过之前优化到 V11 的结果的AC@1能已经基本达到我的预期0.8，接下来优化方向是鲁棒性和可迁移性，前提是 AC@1等指标不变，或者为了鲁棒性运行 AC@1小幅下降（例如下降到 75% 左右）：
+现在算法中使用先验权重的方法会让人质疑是针对数据集特化的，能不能保持无监督的方法来自适应权重，权重现在是 fix 的，可不可以自学习？不然有点针对数据集优化的感觉。我的目的是让审稿人不要认为我的固定权重是通过过拟合数据集得出来的结果，所以即使性能数据 AC@1 有所下降也是可以接受的，我更希望这是一个通用鲁棒的算法。或者至少需要一种方法，可以自动化无监督的得出这些权重，而不是手工硬编码。
 
-
-│ algorithm                 ┆ total ┆ error ┆ runtime.seconds:avg ┆      MRR ┆ AC@1.count ┆ AC@3.count ┆ AC@5.count ┆     AC@1 ┆     AC@3 ┆     AC@5 ┆    Avg@3 ┆    Avg@5 │
-│ evidencerank              ┆ 1,422 ┆     0 ┆           11.737922 ┆ 0.875103 ┆    1,141.0 ┆    1,342.0 ┆    1,387.0 ┆ 0.802391 ┆ 0.943741 ┆ 0.975387 ┆  0.88045 ┆ 0.916315 │
-│ evidencerank_metric_trace ┆ 1,422 ┆     0 ┆            7.706687 ┆ 0.747674 ┆      861.0 ┆    1,251.0 ┆    1,325.0 ┆ 0.605485 ┆ 0.879747 ┆ 0.931786 ┆ 0.759494 ┆ 0.823347 │
-│ evidencerank_log_trace    ┆ 1,422 ┆     0 ┆            7.763734 ┆ 0.651719 ┆      750.0 ┆    1,047.0 ┆    1,131.0 ┆ 0.527426 ┆ 0.736287 ┆ 0.795359 ┆ 0.640881 ┆ 0.698453 │
 
 ```
 
@@ -613,7 +607,7 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-02T14:41:00+08:00_
+_Last refreshed: 2026-06-02T19:03:36+08:00_
 
 ## EvidenceRank Document Index
 
@@ -625,6 +619,16 @@ _Last refreshed: 2026-06-02T14:41:00+08:00_
 | iteration | [docs/EvidRank_evolve/V11_iteration.md](../docs/EvidRank_evolve/V11_iteration.md) | 2026-06-02T14:40:50+08:00 |
 | summary | [docs/EvidRank_evolve/V11_summary.md](../docs/EvidRank_evolve/V11_summary.md) | 2026-06-02T14:36:46+08:00 |
 | summary | [docs/EvidRank_evolve/V11_trial_span008_summary.md](../docs/EvidRank_evolve/V11_trial_span008_summary.md) | 2026-06-02T14:29:11+08:00 |
+| iteration | [docs/EvidRank_evolve/V13_iteration.md](../docs/EvidRank_evolve/V13_iteration.md) | 2026-06-02T18:11:47+08:00 |
+| summary | [docs/EvidRank_evolve/V13_summary.md](../docs/EvidRank_evolve/V13_summary.md) | 2026-06-02T18:10:49+08:00 |
+| iteration | [docs/EvidRank_evolve/V14_iteration.md](../docs/EvidRank_evolve/V14_iteration.md) | 2026-06-02T18:26:00+08:00 |
+| summary | [docs/EvidRank_evolve/V14_summary.md](../docs/EvidRank_evolve/V14_summary.md) | 2026-06-02T18:21:49+08:00 |
+| iteration | [docs/EvidRank_evolve/V15_iteration.md](../docs/EvidRank_evolve/V15_iteration.md) | 2026-06-02T18:35:56+08:00 |
+| summary | [docs/EvidRank_evolve/V15_summary.md](../docs/EvidRank_evolve/V15_summary.md) | 2026-06-02T18:33:51+08:00 |
+| iteration | [docs/EvidRank_evolve/V16_iteration.md](../docs/EvidRank_evolve/V16_iteration.md) | 2026-06-02T18:55:52+08:00 |
+| summary | [docs/EvidRank_evolve/V16_summary.md](../docs/EvidRank_evolve/V16_summary.md) | 2026-06-02T18:45:07+08:00 |
+| iteration | [docs/EvidRank_evolve/V17_iteration.md](../docs/EvidRank_evolve/V17_iteration.md) | 2026-06-02T18:56:12+08:00 |
+| summary | [docs/EvidRank_evolve/V17_summary.md](../docs/EvidRank_evolve/V17_summary.md) | 2026-06-02T18:54:41+08:00 |
 | summary | [docs/EvidRank_evolve/V1_summary.md](../docs/EvidRank_evolve/V1_summary.md) | 2026-06-01T18:29:32+08:00 |
 | iteration | [docs/EvidRank_evolve/V2_iteration.md](../docs/EvidRank_evolve/V2_iteration.md) | 2026-06-01T18:29:32+08:00 |
 | summary | [docs/EvidRank_evolve/V2_summary.md](../docs/EvidRank_evolve/V2_summary.md) | 2026-06-01T18:29:32+08:00 |
@@ -644,6 +648,15 @@ _Last refreshed: 2026-06-02T14:41:00+08:00_
 | summary | [docs/EvidRank_evolve/V9_summary.md](../docs/EvidRank_evolve/V9_summary.md) | 2026-06-02T10:22:26+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V10_vs_V11.md](../docs/EvidRank_evolve/compare_V10_vs_V11.md) | 2026-06-02T14:37:14+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V10_vs_V11_trial_span008.md](../docs/EvidRank_evolve/compare_V10_vs_V11_trial_span008.md) | 2026-06-02T14:29:32+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V11_vs_V13.md](../docs/EvidRank_evolve/compare_V11_vs_V13.md) | 2026-06-02T18:11:00+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V11_vs_V14.md](../docs/EvidRank_evolve/compare_V11_vs_V14.md) | 2026-06-02T18:22:01+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V11_vs_V15.md](../docs/EvidRank_evolve/compare_V11_vs_V15.md) | 2026-06-02T18:34:01+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V11_vs_V16.md](../docs/EvidRank_evolve/compare_V11_vs_V16.md) | 2026-06-02T18:45:17+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V11_vs_V17.md](../docs/EvidRank_evolve/compare_V11_vs_V17.md) | 2026-06-02T18:54:52+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V13_vs_V14.md](../docs/EvidRank_evolve/compare_V13_vs_V14.md) | 2026-06-02T18:22:01+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V14_vs_V15.md](../docs/EvidRank_evolve/compare_V14_vs_V15.md) | 2026-06-02T18:34:03+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V15_vs_V16.md](../docs/EvidRank_evolve/compare_V15_vs_V16.md) | 2026-06-02T18:45:17+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V16_vs_V17.md](../docs/EvidRank_evolve/compare_V16_vs_V17.md) | 2026-06-02T18:54:51+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V1_vs_V2.md](../docs/EvidRank_evolve/compare_V1_vs_V2.md) | 2026-06-01T18:29:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V2_vs_V3.md](../docs/EvidRank_evolve/compare_V2_vs_V3.md) | 2026-06-01T18:29:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V3_vs_V4.md](../docs/EvidRank_evolve/compare_V3_vs_V4.md) | 2026-06-01T18:29:32+08:00 |
@@ -662,6 +675,12 @@ _Last refreshed: 2026-06-02T14:41:00+08:00_
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V10` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V11` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V11_trial_span008` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V12` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V13` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V14` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V15` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V16` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V17` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V2` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V3` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V4` |
@@ -674,6 +693,12 @@ _Last refreshed: 2026-06-02T14:41:00+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/V10` |
 | report | `output/rcabench-platform-v2/evolve_reports/V11` |
 | report | `output/rcabench-platform-v2/evolve_reports/V11_trial_span008` |
+| report | `output/rcabench-platform-v2/evolve_reports/V12` |
+| report | `output/rcabench-platform-v2/evolve_reports/V13` |
+| report | `output/rcabench-platform-v2/evolve_reports/V14` |
+| report | `output/rcabench-platform-v2/evolve_reports/V15` |
+| report | `output/rcabench-platform-v2/evolve_reports/V16` |
+| report | `output/rcabench-platform-v2/evolve_reports/V17` |
 | report | `output/rcabench-platform-v2/evolve_reports/V2` |
 | report | `output/rcabench-platform-v2/evolve_reports/V3` |
 | report | `output/rcabench-platform-v2/evolve_reports/V3_research` |
@@ -686,6 +711,16 @@ _Last refreshed: 2026-06-02T14:41:00+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/V9` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V10_vs_V11` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V10_vs_V11_trial_span008` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V12` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V13` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V14` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V15` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V16` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V17` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V13_vs_V14` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V14_vs_V15` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V15_vs_V16` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V16_vs_V17` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V1_vs_V2` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V2_vs_V3` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V3_vs_V4` |
