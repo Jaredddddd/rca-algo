@@ -1,7 +1,7 @@
 # EvidRank-ARC Baseline
 
 - Created: 2026-06-03
-- Current accepted behavior: `ARC5`
+- Current accepted behavior: `ARC12`
 - Initial evaluated baseline: `ARC_67`
 - Stored pre-rename snapshot: `output/rcabench-platform-v2/evolve_snapshots/V13_SELF_LEARNED_67/`
 - Algorithm registry name: `evidencerank_arc`
@@ -26,6 +26,10 @@ This is a no-label baseline for the "remove fixed per-feature prior" question. I
 - ARC2 also computes a service-level local-vs-propagation contrast from p95-normalized family sums: `metric + mutation + log - propagation`.
 - ARC3 removes ARC2's explicit blend constants and derives correction strength from active evidence-family count.
 - ARC5 adds a final trace-neighbor pairwise contrast: when a higher-scored adjacent service is propagation-heavy and its neighbor is mutation-heavier, score is transferred to the strongest root-like neighbor explanation for that victim.
+- ARC6 removes the fixed reliability meta-weight vector. Reliability diagnostics are still computed, but their combination weights are learned from the current case's diagnostic matrix by PCA rather than fixed constants.
+- ARC7 removes the older one-directional ARC reranking layer because the final top-neighbor pairwise contrast has absorbed its useful behavior.
+- ARC11 replaces integer active-family count with a case-local effective participation number computed from learned family reliability.
+- ARC12 replaces ARC's endpoint support fixed factors with an endpoint/status/rise rank-alignment gate. The default `evidencerank` line still uses the legacy endpoint gate.
 - EvidRank-ARC keeps `topology_in_degree` and `topology_out_degree` as unsupervised structural tie-break features. Removing them lowered AC@1, so they are part of the accepted baseline.
 
 ## Iterations
@@ -40,11 +44,22 @@ This is a no-label baseline for the "remove fixed per-feature prior" question. I
 | `ARC2` | bounded family-reliability correction plus local-vs-propagation family contrast | 0.720113 | 0.832050 | 0.940928 | 0.973277 | superseded by ARC3 |
 | `ARC3` | ARC2-equivalent structural family-count blend, no explicit blend constants | 0.720113 | 0.832050 | 0.940928 | 0.973277 | superseded by ARC5 |
 | `ARC4` | global pseudo-root / pseudo-victim cosine prior synthesis, best conservative candidate | 0.709564 | 0.826269 | 0.940225 | 0.973980 | reject |
-| `ARC5` | trace-directed top-neighbor pairwise mutation-vs-propagation transfer | 0.728551 | 0.836412 | 0.940225 | 0.973277 | accept current |
+| `ARC5` | trace-directed top-neighbor pairwise mutation-vs-propagation transfer | 0.728551 | 0.836412 | 0.940225 | 0.973277 | superseded by ARC6 |
+| `ARC6` | case-local PCA reliability meta-calibration, no fixed reliability coefficients | 0.728551 | 0.836841 | 0.943741 | 0.973277 | superseded by ARC7 |
+| `ARC7` | remove redundant old directional contrast reranking layer | 0.728551 | 0.836843 | 0.943741 | 0.973277 | superseded by ARC12 |
+| `ARC8` | replace family consensus and endpoint gate with pure view/rank agreement | 0.677918 | 0.802414 | 0.917722 | 0.963432 | reject |
+| `ARC9` | isolate self-supervised family averaging with legacy endpoint gate | 0.675809 | 0.801007 | 0.918425 | 0.964838 | reject |
+| `ARC10` | active-anchored learned family correction magnitude | 0.675809 | 0.801007 | 0.918425 | 0.964838 | reject |
+| `ARC11` | family reliability effective participation replaces integer active-family count | 0.728551 | 0.836637 | 0.943741 | 0.973277 | foundation for ARC12 |
+| `ARC12` | ARC endpoint support learned from endpoint/status/rise rank alignment | 0.734880 | 0.839508 | 0.936006 | 0.971871 | accept current |
 
 The important optimization was allowing strong peak evidence to remain above 1 after per-case p95 scaling. The `[0, 1]` version over-flattened localized roots and behaved too much like equalized feature fusion. The topology ablation showed that degree features, even without a hand-coded prior, help stabilize this no-prior baseline.
 
-ARC1 showed that per-feature reliability should not be used as a sharp case-local prior. ARC2 recovers part of that signal at a safer granularity: family-level median reliability and service-level local/propagation contrast. ARC3 keeps ARC2's output while replacing explicit blend constants with family-count-derived correction strength. ARC4 showed that global pseudo-vector prior synthesis is too broad for head ranking. ARC5 keeps the self-supervised idea but applies it only as a trace-local top-neighbor pairwise correction. This keeps ARC unsupervised and adaptive while avoiding a direct return to fixed `FEATURE_WEIGHTS`.
+ARC1 showed that per-feature reliability should not be used as a sharp case-local prior. ARC2 recovers part of that signal at a safer granularity: family-level median reliability and service-level local/propagation contrast. ARC3 keeps ARC2's output while replacing explicit blend constants with family-count-derived correction strength. ARC4 showed that global pseudo-vector prior synthesis is too broad for head ranking. ARC5 keeps the self-supervised idea but applies it only as a trace-local top-neighbor pairwise correction. ARC6 removes the fixed reliability coefficient vector and replaces it with case-local PCA meta-calibration. ARC7 removes the now-redundant old directional contrast layer.
+
+ARC8-ARC10 showed that family consensus cannot be replaced by generic view agreement or free learned view correction: those variants dilute the active root-score anchor and drop AC@1 to about `0.676`. ARC11 keeps the structural RCA correction but learns the family participation count from the current reliability distribution, matching ARC7's top-k behavior. ARC12 then replaces ARC's legacy endpoint fixed factors with a rank-alignment support gate, improving AC@1 and MRR while accepting a small, explainable AC@3/AC@5 trade-off. This keeps ARC unsupervised and adaptive while avoiding a direct return to fixed `FEATURE_WEIGHTS`.
+
+ARC6 also tested whether all remaining hand-designed calibration could be removed at once. That full no-fixed candidate was rejected: best AC@1 fell to `0.652602`. Removing endpoint support alone fell to `0.680731`; removing fixed clipping alone fell to `0.585091`. Therefore endpoint support, robust clipping, and mutation/propagation role priors remain explicit RCA inductive biases until learned replacements can beat ARC6.
 
 ## Current Commands
 
@@ -52,9 +67,9 @@ ARC1 showed that per-feature reliability should not be used as a sharp case-loca
 uv run --package evidencerank python VibeResearchTools/evidrank_lab.py guard
 LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidencerank/main.py eval batch -a evidencerank_arc -d rcabench --clear --use-cpus 48
 uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
-uv run --package evidencerank python VibeResearchTools/evidrank_lab.py snapshot --version ARC5 --algorithm evidencerank_arc --dataset rcabench
-uv run --package evidencerank python VibeResearchTools/evidrank_lab.py summarize --version ARC5 --source ARC5 --algorithm evidencerank_arc --dataset rcabench
-uv run --package evidencerank python VibeResearchTools/evidrank_lab.py compare --old ARC3 --new ARC5 --algorithm evidencerank_arc --dataset rcabench
+uv run --package evidencerank python VibeResearchTools/evidrank_lab.py snapshot --version ARC12 --algorithm evidencerank_arc --dataset rcabench
+uv run --package evidencerank python VibeResearchTools/evidrank_lab.py summarize --version ARC12 --source ARC12 --algorithm evidencerank_arc --dataset rcabench
+uv run --package evidencerank python VibeResearchTools/evidrank_lab.py compare --old ARC7 --new ARC12 --algorithm evidencerank_arc --dataset rcabench
 uv run --package evidencerank python VibeResearchTools/evidrank_lab.py index
 ```
 
@@ -67,14 +82,15 @@ uv run --package evidencerank python VibeResearchTools/evidrank_lab.py index
 - `uv run --package evidencerank python VibeResearchTools/evidrank_lab.py guard`
   - Result: no high-risk overfitting warnings.
 - `LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidencerank/main.py eval batch -a evidencerank_arc -d rcabench --clear --use-cpus 48`
-  - Result for ARC5: full eval completed, 1422 cases, error 0, batch wall time about 299s.
+  - Result for ARC12: full eval completed, 1422 cases, error 0, batch wall time about 308s.
 - `uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench`
-  - Result for ARC5: total 1422, error 0, runtime.avg 9.752806s, AC@1 0.728551, MRR 0.836412, AC@3 0.940225, AC@5 0.973277.
-- Current summary: `docs/EvidRank-ARC-Evolve/ARC5_summary.md`.
-- Current compare: `docs/EvidRank-ARC-Evolve/compare_ARC3_vs_ARC5.md`.
+  - Result for ARC12: total 1422, error 0, runtime.avg 10.061190s, AC@1 0.734880, MRR 0.839508, AC@3 0.936006, AC@5 0.971871.
+- Current summary: `docs/EvidRank-ARC-Evolve/ARC12_summary.md`.
+- Current compare: `docs/EvidRank-ARC-Evolve/compare_ARC7_vs_ARC12.md`.
+- Endpoint-gate isolation compare: `docs/EvidRank-ARC-Evolve/compare_ARC11_vs_ARC12.md`.
 - Main improvement compare: `docs/EvidRank-ARC-Evolve/compare_ARC1_vs_ARC2.md`.
 - Initial ARC drift check: `docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md` shows all 1422 cases unchanged.
 
 ## Decision
 
-Accept `ARC5` as the current `evidencerank_arc` / EvidRank-ARC line. Relative to ARC3, it improves AC@1 `0.720113 -> 0.728551` and MRR `0.832050 -> 0.836412`, keeps AC@5 unchanged, and has only a tiny AC@3 change `0.940928 -> 0.940225`. It should remain a comparison baseline rather than replacing the default EvidenceRank implementation, because it still trails the accepted fixed-prior line on AC@1 and MRR.
+Accept `ARC12` as the current `evidencerank_arc` / EvidRank-ARC line. Relative to ARC7, it improves AC@1 `0.728551 -> 0.734880` and MRR `0.836843 -> 0.839508` by replacing ARC's endpoint fixed factors with current-case rank-alignment support and replacing integer family count with effective family participation. AC@3 drops `0.943741 -> 0.936006` and AC@5 drops `0.973277 -> 0.971871`; the regression is explainable as sharper endpoint/protocol mutation support trading off propagation-shaped delay/partition/loss cases. It should remain a comparison baseline rather than replacing the default EvidenceRank implementation, because it still trails the accepted fixed-prior line on AC@1 and MRR.

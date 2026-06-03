@@ -102,11 +102,6 @@ TRACE_ENDPOINT_POST_GATE_FACTOR = 1.75
 ADAPTIVE_MODALITY_SPAN = 0.08
 ADAPTIVE_MODALITY_MIN_FACTOR = 0.92
 ADAPTIVE_MODALITY_MAX_FACTOR = 1.08
-ARC_SUPPORT_WEIGHT = 0.20
-ARC_CONCENTRATION_WEIGHT = 0.25
-ARC_CONTRAST_WEIGHT = 0.25
-ARC_TOP_GAP_WEIGHT = 0.15
-ARC_AGREEMENT_WEIGHT = 0.15
 ARC_CASE_SCALE_CLIP = 3.0
 ARC_DIRECTIONAL_MUTATION_FEATURES = frozenset({
     "metric_count_drop_shift",
@@ -680,6 +675,19 @@ def _cosine_similarity(left: np.ndarray, right: np.ndarray) -> float | None:
     return min(1.0, max(0.0, similarity))
 
 
+def _arc_positive_rank_view(values: np.ndarray) -> np.ndarray:
+    clean = np.nan_to_num(values.astype(np.float64, copy=False), nan=0.0, posinf=0.0, neginf=0.0)
+    clean = np.maximum(clean, 0.0)
+    view = np.zeros(clean.shape[0], dtype=np.float64)
+    positive_idx = np.flatnonzero(clean > 0.0)
+    if positive_idx.size == 0:
+        return view
+
+    ordered_idx = positive_idx[np.argsort(clean[positive_idx], kind="mergesort")]
+    view[ordered_idx] = np.arange(1, positive_idx.size + 1, dtype=np.float64) / float(positive_idx.size)
+    return view
+
+
 def _feature_agreement(
     matrix: np.ndarray,
     feature_idx: int,
@@ -722,10 +730,10 @@ def _feature_agreement(
     return float(np.mean(agreement_scores))
 
 
-def _feature_reliability(column: np.ndarray, agreement: float) -> float:
+def _feature_reliability_components(column: np.ndarray, agreement: float) -> np.ndarray:
     positive = column[np.isfinite(column) & (column > 0.0)]
     if positive.size == 0:
-        return 0.0
+        return np.zeros(5, dtype=np.float64)
 
     support = min(1.0, math.sqrt(float(positive.size) / 3.0))
 
@@ -751,13 +759,41 @@ def _feature_reliability(column: np.ndarray, agreement: float) -> float:
     contrast = min(1.0, max(0.0, contrast))
 
     agreement = min(1.0, max(0.0, agreement))
-    return (
-        ARC_SUPPORT_WEIGHT * support
-        + ARC_CONCENTRATION_WEIGHT * concentration
-        + ARC_CONTRAST_WEIGHT * contrast
-        + ARC_TOP_GAP_WEIGHT * top_gap
-        + ARC_AGREEMENT_WEIGHT * agreement
+    return np.asarray(
+        [support, concentration, contrast, top_gap, agreement],
+        dtype=np.float64,
     )
+
+
+def _arc_reliability_component_weights(components: np.ndarray) -> np.ndarray:
+    """Learn reliability meta-weights from the current case diagnostics."""
+    if components.size == 0 or components.shape[1] == 0:
+        return np.asarray([], dtype=np.float64)
+
+    clean = np.nan_to_num(components, nan=0.0, posinf=0.0, neginf=0.0)
+    if not np.any(clean > 0.0):
+        return np.zeros(clean.shape[1], dtype=np.float64)
+
+    centered = clean - np.mean(clean, axis=0, keepdims=True)
+    scale = np.std(centered, axis=0)
+    standardized = centered / (scale + 1e-12)
+    covariance = standardized.T @ standardized / max(1, standardized.shape[0] - 1)
+    try:
+        eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+    except np.linalg.LinAlgError:
+        return np.ones(clean.shape[1], dtype=np.float64) / float(clean.shape[1])
+
+    component = eigenvectors[:, int(np.argmax(eigenvalues))]
+    feature_mean = np.mean(clean, axis=1)
+    if float(np.dot(clean @ component, feature_mean)) < 0.0:
+        component = -component
+
+    weights = np.maximum(component, 0.0)
+    if float(np.sum(weights)) <= 1e-12:
+        weights = np.abs(component)
+    if float(np.sum(weights)) <= 1e-12:
+        return np.ones(clean.shape[1], dtype=np.float64) / float(clean.shape[1])
+    return weights / float(np.sum(weights))
 
 
 def _arc_unsupervised_feature_weights(
@@ -769,11 +805,18 @@ def _arc_unsupervised_feature_weights(
         modality = _feature_modality(feature_name) or "other"
         modality_indices.setdefault(modality, []).append(idx)
 
-    weights = np.zeros(len(enabled_features), dtype=np.float32)
+    components = np.zeros((len(enabled_features), 5), dtype=np.float64)
     for idx in range(len(enabled_features)):
         agreement = _feature_agreement(matrix, idx, enabled_features, modality_indices)
-        weights[idx] = _feature_reliability(matrix[:, idx], agreement)
+        components[idx] = _feature_reliability_components(matrix[:, idx], agreement)
 
+    component_weights = _arc_reliability_component_weights(components)
+    if component_weights.size == 0:
+        return np.zeros(len(enabled_features), dtype=np.float32)
+
+    weights = components @ component_weights
+    weights = np.nan_to_num(weights, nan=0.0, posinf=0.0, neginf=0.0)
+    weights = np.maximum(weights, 0.0).astype(np.float32)
     positive = weights[weights > 0.0]
     if positive.size == 0:
         return weights
@@ -815,7 +858,7 @@ def _arc_family_indices(enabled_features: tuple[str, ...]) -> dict[str, list[int
 def _arc_family_reliability_weights(
     feature_reliability: np.ndarray,
     enabled_features: tuple[str, ...],
-) -> tuple[np.ndarray, int]:
+) -> tuple[np.ndarray, float]:
     """Collapse noisy feature reliability into bounded family-level calibration."""
     clean = np.nan_to_num(feature_reliability, nan=0.0, posinf=0.0, neginf=0.0)
     family_indices = _arc_family_indices(enabled_features)
@@ -833,11 +876,11 @@ def _arc_family_reliability_weights(
         if reliability > 0.0
     ]
     if not positive_reliability:
-        return np.ones(len(enabled_features), dtype=np.float32), 1
+        return np.ones(len(enabled_features), dtype=np.float32), 1.0
 
     center = float(np.mean(positive_reliability))
     if not math.isfinite(center) or center <= 0.0:
-        return np.ones(len(enabled_features), dtype=np.float32), 1
+        return np.ones(len(enabled_features), dtype=np.float32), 1.0
 
     weights = np.ones(len(enabled_features), dtype=np.float32)
     for family, reliability in family_reliability.items():
@@ -845,7 +888,16 @@ def _arc_family_reliability_weights(
         if not math.isfinite(family_weight) or family_weight <= 0.0:
             continue
         weights[family_indices[family]] = float(family_weight)
-    return weights, len(positive_reliability)
+
+    reliability_values = np.asarray(positive_reliability, dtype=np.float64)
+    reliability_mass = float(np.sum(reliability_values))
+    reliability_energy = float(np.sum(reliability_values * reliability_values))
+    if reliability_mass <= 0.0 or reliability_energy <= 0.0:
+        return weights, 1.0
+    effective_family_count = reliability_mass * reliability_mass / reliability_energy
+    if not math.isfinite(effective_family_count) or effective_family_count <= 0.0:
+        effective_family_count = 1.0
+    return weights, effective_family_count
 
 
 def _arc_normalized_family_sum(
@@ -882,7 +934,7 @@ def _apply_arc_family_consensus(
     family_scores: dict[str, float],
     family_weighted_matrix: np.ndarray,
     enabled_features: tuple[str, ...],
-    active_family_count: int,
+    effective_family_count: float,
 ) -> dict[str, float]:
     if not active_scores:
         return active_scores
@@ -896,7 +948,7 @@ def _apply_arc_family_consensus(
         dtype=np.float64,
     )
     family_delta = _arc_family_local_contrast(family_weighted_matrix, enabled_features)
-    family_count = max(1.0, float(active_family_count))
+    family_count = max(1.0, float(effective_family_count))
     reliability_blend = 1.0 / family_count
     contrast_blend = 1.0 / math.sqrt(family_count)
     adjusted = (
@@ -904,77 +956,6 @@ def _apply_arc_family_consensus(
         + reliability_blend * family_vector
         + contrast_blend * family_delta
     )
-    adjusted = np.maximum(adjusted, 0.0)
-    return {service: float(adjusted[idx]) for idx, service in enumerate(services)}
-
-
-def _apply_arc_directional_contrast(
-    services: list[str],
-    scores: dict[str, float],
-    weighted_matrix: np.ndarray,
-    enabled_features: tuple[str, ...],
-    trace_edges: list[tuple[str, str]],
-) -> dict[str, float]:
-    if not trace_edges or not scores:
-        return scores
-
-    service_to_idx = {service: idx for idx, service in enumerate(services)}
-    base_scores = np.asarray(
-        [scores.get(service, 0.0) for service in services],
-        dtype=np.float64,
-    )
-    adjusted = base_scores.copy()
-
-    mutation_indices = [
-        idx
-        for idx, name in enumerate(enabled_features)
-        if name in ARC_DIRECTIONAL_MUTATION_FEATURES
-    ]
-    propagation_indices = [
-        idx
-        for idx, name in enumerate(enabled_features)
-        if name in ARC_DIRECTIONAL_PROPAGATION_FEATURES
-    ]
-    if not mutation_indices or not propagation_indices:
-        return scores
-
-    mutation = weighted_matrix[:, mutation_indices].sum(axis=1)
-    propagation = weighted_matrix[:, propagation_indices].sum(axis=1)
-
-    cleaned_edges: list[tuple[int, int]] = []
-    out_counts = np.zeros(len(services), dtype=np.float64)
-    for parent, child in trace_edges:
-        parent_idx = service_to_idx.get(parent)
-        child_idx = service_to_idx.get(child)
-        if parent_idx is None or child_idx is None or parent_idx == child_idx:
-            continue
-        cleaned_edges.append((parent_idx, child_idx))
-        out_counts[parent_idx] += 1.0
-
-    for parent_idx, child_idx in cleaned_edges:
-        if base_scores[parent_idx] <= base_scores[child_idx]:
-            continue
-        child_mutation_excess = max(0.0, float(mutation[child_idx] - mutation[parent_idx]))
-        parent_propagation_excess = max(0.0, float(propagation[parent_idx] - propagation[child_idx]))
-        if child_mutation_excess <= 0.0 or parent_propagation_excess <= 0.0:
-            continue
-
-        mutation_share = child_mutation_excess / (
-            float(mutation[child_idx] + mutation[parent_idx]) + 1e-6
-        )
-        propagation_share = parent_propagation_excess / (
-            float(propagation[parent_idx] + propagation[child_idx]) + 1e-6
-        )
-        score_excess = float(base_scores[parent_idx] - base_scores[child_idx])
-        transfer = (
-            score_excess
-            * mutation_share
-            * propagation_share
-            / max(1.0, out_counts[parent_idx])
-        )
-        adjusted[parent_idx] -= transfer
-        adjusted[child_idx] += transfer
-
     adjusted = np.maximum(adjusted, 0.0)
     return {service: float(adjusted[idx]) for idx, service in enumerate(services)}
 
@@ -1144,11 +1125,15 @@ def _heuristic_scores(
     feature_weights: np.ndarray | None = None,
     trace_edges: list[tuple[str, str]] | None = None,
     parent_context_weight: float = 0.0,
+    endpoint_gate: str = "legacy",
 ) -> dict[str, float]:
     clean_matrix = np.nan_to_num(matrix, nan=0.0, posinf=0.0, neginf=0.0)
     if feature_weights is not None:
         clean_matrix = clean_matrix * feature_weights
-    clean_matrix = _apply_trace_endpoint_support_gate(enabled_features, clean_matrix)
+    if endpoint_gate == "legacy":
+        clean_matrix = _apply_trace_endpoint_support_gate(enabled_features, clean_matrix)
+    elif endpoint_gate == "arc":
+        clean_matrix = _apply_arc_trace_endpoint_support_gate(enabled_features, clean_matrix)
     totals = clean_matrix.sum(axis=1)
     if trace_edges and parent_context_weight > 0.0:
         totals = _apply_parent_context(services, totals, trace_edges, parent_context_weight)
@@ -1184,6 +1169,61 @@ def _apply_trace_endpoint_support_gate(
         0.0,
         endpoint - TRACE_ENDPOINT_UNSUPPORTED_PENALTY * unsupported_endpoint,
     ) * TRACE_ENDPOINT_POST_GATE_FACTOR
+    return adjusted
+
+
+def _apply_arc_trace_endpoint_support_gate(
+    enabled_features: tuple[str, ...],
+    weighted_matrix: np.ndarray,
+) -> np.ndarray:
+    required = (
+        "trace_endpoint_shift",
+        "trace_status_code_shift",
+        "trace_count_rise_shift",
+    )
+    if not all(name in enabled_features for name in required):
+        return weighted_matrix
+
+    endpoint_idx = enabled_features.index("trace_endpoint_shift")
+    status_idx = enabled_features.index("trace_status_code_shift")
+    rise_idx = enabled_features.index("trace_count_rise_shift")
+
+    endpoint = weighted_matrix[:, endpoint_idx].astype(np.float64, copy=False)
+    if not np.any(endpoint > 0.0):
+        return weighted_matrix
+
+    support_candidates = [
+        weighted_matrix[:, status_idx].astype(np.float64, copy=False),
+        weighted_matrix[:, rise_idx].astype(np.float64, copy=False),
+    ]
+    endpoint_view = _arc_positive_rank_view(endpoint)
+    candidate_views = [_arc_positive_rank_view(candidate) for candidate in support_candidates]
+    candidate_weights = np.asarray(
+        [
+            _cosine_similarity(endpoint_view, candidate_view) or 0.0
+            for candidate_view in candidate_views
+        ],
+        dtype=np.float64,
+    )
+    if not np.any(candidate_weights > 0.0):
+        active_candidates = np.asarray(
+            [np.any(candidate > 0.0) for candidate in support_candidates],
+            dtype=np.float64,
+        )
+        if not np.any(active_candidates > 0.0):
+            return weighted_matrix
+        candidate_weights = active_candidates
+    candidate_weights = candidate_weights / float(np.sum(candidate_weights))
+
+    support = np.zeros_like(endpoint, dtype=np.float64)
+    for weight, candidate in zip(candidate_weights, support_candidates):
+        support += float(weight) * candidate
+
+    support_view = _arc_positive_rank_view(support)
+    endpoint_factor = endpoint_view + support_view
+
+    adjusted = weighted_matrix.copy()
+    adjusted[:, endpoint_idx] = np.maximum(0.0, endpoint * endpoint_factor)
     return adjusted
 
 
@@ -1322,19 +1362,13 @@ class EvidenceRankARC(Algorithm):
             feature_weights,
             trace_edges,
             self._parent_context_weight,
+            endpoint_gate="arc",
         )
-        weighted_matrix = _apply_trace_endpoint_support_gate(
+        weighted_matrix = _apply_arc_trace_endpoint_support_gate(
             self._enabled_features,
             case_matrix * feature_weights,
         )
-        scores = _apply_arc_directional_contrast(
-            services,
-            scores,
-            weighted_matrix,
-            self._enabled_features,
-            trace_edges,
-        )
-        family_reliability_weights, active_family_count = _arc_family_reliability_weights(
+        family_reliability_weights, effective_family_count = _arc_family_reliability_weights(
             feature_reliability,
             self._enabled_features,
         )
@@ -1346,17 +1380,11 @@ class EvidenceRankARC(Algorithm):
             family_feature_weights,
             trace_edges,
             self._parent_context_weight,
+            endpoint_gate="arc",
         )
-        family_weighted_matrix = _apply_trace_endpoint_support_gate(
+        family_weighted_matrix = _apply_arc_trace_endpoint_support_gate(
             self._enabled_features,
             case_matrix * family_feature_weights,
-        )
-        family_scores = _apply_arc_directional_contrast(
-            services,
-            family_scores,
-            family_weighted_matrix,
-            self._enabled_features,
-            trace_edges,
         )
         scores = _apply_arc_family_consensus(
             services,
@@ -1364,7 +1392,7 @@ class EvidenceRankARC(Algorithm):
             family_scores,
             family_weighted_matrix,
             self._enabled_features,
-            active_family_count,
+            effective_family_count,
         )
         scores = _apply_arc_top_neighbor_pairwise_contrast(
             services,
