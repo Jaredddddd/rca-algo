@@ -787,6 +787,127 @@ def _arc_active_feature_weights(feature_reliability: np.ndarray) -> np.ndarray:
     return (clean > 0.0).astype(np.float32)
 
 
+def _arc_family_indices(enabled_features: tuple[str, ...]) -> dict[str, list[int]]:
+    return {
+        "metric": [
+            idx
+            for idx, name in enumerate(enabled_features)
+            if name in MODALITY_FEATURES["metric"] and not name.startswith("topology_")
+        ],
+        "mutation": [
+            idx
+            for idx, name in enumerate(enabled_features)
+            if name in ARC_DIRECTIONAL_MUTATION_FEATURES
+        ],
+        "propagation": [
+            idx
+            for idx, name in enumerate(enabled_features)
+            if name in ARC_DIRECTIONAL_PROPAGATION_FEATURES
+        ],
+        "log": [
+            idx
+            for idx, name in enumerate(enabled_features)
+            if name in MODALITY_FEATURES["log"]
+        ],
+    }
+
+
+def _arc_family_reliability_weights(
+    feature_reliability: np.ndarray,
+    enabled_features: tuple[str, ...],
+) -> tuple[np.ndarray, int]:
+    """Collapse noisy feature reliability into bounded family-level calibration."""
+    clean = np.nan_to_num(feature_reliability, nan=0.0, posinf=0.0, neginf=0.0)
+    family_indices = _arc_family_indices(enabled_features)
+    family_reliability: dict[str, float] = {}
+    for family, indices in family_indices.items():
+        positive = clean[indices][clean[indices] > 0.0]
+        if positive.size == 0:
+            continue
+        reliability = float(np.median(positive))
+        if math.isfinite(reliability) and reliability > 0.0:
+            family_reliability[family] = reliability
+
+    positive_reliability = [
+        reliability for reliability in family_reliability.values()
+        if reliability > 0.0
+    ]
+    if not positive_reliability:
+        return np.ones(len(enabled_features), dtype=np.float32), 1
+
+    center = float(np.mean(positive_reliability))
+    if not math.isfinite(center) or center <= 0.0:
+        return np.ones(len(enabled_features), dtype=np.float32), 1
+
+    weights = np.ones(len(enabled_features), dtype=np.float32)
+    for family, reliability in family_reliability.items():
+        family_weight = reliability / center
+        if not math.isfinite(family_weight) or family_weight <= 0.0:
+            continue
+        weights[family_indices[family]] = float(family_weight)
+    return weights, len(positive_reliability)
+
+
+def _arc_normalized_family_sum(
+    weighted_matrix: np.ndarray,
+    indices: list[int],
+) -> np.ndarray:
+    if not indices:
+        return np.zeros(weighted_matrix.shape[0], dtype=np.float64)
+    values = weighted_matrix[:, indices].sum(axis=1).astype(np.float64)
+    positive = values[np.isfinite(values) & (values > 0.0)]
+    if positive.size == 0:
+        return np.zeros(weighted_matrix.shape[0], dtype=np.float64)
+    scale = float(np.percentile(positive, 95)) if positive.size > 1 else float(positive[0])
+    if not math.isfinite(scale) or scale <= 0.0:
+        return np.zeros(weighted_matrix.shape[0], dtype=np.float64)
+    return np.clip(values / scale, 0.0, ARC_CASE_SCALE_CLIP)
+
+
+def _arc_family_local_contrast(
+    weighted_matrix: np.ndarray,
+    enabled_features: tuple[str, ...],
+) -> np.ndarray:
+    family_indices = _arc_family_indices(enabled_features)
+    metric = _arc_normalized_family_sum(weighted_matrix, family_indices["metric"])
+    mutation = _arc_normalized_family_sum(weighted_matrix, family_indices["mutation"])
+    propagation = _arc_normalized_family_sum(weighted_matrix, family_indices["propagation"])
+    log = _arc_normalized_family_sum(weighted_matrix, family_indices["log"])
+    return metric + mutation + log - propagation
+
+
+def _apply_arc_family_consensus(
+    services: list[str],
+    active_scores: dict[str, float],
+    family_scores: dict[str, float],
+    family_weighted_matrix: np.ndarray,
+    enabled_features: tuple[str, ...],
+    active_family_count: int,
+) -> dict[str, float]:
+    if not active_scores:
+        return active_scores
+
+    active_vector = np.asarray(
+        [active_scores.get(service, 0.0) for service in services],
+        dtype=np.float64,
+    )
+    family_vector = np.asarray(
+        [family_scores.get(service, 0.0) for service in services],
+        dtype=np.float64,
+    )
+    family_delta = _arc_family_local_contrast(family_weighted_matrix, enabled_features)
+    family_count = max(1.0, float(active_family_count))
+    reliability_blend = 1.0 / family_count
+    contrast_blend = 1.0 / math.sqrt(family_count)
+    adjusted = (
+        (1.0 - reliability_blend) * active_vector
+        + reliability_blend * family_vector
+        + contrast_blend * family_delta
+    )
+    adjusted = np.maximum(adjusted, 0.0)
+    return {service: float(adjusted[idx]) for idx, service in enumerate(services)}
+
+
 def _apply_arc_directional_contrast(
     services: list[str],
     scores: dict[str, float],
@@ -853,6 +974,123 @@ def _apply_arc_directional_contrast(
         )
         adjusted[parent_idx] -= transfer
         adjusted[child_idx] += transfer
+
+    adjusted = np.maximum(adjusted, 0.0)
+    return {service: float(adjusted[idx]) for idx, service in enumerate(services)}
+
+
+def _apply_arc_top_neighbor_pairwise_contrast(
+    services: list[str],
+    scores: dict[str, float],
+    weighted_matrix: np.ndarray,
+    enabled_features: tuple[str, ...],
+    trace_edges: list[tuple[str, str]],
+) -> dict[str, float]:
+    """Use trace-neighbor root/victim pairs as a final ARC correction."""
+    if not trace_edges or not scores:
+        return scores
+
+    service_to_idx = {service: idx for idx, service in enumerate(services)}
+    base_scores = np.asarray(
+        [scores.get(service, 0.0) for service in services],
+        dtype=np.float64,
+    )
+    adjusted = base_scores.copy()
+
+    mutation_indices = [
+        idx
+        for idx, name in enumerate(enabled_features)
+        if name in ARC_DIRECTIONAL_MUTATION_FEATURES
+    ]
+    propagation_indices = [
+        idx
+        for idx, name in enumerate(enabled_features)
+        if name in ARC_DIRECTIONAL_PROPAGATION_FEATURES
+    ]
+    if not mutation_indices or not propagation_indices:
+        return scores
+
+    mutation = _arc_normalized_family_sum(weighted_matrix, mutation_indices)
+    propagation = _arc_normalized_family_sum(weighted_matrix, propagation_indices)
+
+    candidate_pairs: list[tuple[int, int, float, float, float, float]] = []
+
+    def add_pair(root_idx: int, victim_idx: int) -> None:
+        if root_idx == victim_idx or base_scores[victim_idx] <= base_scores[root_idx]:
+            return
+
+        mutation_excess = max(0.0, float(mutation[root_idx] - mutation[victim_idx]))
+        propagation_excess = max(
+            0.0,
+            float(propagation[victim_idx] - propagation[root_idx]),
+        )
+        if mutation_excess <= 0.0 or propagation_excess <= 0.0:
+            return
+
+        mutation_share = mutation_excess / (
+            float(mutation[root_idx] + mutation[victim_idx]) + 1e-6
+        )
+        propagation_share = propagation_excess / (
+            float(propagation[victim_idx] + propagation[root_idx]) + 1e-6
+        )
+        score_excess = float(base_scores[victim_idx] - base_scores[root_idx])
+        score_share = score_excess / (
+            float(base_scores[victim_idx] + base_scores[root_idx]) + 1e-6
+        )
+        strength = mutation_share * propagation_share * score_share
+        if not math.isfinite(strength) or strength <= 0.0:
+            return
+
+        candidate_pairs.append(
+            (
+                root_idx,
+                victim_idx,
+                mutation_share,
+                propagation_share,
+                strength,
+                score_excess,
+            )
+        )
+
+    for parent, child in trace_edges:
+        parent_idx = service_to_idx.get(parent)
+        child_idx = service_to_idx.get(child)
+        if parent_idx is None or child_idx is None or parent_idx == child_idx:
+            continue
+
+        add_pair(child_idx, parent_idx)
+        add_pair(parent_idx, child_idx)
+
+    if not candidate_pairs:
+        return scores
+
+    best_by_victim: dict[int, tuple[int, int, float, float, float, float]] = {}
+    for pair in candidate_pairs:
+        victim_idx = pair[1]
+        current = best_by_victim.get(victim_idx)
+        if current is None or pair[4] > current[4]:
+            best_by_victim[victim_idx] = pair
+
+    pair_counts = np.zeros(len(services), dtype=np.float64)
+    for _root_idx, victim_idx, *_rest in best_by_victim.values():
+        pair_counts[victim_idx] += 1.0
+
+    for (
+        root_idx,
+        victim_idx,
+        mutation_share,
+        propagation_share,
+        _strength,
+        score_excess,
+    ) in best_by_victim.values():
+        transfer = (
+            score_excess
+            * mutation_share
+            * propagation_share
+            / max(1.0, pair_counts[victim_idx])
+        )
+        adjusted[victim_idx] -= transfer
+        adjusted[root_idx] += transfer
 
     adjusted = np.maximum(adjusted, 0.0)
     return {service: float(adjusted[idx]) for idx, service in enumerate(services)}
@@ -1072,11 +1310,11 @@ class EvidenceRankARC(Algorithm):
             self._modalities,
         )
         case_matrix = _robust_case_feature_matrix(matrix)
-        feature_weights = _arc_unsupervised_feature_weights(
+        feature_reliability = _arc_unsupervised_feature_weights(
             case_matrix,
             self._enabled_features,
         )
-        feature_weights = _arc_active_feature_weights(feature_weights)
+        feature_weights = _arc_active_feature_weights(feature_reliability)
         scores = _heuristic_scores(
             services,
             case_matrix,
@@ -1090,6 +1328,45 @@ class EvidenceRankARC(Algorithm):
             case_matrix * feature_weights,
         )
         scores = _apply_arc_directional_contrast(
+            services,
+            scores,
+            weighted_matrix,
+            self._enabled_features,
+            trace_edges,
+        )
+        family_reliability_weights, active_family_count = _arc_family_reliability_weights(
+            feature_reliability,
+            self._enabled_features,
+        )
+        family_feature_weights = feature_weights * family_reliability_weights
+        family_scores = _heuristic_scores(
+            services,
+            case_matrix,
+            self._enabled_features,
+            family_feature_weights,
+            trace_edges,
+            self._parent_context_weight,
+        )
+        family_weighted_matrix = _apply_trace_endpoint_support_gate(
+            self._enabled_features,
+            case_matrix * family_feature_weights,
+        )
+        family_scores = _apply_arc_directional_contrast(
+            services,
+            family_scores,
+            family_weighted_matrix,
+            self._enabled_features,
+            trace_edges,
+        )
+        scores = _apply_arc_family_consensus(
+            services,
+            scores,
+            family_scores,
+            family_weighted_matrix,
+            self._enabled_features,
+            active_family_count,
+        )
+        scores = _apply_arc_top_neighbor_pairwise_contrast(
             services,
             scores,
             weighted_matrix,
