@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import math
 from collections import defaultdict
+from enum import IntEnum
 from pathlib import Path
 from typing import Any
 
@@ -70,29 +71,63 @@ INPUT_FRAME_NAMES = (
     "abnormal_logs",
 )
 
-FEATURE_WEIGHTS = {
-    "metric_max_z": 0.75,
-    "metric_mean_z": 0.75,
-    "metric_anomaly_count": 0.75,
-    "metric_value_delta": 0.75,
-    "metric_count_drop_shift": 10.0,
-    "trace_duration_z": 1.0,
-    "trace_duration_delta": 1.0,
-    "trace_count_delta": 1.0,
-    "trace_count_rise_shift": 6.0,
-    "trace_count_drop_shift": 0.85,
-    "trace_endpoint_shift": 6.0,
-    "trace_error_rate": 1.0,
-    "trace_status_code_shift": 16.0,
-    "trace_self_duration_relative_shift": 1.5,
-    "log_count_delta": 0.75,
-    "log_error_rate": 0.75,
-    "log_template_delta": 0.75,
-    "topology_in_degree": 0.0,
-    "topology_out_degree": 0.0,
-    "abnormal_metric_rows": 1.25,
-    "abnormal_trace_rows": 1.25,
+class FeaturePriority(IntEnum):
+    DISABLED = 0
+    BACKGROUND = 1
+    BASELINE = 2
+    SUPPORT = 3
+    LOCAL = 4
+    HIGH = 5
+    ROOT = 6
+    CRITICAL = 7
+
+
+FEATURE_PRIORITY_WEIGHTS = {
+    FeaturePriority.DISABLED: 0.0,
+    FeaturePriority.BACKGROUND: 0.75,
+    FeaturePriority.BASELINE: 1.0,
+    FeaturePriority.SUPPORT: 1.25,
+    FeaturePriority.LOCAL: 1.5,
+    FeaturePriority.HIGH: 6.0,
+    FeaturePriority.ROOT: 10.0,
+    FeaturePriority.CRITICAL: 16.0,
 }
+
+FEATURE_PRIORITIES = {
+    "metric_max_z": FeaturePriority.BACKGROUND,
+    "metric_mean_z": FeaturePriority.BACKGROUND,
+    "metric_anomaly_count": FeaturePriority.BACKGROUND,
+    "metric_value_delta": FeaturePriority.BACKGROUND,
+    "metric_count_drop_shift": FeaturePriority.ROOT,
+    "trace_duration_z": FeaturePriority.BASELINE,
+    "trace_duration_delta": FeaturePriority.BASELINE,
+    "trace_count_delta": FeaturePriority.BASELINE,
+    "trace_count_rise_shift": FeaturePriority.HIGH,
+    "trace_count_drop_shift": FeaturePriority.BASELINE,
+    "trace_endpoint_shift": FeaturePriority.HIGH,
+    "trace_error_rate": FeaturePriority.BASELINE,
+    "trace_status_code_shift": FeaturePriority.CRITICAL,
+    "trace_self_duration_relative_shift": FeaturePriority.LOCAL,
+    "log_count_delta": FeaturePriority.BACKGROUND,
+    "log_error_rate": FeaturePriority.BACKGROUND,
+    "log_template_delta": FeaturePriority.BACKGROUND,
+    "topology_in_degree": FeaturePriority.DISABLED,
+    "topology_out_degree": FeaturePriority.DISABLED,
+    "abnormal_metric_rows": FeaturePriority.SUPPORT,
+    "abnormal_trace_rows": FeaturePriority.SUPPORT,
+}
+
+
+def _feature_weights_from_priorities(
+    priorities: dict[str, FeaturePriority],
+) -> dict[str, float]:
+    return {
+        name: FEATURE_PRIORITY_WEIGHTS[priority]
+        for name, priority in priorities.items()
+    }
+
+
+FEATURE_WEIGHTS = _feature_weights_from_priorities(FEATURE_PRIORITIES)
 
 PARENT_CONTEXT_WEIGHT = 0.05
 TRACE_ENDPOINT_SUPPORT_STATUS_FACTOR = 2.0

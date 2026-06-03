@@ -590,6 +590,7 @@ uv run --package evidencerank python algorithms/evidencerank/main.py \
   -a evidencerank_metric_log \
   -a evidencerank_metric_trace \
   -a evidencerank_log_trace \
+  -a evidencerank_arc \
   -d rcabench --clear --use-cpus 32
 ```
 
@@ -611,6 +612,7 @@ uv run --package evidencerank python algorithms/evidencerank/main.py \
   -a evidencerank_metric_log \
   -a evidencerank_metric_trace \
   -a evidencerank_log_trace \
+  -a evidencerank_arc \
   -d rcabench --clear --use-cpus 45
 ```
 
