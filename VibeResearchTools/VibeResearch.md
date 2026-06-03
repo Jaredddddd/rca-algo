@@ -703,7 +703,7 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 
 本轮目标：
 1. 从 EvidRank-ARC 当前 67.09% AC@1 继续提升准确率，优先提升 AC@1 和 MRR。
-2. 第一目标是稳定超过 0.70 AC@1；进一步目标是接近或超过 0.75。
+2. 第一目标是稳定超过 0.75 AC@1；进一步目标是接近或超过 0.8。
 3. AC@3 / AC@5 不应出现不可解释的大幅退化。
 4. 仍然保持无监督 baseline：不要回退到手工固定 `FEATURE_WEIGHTS`，不要把 V11/V20 的固定 prior 直接塞回 ARC。
 
@@ -780,12 +780,13 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-03T13:53:25+08:00_
+_Last refreshed: 2026-06-03T14:04:27+08:00_
 
 ## EvidenceRank Document Index
 
 | type | document | updated |
 | --- | --- | --- |
+| summary | [docs/EvidRank-ARC-Evolve/ARC_BASELINE_summary.md](../docs/EvidRank-ARC-Evolve/ARC_BASELINE_summary.md) | 2026-06-03T14:04:27+08:00 |
 | summary | [docs/EvidRank-ARC-Evolve/EvidRank_ARC_67_summary.md](../docs/EvidRank-ARC-Evolve/EvidRank_ARC_67_summary.md) | 2026-06-03T13:52:23+08:00 |
 | note | [docs/EvidRank-ARC-Evolve/EvidRank_ARC_baseline.md](../docs/EvidRank-ARC-Evolve/EvidRank_ARC_baseline.md) | 2026-06-03T13:52:51+08:00 |
 | compare | [docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md](../docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md) | 2026-06-03T13:52:33+08:00 |
@@ -869,6 +870,7 @@ _Last refreshed: 2026-06-03T13:53:25+08:00_
 
 | kind | path |
 | --- | --- |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/ARC_BASELINE` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V1` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V10` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V11` |
@@ -894,6 +896,7 @@ _Last refreshed: 2026-06-03T13:53:25+08:00_
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V7` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V8` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V9` |
+| report | `output/rcabench-platform-v2/evolve_reports/ARC_BASELINE` |
 | report | `output/rcabench-platform-v2/evolve_reports/V1` |
 | report | `output/rcabench-platform-v2/evolve_reports/V10` |
 | report | `output/rcabench-platform-v2/evolve_reports/V11` |
