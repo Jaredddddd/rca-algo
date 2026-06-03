@@ -105,6 +105,24 @@ Fixed `HIGH=6`, `ROOT=10`, `CRITICAL=16`, `BASELINE=1`.
 
 Only `BACKGROUND=0.75`, `SUPPORT=1.25`, `LOCAL=1.5` preserved the current AC@1 in this coarse grid.
 
+### Robustness Mechanism Attempts
+
+After observing high sensitivity, several offline mechanisms were tested on the feature cache to see whether `0,1,1,1,2,5,10,15` or priority ordering alone could recover current AC@1.
+
+| mechanism | best / representative setting | AC@1 | MRR | interpretation |
+| --- | --- | ---: | ---: | --- |
+| case feature p95 normalization | decimal ladder, feature p95 | 0.523910 | 0.706148 | Too much useful magnitude information is removed. |
+| feature rank normalization | decimal ladder, per-feature rank | 0.434599 | 0.655407 | Priority order cannot rescue rank-only feature evidence. |
+| global unlabeled scale compensation | decimal + max-scale alpha `0.25` | 0.796062 | 0.874992 | Close on MRR, still loses about 7 top-1 cases. |
+| case priority-group calibration | decimal + mean-scale alpha `0.1` | 0.793249 | 0.873004 | Improves decimal but does not reach current. |
+| context cap / low-priority cap | cap context by strong evidence | 0.414909 | 0.575017 | Too harsh; context evidence is necessary. |
+| generic ladder ensemble | decimal + power2 + linear + integer-best | 0.767932 | 0.856877 | Generic-only consensus remains below current. |
+| current-neighbor ensemble | `HIGH=6`, `CRITICAL=16`, `ROOT in 8..11` | 0.800985 | 0.874399 | Stable for ROOT interval only; still relies on calibrated low/high/critical. |
+| mixed small interval ensemble | current + generic nearby ladders | 0.793952 | 0.872855 | Robust but loses top-1. |
+| lexicographic priority-only | priority group tuple, no numeric ladder | 0.394515 | 0.584970 | Pure priority order is insufficient. |
+
+The strongest near-miss is global unlabeled scale compensation: it makes a generic decimal ladder competitive in MRR, but not in AC@1. This suggests the next publishable direction is not "no severity values", but "severity ladder synthesized from unlabeled feature-scale and stability evidence".
+
 ## Case Deltas
 
 - Linear `0..7`: large regression, `227` cases regressed from hit@1 and `43` improved to hit@1 versus `FW_PRIORITY_PRIOR`.
@@ -117,4 +135,25 @@ Only `BACKGROUND=0.75`, `SUPPORT=1.25`, `LOCAL=1.5` preserved the current AC@1 i
 - Reason: the current ladder is not arbitrary-looking by accident; it defines narrow ranking margins between root-specific evidence and propagation symptoms. `0..7` compresses `CRITICAL/BASELINE` from `16` to `3.5`, `ROOT/BASELINE` from `10` to `3`, and raises support/background evidence, causing large top-1 loss.
 - Answer to the interval question: yes, the new cache can analyze candidate intervals without full eval. In the tested grid, `ROOT` is relatively tolerant (`8..11` with current low/critical/high), while `HIGH`, `CRITICAL`, `BACKGROUND`, and `LOCAL` are sensitive.
 - Presentation implication: a cleaner paper story should not claim these values are interchangeable ordinal IDs. A defensible wording is "SRE feature-priority prior with a calibrated severity ladder"; the ladder can be justified by offline sensitivity analysis or learned from unlabeled incidents.
-- Next smallest general step: run a narrower continuous/offline search around the current ladder, then either report stability intervals or learn the ladder with a label-free objective constrained by these no-regression bands.
+- Next smallest general step: learn the severity ladder from unlabeled feature cache with a stability/causal objective, then use the fixed priority ordering only as constraints. The current evidence does not support a claim that priority ordering alone reaches best AC@1.
+
+## Follow-up: Synthesized Priority Ladder
+
+Follow-up accepted version: `FW_PRIORITY_SYNTH_LADDER`.
+
+- Code change: removed the explicit `FEATURE_PRIORITY_WEIGHTS` float table from `algorithm.py` and replaced it with `_synthesize_feature_priority_ladder()`.
+- Mechanism: keep only ordinal `FeaturePriority` assignments at the feature level; synthesize the nonlinear severity ladder from the priority-tier structure.
+- Generated ladder for the current taxonomy: `[0.0, 0.75, 1.0, 1.25, 1.5, 6.0, 10.0, 16.0]`.
+- Full eval: AC@1 `0.800985`, MRR `0.874517`, AC@3 `0.942335`, AC@5 `0.975387`, error `0`.
+- Compare against `FW_PRIORITY_PRIOR`: all `1422` cases unchanged.
+- Detailed record: `docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_iteration.md`.
+
+Additional negative checks after the original ablation:
+
+| mechanism | representative setting | AC@1 | MRR | note |
+| --- | --- | ---: | ---: | --- |
+| priority-group max-scale compensation | decimal + two-sided alpha `0.20` | 0.797468 | 0.874584 | close but still loses top-1 |
+| conservative p25/down-only compensation | decimal + alpha `0.30` | 0.796765 | 0.875511 | better MRR, still lower AC@1 |
+| severity-family rank fusion | best RRF consensus | 0.797468 | 0.874605 | consensus did not recover current AC@1 |
+
+Conclusion refinement: direct generic values like `0,1,1,1,2,5,10,15` should be treated as ordinal priority IDs, not direct linear scorer weights. Under the current scorer, best AC@1 still requires a nonlinear diagnostic strength curve; the accepted change moves that curve into a reproducible synthesis rule rather than a hand-maintained float lookup.

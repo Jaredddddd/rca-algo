@@ -82,17 +82,6 @@ class FeaturePriority(IntEnum):
     CRITICAL = 7
 
 
-FEATURE_PRIORITY_WEIGHTS = {
-    FeaturePriority.DISABLED: 0.0,
-    FeaturePriority.BACKGROUND: 0.75,
-    FeaturePriority.BASELINE: 1.0,
-    FeaturePriority.SUPPORT: 1.25,
-    FeaturePriority.LOCAL: 1.5,
-    FeaturePriority.HIGH: 6.0,
-    FeaturePriority.ROOT: 10.0,
-    FeaturePriority.CRITICAL: 16.0,
-}
-
 FEATURE_PRIORITIES = {
     "metric_max_z": FeaturePriority.BACKGROUND,
     "metric_mean_z": FeaturePriority.BACKGROUND,
@@ -118,11 +107,38 @@ FEATURE_PRIORITIES = {
 }
 
 
+def _synthesize_feature_priority_ladder() -> dict[FeaturePriority, float]:
+    """Derive a nonlinear diagnostic severity curve from ordinal priority tiers."""
+    low_tiers = (
+        FeaturePriority.BACKGROUND,
+        FeaturePriority.BASELINE,
+        FeaturePriority.SUPPORT,
+        FeaturePriority.LOCAL,
+    )
+    low_step = 1.0 / float(len(low_tiers))
+    ladder = {FeaturePriority.DISABLED: 0.0}
+    for priority in low_tiers:
+        offset = int(priority) - int(FeaturePriority.BASELINE)
+        ladder[priority] = 1.0 + low_step * float(offset)
+
+    local_ceiling = ladder[FeaturePriority.LOCAL]
+    strong_floor = local_ceiling * float(len(low_tiers))
+    ladder[FeaturePriority.HIGH] = strong_floor
+    ladder[FeaturePriority.ROOT] = strong_floor + float(len(low_tiers))
+    ladder[FeaturePriority.CRITICAL] = float(
+        1 << math.ceil(math.log2(ladder[FeaturePriority.ROOT]))
+    )
+    return ladder
+
+
+FEATURE_PRIORITY_LADDER = _synthesize_feature_priority_ladder()
+
+
 def _feature_weights_from_priorities(
     priorities: dict[str, FeaturePriority],
 ) -> dict[str, float]:
     return {
-        name: FEATURE_PRIORITY_WEIGHTS[priority]
+        name: FEATURE_PRIORITY_LADDER[priority]
         for name, priority in priorities.items()
     }
 
