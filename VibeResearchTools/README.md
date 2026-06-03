@@ -4,6 +4,7 @@ This directory contains evaluation-side tools for EvidenceRank evolution. Run th
 
 ```bash
 uv run --package evidencerank python VibeResearchTools/evidrank_lab.py --help
+uv run --package evidencerank python VibeResearchTools/evidrank_feature_cache.py --help
 ```
 
 Main commands:
@@ -15,6 +16,12 @@ Main commands:
 - `guard`: scan EvidenceRank source for obvious label leakage or hardcoded case/service literals.
 - `new-note`: create a versioned iteration-note template in `docs/EvidRank_evolve/`.
 - `index`: refresh `VibeResearchTools/VibeResearch.md` so it links the current `docs/EvidRank_evolve/*.md` documents and generated artifacts.
+
+Feature cache commands:
+
+- `dump`: export one unlabeled raw EvidenceRank service-feature matrix cache from raw incident frames.
+- `reweight`: apply a candidate priority ladder to a feature cache and compute offline ranking metrics.
+- `scan`: grid-search priority ladder ranges without rerunning full batch eval.
 
 These tools may read labels and injection metadata for offline analysis. Algorithm code under `algorithms/evidencerank` must not read those files. Do not use `conclusion.parquet` in either tooling-driven analysis or algorithm code.
 

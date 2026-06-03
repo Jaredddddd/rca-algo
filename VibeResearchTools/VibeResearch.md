@@ -782,7 +782,7 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-03T23:47:37+08:00_
+_Last refreshed: 2026-06-04T00:47:57+08:00_
 
 ## EvidenceRank Document Index
 
@@ -827,8 +827,8 @@ _Last refreshed: 2026-06-03T23:47:37+08:00_
 | compare | [docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC1.md](../docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC1.md) | 2026-06-03T15:14:00+08:00 |
 | compare | [docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md](../docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md) | 2026-06-03T13:52:33+08:00 |
 | summary | [docs/EvidRank_evolve/FW_NUMERIC_BASELINE_summary.md](../docs/EvidRank_evolve/FW_NUMERIC_BASELINE_summary.md) | 2026-06-03T23:08:56+08:00 |
-| iteration | [docs/EvidRank_evolve/FW_PRIORITY_LADDER_ABLATION_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_LADDER_ABLATION_iteration.md) | 2026-06-03T23:40:28+08:00 |
-| iteration | [docs/EvidRank_evolve/FW_PRIORITY_LINEAR_0_7_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_LINEAR_0_7_iteration.md) | 2026-06-03T23:25:58+08:00 |
+| iteration | [docs/EvidRank_evolve/FW_PRIORITY_LADDER_ABLATION_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_LADDER_ABLATION_iteration.md) | 2026-06-04T00:45:20+08:00 |
+| iteration | [docs/EvidRank_evolve/FW_PRIORITY_LINEAR_0_7_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_LINEAR_0_7_iteration.md) | 2026-06-04T00:45:50+08:00 |
 | summary | [docs/EvidRank_evolve/FW_PRIORITY_LINEAR_0_7_summary.md](../docs/EvidRank_evolve/FW_PRIORITY_LINEAR_0_7_summary.md) | 2026-06-03T23:32:35+08:00 |
 | summary | [docs/EvidRank_evolve/FW_PRIORITY_POWER2_TIER_summary.md](../docs/EvidRank_evolve/FW_PRIORITY_POWER2_TIER_summary.md) | 2026-06-03T23:47:04+08:00 |
 | iteration | [docs/EvidRank_evolve/FW_PRIORITY_PRIOR_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_PRIOR_iteration.md) | 2026-06-03T23:21:26+08:00 |
@@ -876,12 +876,12 @@ _Last refreshed: 2026-06-03T23:47:37+08:00_
 | summary | [docs/EvidRank_evolve/V8_summary.md](../docs/EvidRank_evolve/V8_summary.md) | 2026-06-02T03:53:28+08:00 |
 | iteration | [docs/EvidRank_evolve/V9_iteration.md](../docs/EvidRank_evolve/V9_iteration.md) | 2026-06-02T23:35:33+08:00 |
 | summary | [docs/EvidRank_evolve/V9_summary.md](../docs/EvidRank_evolve/V9_summary.md) | 2026-06-02T10:22:26+08:00 |
-| compare | [docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_LINEAR_0_7.md](../docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_LINEAR_0_7.md) | 2026-06-03T23:33:06+08:00 |
-| compare | [docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_POWER2_TIER.md](../docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_POWER2_TIER.md) | 2026-06-03T23:47:37+08:00 |
+| compare | [docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_LINEAR_0_7.md](../docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_LINEAR_0_7.md) | 2026-06-04T00:47:14+08:00 |
+| compare | [docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_POWER2_TIER.md](../docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_POWER2_TIER.md) | 2026-06-04T00:47:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_PRIOR.md](../docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_PRIOR.md) | 2026-06-03T23:21:38+08:00 |
 | compare | [docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_current.md](../docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_current.md) | 2026-06-03T23:22:21+08:00 |
-| compare | [docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_LINEAR_0_7.md](../docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_LINEAR_0_7.md) | 2026-06-03T23:33:06+08:00 |
-| compare | [docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_POWER2_TIER.md](../docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_POWER2_TIER.md) | 2026-06-03T23:47:36+08:00 |
+| compare | [docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_LINEAR_0_7.md](../docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_LINEAR_0_7.md) | 2026-06-04T00:46:16+08:00 |
+| compare | [docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_POWER2_TIER.md](../docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_POWER2_TIER.md) | 2026-06-04T00:46:36+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V10_vs_V11.md](../docs/EvidRank_evolve/compare_V10_vs_V11.md) | 2026-06-02T14:37:14+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V10_vs_V11_trial_span008.md](../docs/EvidRank_evolve/compare_V10_vs_V11_trial_span008.md) | 2026-06-02T14:29:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V11_vs_V13.md](../docs/EvidRank_evolve/compare_V11_vs_V13.md) | 2026-06-02T18:11:00+08:00 |

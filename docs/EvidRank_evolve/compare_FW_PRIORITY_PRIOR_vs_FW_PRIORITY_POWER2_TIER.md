@@ -70,6 +70,7 @@
 
 ## Decision Notes
 
-- Explain whether the new version should be accepted.
-- Pay special attention to `regressed_from_hit1` cases.
-- If accepted, record the general mechanism that improved the ranking.
+- Decision: reject `0,1,1,1,2,4,8,16` as default, but keep it as a useful ablation.
+- Reason: it is much better than `0..7`, but still loses `0.044304` AC@1 and `0.022705` MRR versus `FW_PRIORITY_PRIOR`.
+- Mechanism: keeping `CRITICAL=16` preserves top-3/top-5 fairly well, but lowering `HIGH` from `6` to `4` and `ROOT` from `10` to `8` still loses many close top-1 contests.
+- Interpretation: the strong end of the ladder needs calibrated spacing; a visually clean power-of-two ladder is not enough for the current feature distributions.

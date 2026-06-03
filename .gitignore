@@ -18,3 +18,4 @@ output.venv
 *.pkl
 *.h5
 output/rcabench-platform-v2/rca_algo_outcomt_data_0601.zip
+output/rcabench-platform-v2/evolve_reweights

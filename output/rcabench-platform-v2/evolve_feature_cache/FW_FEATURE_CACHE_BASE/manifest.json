@@ -1,0 +1,33 @@
+{
+  "case_count": 1422,
+  "created": "2026-06-03T23:57:55+08:00",
+  "data_root": "/home/ljw/paper/aegis/rca-algo-contrib/data/rcabench-platform-v2/data",
+  "dataset": "rcabench",
+  "edge_rows": 108316,
+  "errors": {},
+  "feature_names": [
+    "metric_max_z",
+    "metric_mean_z",
+    "metric_anomaly_count",
+    "metric_value_delta",
+    "metric_count_drop_shift",
+    "trace_duration_z",
+    "trace_duration_delta",
+    "trace_count_delta",
+    "trace_count_rise_shift",
+    "trace_count_drop_shift",
+    "trace_endpoint_shift",
+    "trace_error_rate",
+    "trace_status_code_shift",
+    "trace_self_duration_relative_shift",
+    "log_count_delta",
+    "log_error_rate",
+    "log_template_delta",
+    "topology_in_degree",
+    "topology_out_degree",
+    "abnormal_metric_rows",
+    "abnormal_trace_rows"
+  ],
+  "feature_rows": 69684,
+  "version": "FW_FEATURE_CACHE_BASE"
+}

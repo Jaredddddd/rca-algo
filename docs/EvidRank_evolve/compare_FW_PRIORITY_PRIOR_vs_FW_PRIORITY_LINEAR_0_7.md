@@ -70,6 +70,7 @@
 
 ## Decision Notes
 
-- Explain whether the new version should be accepted.
-- Pay special attention to `regressed_from_hit1` cases.
-- If accepted, record the general mechanism that improved the ranking.
+- Decision: reject `0..7` linear ordinal weights as default.
+- Reason: AC@1 drops by `0.129395`, MRR by `0.085221`, AC@3 by `0.056259`, and AC@5 by `0.030239`.
+- Mechanism: linear ordinal spacing compresses root-specific evidence too aggressively and raises support/background priorities relative to root evidence. This makes propagated high-volume or victim symptoms competitive with true root-side protocol/status/drop signals.
+- Use this as negative evidence: priority labels are useful for presentation, but the priority-to-weight ladder still needs calibration.

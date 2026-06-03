@@ -70,6 +70,6 @@
 
 ## Decision Notes
 
-- Explain whether the new version should be accepted.
-- Pay special attention to `regressed_from_hit1` cases.
-- If accepted, record the general mechanism that improved the ranking.
+- Decision: reject `0,1,1,1,2,4,8,16` as default.
+- Reason: relative to the numeric baseline, AC@1 drops by `0.045710` and MRR by `0.023526`, although AC@3/AC@5 remain close.
+- Mechanism: the clean power-of-two ladder keeps `CRITICAL` strong but makes `HIGH` and `ROOT` too weak for close top-1 contests.

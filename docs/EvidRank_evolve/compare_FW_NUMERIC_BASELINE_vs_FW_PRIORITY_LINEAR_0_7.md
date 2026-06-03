@@ -70,6 +70,6 @@
 
 ## Decision Notes
 
-- Explain whether the new version should be accepted.
-- Pay special attention to `regressed_from_hit1` cases.
-- If accepted, record the general mechanism that improved the ranking.
+- Decision: reject `0..7` linear ordinal weights as default.
+- Reason: relative to the numeric baseline, AC@1 drops by `0.130802`, MRR by `0.086042`, AC@3 by `0.057665`, and AC@5 by `0.030239`.
+- Mechanism: ordinal values compress root-specific evidence and over-weight propagation/background evidence. This is too large a behavioral change for a presentation refactor.
