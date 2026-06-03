@@ -780,15 +780,18 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-03T14:04:27+08:00_
+_Last refreshed: 2026-06-03T15:14:10+08:00_
 
 ## EvidenceRank Document Index
 
 | type | document | updated |
 | --- | --- | --- |
+| iteration | [docs/EvidRank-ARC-Evolve/ARC1_iteration.md](../docs/EvidRank-ARC-Evolve/ARC1_iteration.md) | 2026-06-03T15:12:37+08:00 |
+| summary | [docs/EvidRank-ARC-Evolve/ARC1_summary.md](../docs/EvidRank-ARC-Evolve/ARC1_summary.md) | 2026-06-03T15:10:59+08:00 |
 | summary | [docs/EvidRank-ARC-Evolve/ARC_BASELINE_summary.md](../docs/EvidRank-ARC-Evolve/ARC_BASELINE_summary.md) | 2026-06-03T14:04:27+08:00 |
 | summary | [docs/EvidRank-ARC-Evolve/EvidRank_ARC_67_summary.md](../docs/EvidRank-ARC-Evolve/EvidRank_ARC_67_summary.md) | 2026-06-03T13:52:23+08:00 |
 | note | [docs/EvidRank-ARC-Evolve/EvidRank_ARC_baseline.md](../docs/EvidRank-ARC-Evolve/EvidRank_ARC_baseline.md) | 2026-06-03T13:52:51+08:00 |
+| compare | [docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC1.md](../docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC1.md) | 2026-06-03T15:14:00+08:00 |
 | compare | [docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md](../docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md) | 2026-06-03T13:52:33+08:00 |
 | guide | [docs/EvidRank_evolve/README.md](../docs/EvidRank_evolve/README.md) | 2026-06-01T18:29:32+08:00 |
 | iteration | [docs/EvidRank_evolve/V10_iteration.md](../docs/EvidRank_evolve/V10_iteration.md) | 2026-06-03T13:14:42+08:00 |
@@ -870,6 +873,7 @@ _Last refreshed: 2026-06-03T14:04:27+08:00_
 
 | kind | path |
 | --- | --- |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/ARC1` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/ARC_BASELINE` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V1` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V10` |
@@ -896,6 +900,7 @@ _Last refreshed: 2026-06-03T14:04:27+08:00_
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V7` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V8` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V9` |
+| report | `output/rcabench-platform-v2/evolve_reports/ARC1` |
 | report | `output/rcabench-platform-v2/evolve_reports/ARC_BASELINE` |
 | report | `output/rcabench-platform-v2/evolve_reports/V1` |
 | report | `output/rcabench-platform-v2/evolve_reports/V10` |
@@ -924,6 +929,7 @@ _Last refreshed: 2026-06-03T14:04:27+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/V7` |
 | report | `output/rcabench-platform-v2/evolve_reports/V8` |
 | report | `output/rcabench-platform-v2/evolve_reports/V9` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_ARC_BASELINE_vs_ARC1` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V10_vs_V11` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V10_vs_V11_trial_span008` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V12` |

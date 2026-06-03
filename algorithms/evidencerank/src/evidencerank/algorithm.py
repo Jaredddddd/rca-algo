@@ -108,6 +108,23 @@ ARC_CONTRAST_WEIGHT = 0.25
 ARC_TOP_GAP_WEIGHT = 0.15
 ARC_AGREEMENT_WEIGHT = 0.15
 ARC_CASE_SCALE_CLIP = 3.0
+ARC_DIRECTIONAL_MUTATION_FEATURES = frozenset({
+    "metric_count_drop_shift",
+    "trace_count_drop_shift",
+    "trace_endpoint_shift",
+    "trace_error_rate",
+    "trace_status_code_shift",
+})
+ARC_DIRECTIONAL_PROPAGATION_FEATURES = frozenset({
+    "trace_duration_z",
+    "trace_duration_delta",
+    "trace_self_duration_relative_shift",
+    "trace_count_delta",
+    "trace_count_rise_shift",
+    "abnormal_trace_rows",
+    "log_count_delta",
+    "log_template_delta",
+})
 
 
 def _safe_read_parquet(path: Path) -> pd.DataFrame:
@@ -764,6 +781,83 @@ def _arc_unsupervised_feature_weights(
     return weights.astype(np.float32)
 
 
+def _arc_active_feature_weights(feature_reliability: np.ndarray) -> np.ndarray:
+    """Use single-case reliability as an active evidence mask, not a sharp prior."""
+    clean = np.nan_to_num(feature_reliability, nan=0.0, posinf=0.0, neginf=0.0)
+    return (clean > 0.0).astype(np.float32)
+
+
+def _apply_arc_directional_contrast(
+    services: list[str],
+    scores: dict[str, float],
+    weighted_matrix: np.ndarray,
+    enabled_features: tuple[str, ...],
+    trace_edges: list[tuple[str, str]],
+) -> dict[str, float]:
+    if not trace_edges or not scores:
+        return scores
+
+    service_to_idx = {service: idx for idx, service in enumerate(services)}
+    base_scores = np.asarray(
+        [scores.get(service, 0.0) for service in services],
+        dtype=np.float64,
+    )
+    adjusted = base_scores.copy()
+
+    mutation_indices = [
+        idx
+        for idx, name in enumerate(enabled_features)
+        if name in ARC_DIRECTIONAL_MUTATION_FEATURES
+    ]
+    propagation_indices = [
+        idx
+        for idx, name in enumerate(enabled_features)
+        if name in ARC_DIRECTIONAL_PROPAGATION_FEATURES
+    ]
+    if not mutation_indices or not propagation_indices:
+        return scores
+
+    mutation = weighted_matrix[:, mutation_indices].sum(axis=1)
+    propagation = weighted_matrix[:, propagation_indices].sum(axis=1)
+
+    cleaned_edges: list[tuple[int, int]] = []
+    out_counts = np.zeros(len(services), dtype=np.float64)
+    for parent, child in trace_edges:
+        parent_idx = service_to_idx.get(parent)
+        child_idx = service_to_idx.get(child)
+        if parent_idx is None or child_idx is None or parent_idx == child_idx:
+            continue
+        cleaned_edges.append((parent_idx, child_idx))
+        out_counts[parent_idx] += 1.0
+
+    for parent_idx, child_idx in cleaned_edges:
+        if base_scores[parent_idx] <= base_scores[child_idx]:
+            continue
+        child_mutation_excess = max(0.0, float(mutation[child_idx] - mutation[parent_idx]))
+        parent_propagation_excess = max(0.0, float(propagation[parent_idx] - propagation[child_idx]))
+        if child_mutation_excess <= 0.0 or parent_propagation_excess <= 0.0:
+            continue
+
+        mutation_share = child_mutation_excess / (
+            float(mutation[child_idx] + mutation[parent_idx]) + 1e-6
+        )
+        propagation_share = parent_propagation_excess / (
+            float(propagation[parent_idx] + propagation[child_idx]) + 1e-6
+        )
+        score_excess = float(base_scores[parent_idx] - base_scores[child_idx])
+        transfer = (
+            score_excess
+            * mutation_share
+            * propagation_share
+            / max(1.0, out_counts[parent_idx])
+        )
+        adjusted[parent_idx] -= transfer
+        adjusted[child_idx] += transfer
+
+    adjusted = np.maximum(adjusted, 0.0)
+    return {service: float(adjusted[idx]) for idx, service in enumerate(services)}
+
+
 def _adaptive_feature_weights(
     matrix: np.ndarray,
     enabled_features: tuple[str, ...],
@@ -982,6 +1076,7 @@ class EvidenceRankARC(Algorithm):
             case_matrix,
             self._enabled_features,
         )
+        feature_weights = _arc_active_feature_weights(feature_weights)
         scores = _heuristic_scores(
             services,
             case_matrix,
@@ -989,6 +1084,17 @@ class EvidenceRankARC(Algorithm):
             feature_weights,
             trace_edges,
             self._parent_context_weight,
+        )
+        weighted_matrix = _apply_trace_endpoint_support_gate(
+            self._enabled_features,
+            case_matrix * feature_weights,
+        )
+        scores = _apply_arc_directional_contrast(
+            services,
+            scores,
+            weighted_matrix,
+            self._enabled_features,
+            trace_edges,
         )
         sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
 
