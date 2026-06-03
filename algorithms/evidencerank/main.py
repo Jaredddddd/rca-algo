@@ -15,6 +15,7 @@ from src.evidencerank.algorithm import (
     EvidenceRankMetricLog,
     EvidenceRankMetricTrace,
     EvidenceRankTrace,
+    EvidenceRankARC,
 )
 
 if __name__ == "__main__":
@@ -26,5 +27,6 @@ if __name__ == "__main__":
     registry["evidencerank_metric_log"] = EvidenceRankMetricLog
     registry["evidencerank_metric_trace"] = EvidenceRankMetricTrace
     registry["evidencerank_log_trace"] = EvidenceRankLogTrace
+    registry["evidencerank_arc"] = EvidenceRankARC
 
     main(enable_builtin_algorithms=False)

@@ -166,7 +166,7 @@ uv run --package evidencerank python algorithms/evidencerank/calibrate_causal_fe
 
 ```bash
 uv run --package evidencerank python VibeResearchTools/evidrank_lab.py guard
-LOGURU_LEVEL=INFO uv run --package evidencerank python algorithms/evidencerank/main.py eval batch -a evidencerank -d rcabench --clear --use-cpus 48
+LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidencerank/main.py eval batch -a evidencerank -d rcabench --clear --use-cpus 48
 uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
 uv run --package evidencerank python VibeResearchTools/evidrank_lab.py snapshot --version V19 --algorithm evidencerank --dataset rcabench
 uv run --package evidencerank python VibeResearchTools/evidrank_lab.py summarize --version V19 --source V19 --algorithm evidencerank --dataset rcabench

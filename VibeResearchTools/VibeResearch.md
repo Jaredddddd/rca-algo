@@ -1,12 +1,13 @@
 # Vibe Research
 
-This is the main page for EvidenceRank vibe research. Keep long-lived research context, launch prompts, decisions, and links here. Detailed iteration notes can stay in `docs/EvidRank_evolve/`.
+This is the main page for EvidenceRank vibe research. Keep long-lived research context, launch prompts, decisions, and links here. Detailed iteration notes can stay in `docs/EvidRank_evolve/`; EvidRank-ARC notes live in `docs/EvidRank-ARC-Evolve/`.
 
 ## Research Entry
 
 - Target algorithm: `algorithms/evidencerank`
 - Default dataset for current evolution: `rcabench`
 - Iteration docs: `docs/EvidRank_evolve/`
+- EvidRank-ARC docs: `docs/EvidRank-ARC-Evolve/`
 - Tool CLI: `VibeResearchTools/evidrank_lab.py`
 - Labels for offline analysis only: `data/rcabench-platform-v2/meta/rcabench-csv/labels.csv`
 - Case metadata for offline analysis only: `data/rcabench-platform-v2/data/rcabench/<datapack>/injection.json`
@@ -682,44 +683,138 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 ```
 
 
+### 第八次迭代：开始转向优化 EvidRank-ARC
+
+```text
+你是一个微服务 RCA 算法研究员兼谨慎的 coding agent。你当前在仓库 /home/ljw/paper/aegis/rca-algo-contrib 中工作，目标是继续优化 EvidRank-ARC（Adaptive Reliability Calibration）的算法准确率，同时保持无监督、自适应、可迁移的研究定位。
+
+当前研究对象：
+- 正式算法名：EvidRank-ARC, Adaptive Reliability Calibration。
+- CLI registry：`evidencerank_arc`。
+- 主实现：`algorithms/evidencerank/src/evidencerank/algorithm.py` 中的 `EvidenceRankARC`。
+- 默认 `evidencerank` 不要被替换；EvidRank-ARC 是一个独立 baseline / ablation line。可以通过和evidencerank的输出对比，发现可以优化的点和逻辑，在EvidenceRankARC最好不能出现手工固定的参数或者权重，以免无法迁移。
+- ARC 的核心机制：单 case 内对 feature matrix 做 positive-p95 scaling，clip 到 `[0, 3.0]`；再根据特征覆盖、证据集中度、峰值对比、top gap、同模态/跨模态一致性学习 feature reliability weight；保留 topology degree 作为无监督结构特征。
+
+当前 ARC baseline：
+- 历史重命名前等价输出：`output/rcabench-platform-v2/evolve_snapshots/V13_SELF_LEARNED_67/`。
+- 记录文档：`docs/EvidRank-ARC-Evolve/EvidRank_ARC_baseline.md`。
+- 指标：total 1422, error 0, AC@1 0.670886, MRR 0.801983, AC@3 0.925457, AC@5 0.973980。
+- 已知负向 ablation：去掉 topology degree 后 AC@1 降到 0.649086，因此不要轻易移除结构特征。
+
+本轮目标：
+1. 从 EvidRank-ARC 当前 67.09% AC@1 继续提升准确率，优先提升 AC@1 和 MRR。
+2. 第一目标是稳定超过 0.70 AC@1；进一步目标是接近或超过 0.75。
+3. AC@3 / AC@5 不应出现不可解释的大幅退化。
+4. 仍然保持无监督 baseline：不要回退到手工固定 `FEATURE_WEIGHTS`，不要把 V11/V20 的固定 prior 直接塞回 ARC。
+
+强约束：
+1. 禁止硬编码 datapack、case id、随机后缀、服务名、故障名、dataset split。
+2. 禁止在算法实现中读取 labels.csv、injection.json、output、perf report、历史排行榜或任何 ground truth。
+3. 禁止读取 conclusion.parquet 作为算法证据或离线 false case 证据；端点类想法必须从 raw traces 重建。
+4. label / injection 只允许用于离线报告、错误归因和文档，不允许进入 `algorithms/evidencerank` 运行路径。
+5. 任何改动必须能解释为跨微服务系统通用的 RCA 信号、归一化、证据融合、拓扑推理或无标签校准。
+6. 每轮实验必须保留版本化输出，不覆盖旧结果；ARC 文档必须同步到 `docs/EvidRank-ARC-Evolve/` 并刷新 VibeResearch index。
+7. full eval 慢是可以接受的，不要因为耗时而跳过验证或停止实验。
+
+优先研究方向：
+- Root-vs-victim contrast：区分根因节点的局部突变和受害者/入口节点的传播型尖峰。
+- Topology-aware reliability：利用 trace edge 方向、父子异常差异、邻域对比来抑制高流量传播节点。
+- Modality confidence：当 log-only、trace-only 或 endpoint-only 信号与其他模态冲突时自动降权，而不是固定降权。
+- Feature-family reliability：不要自由学习每个 feature 到失控；可以学习 family-level 或 constrained reliability multiplier。
+- Iterative consensus：先形成服务级异常共识，再反过来重估 feature reliability，避免单一尖峰主导。
+- Rank fusion / robust scaling：用 feature family rank、分位数、MAD 或 winsorized effect size 降低量纲和极端 row count 支配。
+
+推荐工作流：
+1. 先阅读：
+   - `AGENTS.md`
+   - `VibeResearchTools/VibeResearch.md`
+   - `docs/EvidRank-ARC-Evolve/EvidRank_ARC_baseline.md`
+   - `docs/EvidRank-ARC-Evolve/EvidRank_ARC_67_summary.md`
+   - `algorithms/evidencerank/src/evidencerank/algorithm.py`
+2. 如果当前还没有 `evidencerank_arc` 的新输出，先跑一遍重命名后的 baseline：
+   `LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidencerank/main.py eval batch -a evidencerank_arc -d rcabench --clear --use-cpus 48`
+   `uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench`
+   `uv run --package evidencerank python VibeResearchTools/evidrank_lab.py snapshot --version ARC_BASELINE --algorithm evidencerank_arc --dataset rcabench`
+   `uv run --package evidencerank python VibeResearchTools/evidrank_lab.py summarize --version ARC_BASELINE --source ARC_BASELINE --algorithm evidencerank_arc --dataset rcabench`
+3. 从 ARC false cases 出发，聚合 weak groups、hard cases、rank deltas，提出一个最小通用假设。
+4. 改代码前创建迭代记录，例如：
+   `uv run --package evidencerank python VibeResearchTools/evidrank_lab.py new-note --version ARC1 --hypothesis "<一句话描述本轮 ARC 通用改进假设>"`
+5. 只修改 `algorithms/evidencerank` 中与 ARC 排序相关的通用逻辑，保持 Algorithm 接口兼容。
+6. 修改后至少运行：
+   `uv run --package evidencerank python VibeResearchTools/evidrank_lab.py guard`
+   `LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidencerank/main.py eval batch -a evidencerank_arc -d rcabench --clear --use-cpus 48`
+   `uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench`
+7. 评估后保存和比较：
+   `uv run --package evidencerank python VibeResearchTools/evidrank_lab.py snapshot --version ARC<N> --algorithm evidencerank_arc --dataset rcabench`
+   `uv run --package evidencerank python VibeResearchTools/evidrank_lab.py summarize --version ARC<N> --source ARC<N> --algorithm evidencerank_arc --dataset rcabench`
+   `uv run --package evidencerank python VibeResearchTools/evidrank_lab.py compare --old ARC<N-1> --new ARC<N> --algorithm evidencerank_arc --dataset rcabench`
+   `uv run --package evidencerank python VibeResearchTools/evidrank_lab.py index`
+
+每个候选改动必须记录：
+1. 失败机制；
+2. 当前 ARC 为什么会错；
+3. 可泛化的新信号或组合方式；
+4. 可能改善的 case 类型；
+5. 可能退化的 case 类型；
+6. 最小代码改动位置；
+7. 验证指标和 ablation 方式；
+8. 是否接受该版本以及理由。
+
+接受标准：
+- guard 无 high-risk 过拟合告警；
+- full eval error == 0；
+- AC@1 或 MRR 至少一个提升；
+- AC@3 / AC@5 没有不可解释的大幅退化；
+- 退化 case 已被解释；
+- docs 和 VibeResearch index 已刷新；
+- 算法仍保持 EvidRank-ARC 的无监督自适应权重定位。
+```
+
+
 
 ## Operating Notes
 
 - `VibeResearchTools/VibeResearch.md` is the dashboard and index. Prefer linking detailed notes instead of duplicating long analyses here.
-- `docs/EvidRank_evolve/` is the durable archive for iteration summaries, comparisons, and detailed case studies.
+- `docs/EvidRank_evolve/` is the durable archive for legacy EvidenceRank iterations; `docs/EvidRank-ARC-Evolve/` is the archive for EvidRank-ARC iterations.
 - `VibeResearchTools/evidrank_lab.py index` refreshes the generated index below.
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-03T00:31:19+08:00_
+_Last refreshed: 2026-06-03T13:53:25+08:00_
 
 ## EvidenceRank Document Index
 
 | type | document | updated |
 | --- | --- | --- |
+| summary | [docs/EvidRank-ARC-Evolve/EvidRank_ARC_67_summary.md](../docs/EvidRank-ARC-Evolve/EvidRank_ARC_67_summary.md) | 2026-06-03T13:52:23+08:00 |
+| note | [docs/EvidRank-ARC-Evolve/EvidRank_ARC_baseline.md](../docs/EvidRank-ARC-Evolve/EvidRank_ARC_baseline.md) | 2026-06-03T13:52:51+08:00 |
+| compare | [docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md](../docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md) | 2026-06-03T13:52:33+08:00 |
 | guide | [docs/EvidRank_evolve/README.md](../docs/EvidRank_evolve/README.md) | 2026-06-01T18:29:32+08:00 |
-| iteration | [docs/EvidRank_evolve/V10_iteration.md](../docs/EvidRank_evolve/V10_iteration.md) | 2026-06-02T11:24:32+08:00 |
+| iteration | [docs/EvidRank_evolve/V10_iteration.md](../docs/EvidRank_evolve/V10_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V10_summary.md](../docs/EvidRank_evolve/V10_summary.md) | 2026-06-02T11:24:53+08:00 |
-| iteration | [docs/EvidRank_evolve/V11_iteration.md](../docs/EvidRank_evolve/V11_iteration.md) | 2026-06-02T14:40:50+08:00 |
+| iteration | [docs/EvidRank_evolve/V11_iteration.md](../docs/EvidRank_evolve/V11_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V11_summary.md](../docs/EvidRank_evolve/V11_summary.md) | 2026-06-02T14:36:46+08:00 |
 | summary | [docs/EvidRank_evolve/V11_trial_span008_summary.md](../docs/EvidRank_evolve/V11_trial_span008_summary.md) | 2026-06-02T14:29:11+08:00 |
-| iteration | [docs/EvidRank_evolve/V13_iteration.md](../docs/EvidRank_evolve/V13_iteration.md) | 2026-06-02T18:11:47+08:00 |
+| summary | [docs/EvidRank_evolve/V13_REIMPL_V2_summary.md](../docs/EvidRank_evolve/V13_REIMPL_V2_summary.md) | 2026-06-03T12:23:58+08:00 |
+| summary | [docs/EvidRank_evolve/V13_REIMPL_V3_NO_TOPO_summary.md](../docs/EvidRank_evolve/V13_REIMPL_V3_NO_TOPO_summary.md) | 2026-06-03T12:32:27+08:00 |
+| summary | [docs/EvidRank_evolve/V13_REIMPL_summary.md](../docs/EvidRank_evolve/V13_REIMPL_summary.md) | 2026-06-03T12:06:14+08:00 |
+| iteration | [docs/EvidRank_evolve/V13_iteration.md](../docs/EvidRank_evolve/V13_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V13_summary.md](../docs/EvidRank_evolve/V13_summary.md) | 2026-06-02T18:10:49+08:00 |
-| iteration | [docs/EvidRank_evolve/V14_iteration.md](../docs/EvidRank_evolve/V14_iteration.md) | 2026-06-02T18:26:00+08:00 |
+| iteration | [docs/EvidRank_evolve/V14_iteration.md](../docs/EvidRank_evolve/V14_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V14_summary.md](../docs/EvidRank_evolve/V14_summary.md) | 2026-06-02T18:21:49+08:00 |
-| iteration | [docs/EvidRank_evolve/V15_iteration.md](../docs/EvidRank_evolve/V15_iteration.md) | 2026-06-02T18:35:56+08:00 |
+| iteration | [docs/EvidRank_evolve/V15_iteration.md](../docs/EvidRank_evolve/V15_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V15_summary.md](../docs/EvidRank_evolve/V15_summary.md) | 2026-06-02T18:33:51+08:00 |
-| iteration | [docs/EvidRank_evolve/V16_iteration.md](../docs/EvidRank_evolve/V16_iteration.md) | 2026-06-02T18:55:52+08:00 |
+| iteration | [docs/EvidRank_evolve/V16_iteration.md](../docs/EvidRank_evolve/V16_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V16_summary.md](../docs/EvidRank_evolve/V16_summary.md) | 2026-06-02T18:45:07+08:00 |
-| iteration | [docs/EvidRank_evolve/V17_iteration.md](../docs/EvidRank_evolve/V17_iteration.md) | 2026-06-02T18:56:12+08:00 |
+| iteration | [docs/EvidRank_evolve/V17_iteration.md](../docs/EvidRank_evolve/V17_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V17_summary.md](../docs/EvidRank_evolve/V17_summary.md) | 2026-06-02T18:54:41+08:00 |
-| iteration | [docs/EvidRank_evolve/V18_iteration.md](../docs/EvidRank_evolve/V18_iteration.md) | 2026-06-02T21:22:59+08:00 |
+| iteration | [docs/EvidRank_evolve/V18_iteration.md](../docs/EvidRank_evolve/V18_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V18_summary.md](../docs/EvidRank_evolve/V18_summary.md) | 2026-06-02T21:15:00+08:00 |
-| iteration | [docs/EvidRank_evolve/V19_iteration.md](../docs/EvidRank_evolve/V19_iteration.md) | 2026-06-02T23:09:53+08:00 |
+| iteration | [docs/EvidRank_evolve/V19_iteration.md](../docs/EvidRank_evolve/V19_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V19_summary.md](../docs/EvidRank_evolve/V19_summary.md) | 2026-06-02T22:25:28+08:00 |
 | summary | [docs/EvidRank_evolve/V1_summary.md](../docs/EvidRank_evolve/V1_summary.md) | 2026-06-01T18:29:32+08:00 |
 | note | [docs/EvidRank_evolve/V20_family_calibration_methodology.md](../docs/EvidRank_evolve/V20_family_calibration_methodology.md) | 2026-06-03T00:31:00+08:00 |
-| iteration | [docs/EvidRank_evolve/V20_iteration.md](../docs/EvidRank_evolve/V20_iteration.md) | 2026-06-02T23:42:10+08:00 |
+| iteration | [docs/EvidRank_evolve/V20_iteration.md](../docs/EvidRank_evolve/V20_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V20_summary.md](../docs/EvidRank_evolve/V20_summary.md) | 2026-06-02T23:38:55+08:00 |
 | iteration | [docs/EvidRank_evolve/V2_iteration.md](../docs/EvidRank_evolve/V2_iteration.md) | 2026-06-01T18:29:32+08:00 |
 | summary | [docs/EvidRank_evolve/V2_summary.md](../docs/EvidRank_evolve/V2_summary.md) | 2026-06-01T18:29:32+08:00 |
@@ -747,6 +842,8 @@ _Last refreshed: 2026-06-03T00:31:19+08:00_
 | compare | [docs/EvidRank_evolve/compare_V11_vs_V18.md](../docs/EvidRank_evolve/compare_V11_vs_V18.md) | 2026-06-02T21:15:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V11_vs_V19.md](../docs/EvidRank_evolve/compare_V11_vs_V19.md) | 2026-06-02T22:25:39+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V11_vs_V20.md](../docs/EvidRank_evolve/compare_V11_vs_V20.md) | 2026-06-02T23:39:26+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V13_REIMPL_V2_vs_V13_REIMPL_V3_NO_TOPO.md](../docs/EvidRank_evolve/compare_V13_REIMPL_V2_vs_V13_REIMPL_V3_NO_TOPO.md) | 2026-06-03T12:32:37+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V13_REIMPL_vs_V13_REIMPL_V2.md](../docs/EvidRank_evolve/compare_V13_REIMPL_vs_V13_REIMPL_V2.md) | 2026-06-03T12:24:08+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V13_vs_V14.md](../docs/EvidRank_evolve/compare_V13_vs_V14.md) | 2026-06-02T18:22:01+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V14_vs_V15.md](../docs/EvidRank_evolve/compare_V14_vs_V15.md) | 2026-06-02T18:34:03+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V15_vs_V16.md](../docs/EvidRank_evolve/compare_V15_vs_V16.md) | 2026-06-02T18:45:17+08:00 |
@@ -764,6 +861,10 @@ _Last refreshed: 2026-06-03T00:31:19+08:00_
 | compare | [docs/EvidRank_evolve/compare_V8_vs_V9.md](../docs/EvidRank_evolve/compare_V8_vs_V9.md) | 2026-06-02T10:23:35+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V9_vs_V10.md](../docs/EvidRank_evolve/compare_V9_vs_V10.md) | 2026-06-02T11:24:43+08:00 |
 
+### EvidRank-ARC
+
+- [ARC evolve docs](../docs/EvidRank-ARC-Evolve)
+
 ## Versioned Artifacts
 
 | kind | path |
@@ -774,6 +875,10 @@ _Last refreshed: 2026-06-03T00:31:19+08:00_
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V11_trial_span008` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V12` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V13` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V13_REIMPL` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V13_REIMPL_V2` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V13_REIMPL_V3_NO_TOPO` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V13_SELF_LEARNED_67` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V14` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V15` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V16` |
@@ -795,6 +900,10 @@ _Last refreshed: 2026-06-03T00:31:19+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/V11_trial_span008` |
 | report | `output/rcabench-platform-v2/evolve_reports/V12` |
 | report | `output/rcabench-platform-v2/evolve_reports/V13` |
+| report | `output/rcabench-platform-v2/evolve_reports/V13_REIMPL` |
+| report | `output/rcabench-platform-v2/evolve_reports/V13_REIMPL_V2` |
+| report | `output/rcabench-platform-v2/evolve_reports/V13_REIMPL_V3_NO_TOPO` |
+| report | `output/rcabench-platform-v2/evolve_reports/V13_SELF_LEARNED_67` |
 | report | `output/rcabench-platform-v2/evolve_reports/V14` |
 | report | `output/rcabench-platform-v2/evolve_reports/V15` |
 | report | `output/rcabench-platform-v2/evolve_reports/V16` |
@@ -823,6 +932,9 @@ _Last refreshed: 2026-06-03T00:31:19+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V18` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V19` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V20` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V13_REIMPL_V2_vs_V13_REIMPL_V3_NO_TOPO` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V13_REIMPL_V2_vs_V13_SELF_LEARNED_67` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V13_REIMPL_vs_V13_REIMPL_V2` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V13_vs_V14` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V14_vs_V15` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V15_vs_V16` |

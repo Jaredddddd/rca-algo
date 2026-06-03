@@ -25,7 +25,8 @@ PLATFORM_OUTPUT = REPO_ROOT / "output" / "rcabench-platform-v2"
 CURRENT_DATA_ROOT = PLATFORM_OUTPUT / "data"
 SNAPSHOT_ROOT = PLATFORM_OUTPUT / "evolve_snapshots"
 REPORT_ROOT = PLATFORM_OUTPUT / "evolve_reports"
-DOC_ROOT = REPO_ROOT / "docs" / "EvidRank_evolve"
+LEGACY_DOC_ROOT = REPO_ROOT / "docs" / "EvidRank_evolve"
+ARC_DOC_ROOT = REPO_ROOT / "docs" / "EvidRank-ARC-Evolve"
 VIBE_RESEARCH_PAGE = REPO_ROOT / "VibeResearchTools" / "VibeResearch.md"
 DEFAULT_LABELS = (
     REPO_ROOT / "data" / "rcabench-platform-v2" / "meta" / "rcabench-csv" / "labels.csv"
@@ -143,7 +144,7 @@ def _doc_type(path: Path) -> str:
 def _initial_vibe_research_page() -> str:
     return """# Vibe Research
 
-This is the main page for EvidenceRank vibe research. Keep long-lived research context, launch prompts, decisions, and links here. Detailed iteration notes can stay in `docs/EvidRank_evolve/`.
+This is the main page for EvidenceRank vibe research. Keep long-lived research context, launch prompts, decisions, and links here. Detailed iteration notes can stay in `docs/EvidRank_evolve/` or `docs/EvidRank-ARC-Evolve/`.
 
 ## LLM Launch Prompt
 
@@ -155,7 +156,11 @@ Use the prompt in `AGENTS.md` as the source of truth for analysis agents. Keep t
 
 
 def _render_vibe_index() -> str:
-    docs = sorted(DOC_ROOT.glob("*.md")) if DOC_ROOT.exists() else []
+    docs: list[Path] = []
+    for root in (LEGACY_DOC_ROOT, ARC_DOC_ROOT):
+        if root.exists():
+            docs.extend(root.glob("*.md"))
+    docs = sorted(docs)
     snapshots = sorted(SNAPSHOT_ROOT.glob("*")) if SNAPSHOT_ROOT.exists() else []
     reports = sorted(REPORT_ROOT.glob("*")) if REPORT_ROOT.exists() else []
 
@@ -176,7 +181,15 @@ def _render_vibe_index() -> str:
                 f"| {_doc_type(doc)} | {_link_from_vibe_page(doc)} | {_mtime(doc)} |"
             )
     else:
-        lines.append("No `docs/EvidRank_evolve/*.md` documents found yet.")
+        lines.append("No `docs/EvidRank_evolve/*.md` or `docs/EvidRank-ARC-Evolve/*.md` documents found yet.")
+
+    if any(doc.parent == ARC_DOC_ROOT for doc in docs):
+        lines += [
+            "",
+            "### EvidRank-ARC",
+            "",
+            f"- [ARC evolve docs]({Path('..') / ARC_DOC_ROOT.relative_to(REPO_ROOT)})",
+        ]
 
     lines += [
         "",
@@ -223,6 +236,14 @@ def _refresh_vibe_research_index() -> None:
     else:
         text = f"{text.rstrip()}\n\n{index}\n"
     VIBE_RESEARCH_PAGE.write_text(text, encoding="utf-8")
+
+
+def _doc_root_for_algorithm(algorithm: str) -> Path:
+    return ARC_DOC_ROOT if algorithm == "evidencerank_arc" else LEGACY_DOC_ROOT
+
+
+def _doc_root_for_version(version: str) -> Path:
+    return ARC_DOC_ROOT if _safe_name(version).upper().startswith("ARC") else LEGACY_DOC_ROOT
 
 
 def _run_git(args: list[str]) -> str:
@@ -467,7 +488,12 @@ def _group_summary(cases: pd.DataFrame) -> pd.DataFrame:
 
 
 def _markdown_summary(
-    version: str, source: str, cases: pd.DataFrame, groups: pd.DataFrame
+    version: str,
+    source: str,
+    algorithm: str,
+    dataset: str,
+    cases: pd.DataFrame,
+    groups: pd.DataFrame,
 ) -> str:
     metrics = _metrics(cases)
     false_cases = cases[~cases["hit@1"]].copy()
@@ -485,8 +511,8 @@ def _markdown_summary(
         "",
         f"- Created: {_now()}",
         f"- Source: `{source}`",
-        "- Algorithm: `evidencerank`",
-        "- Dataset: `rcabench`",
+        f"- Algorithm: `{algorithm}`",
+        f"- Dataset: `{dataset}`",
         "",
         "## Metrics",
         "",
@@ -634,7 +660,7 @@ def cmd_summarize(args: argparse.Namespace) -> None:
     all_cases_path = report_dir / "all_cases.csv"
     false_cases_path = report_dir / "false_cases.csv"
     group_path = report_dir / "group_summary.csv"
-    doc_path = DOC_ROOT / f"{version}_summary.md"
+    doc_path = _doc_root_for_algorithm(args.algorithm) / f"{version}_summary.md"
     for path in (all_cases_path, false_cases_path, group_path, doc_path):
         if path.exists():
             raise SystemExit(f"Refusing to overwrite existing report file: {path}")
@@ -644,7 +670,10 @@ def cmd_summarize(args: argparse.Namespace) -> None:
     _write_csv_once(all_cases_path, cases)
     _write_csv_once(false_cases_path, false_cases)
     _write_csv_once(group_path, groups)
-    _write_text_once(doc_path, _markdown_summary(version, source, cases, groups))
+    _write_text_once(
+        doc_path,
+        _markdown_summary(version, source, args.algorithm, args.dataset, cases, groups),
+    )
     _refresh_vibe_research_index()
     metrics = _metrics(cases)
     print(f"Summary saved: {doc_path.relative_to(REPO_ROOT)}")
@@ -830,7 +859,7 @@ def cmd_compare(args: argparse.Namespace) -> None:
     compare_name = _safe_name(args.version or f"compare_{args.old}_vs_{args.new}")
     report_dir = REPORT_ROOT / compare_name
     csv_path = report_dir / "case_deltas.csv"
-    doc_path = DOC_ROOT / f"{compare_name}.md"
+    doc_path = _doc_root_for_algorithm(args.algorithm) / f"{compare_name}.md"
     _write_csv_once(csv_path, deltas)
     _write_text_once(
         doc_path, _markdown_compare(args.old, args.new, old_cases, new_cases, deltas)
@@ -1023,12 +1052,15 @@ def cmd_guard(args: argparse.Namespace) -> None:
 
 def cmd_new_note(args: argparse.Namespace) -> None:
     version = _safe_name(args.version)
-    path = DOC_ROOT / f"{version}_iteration.md"
-    text = f"""# EvidenceRank {version} Iteration
+    path = _doc_root_for_version(version) / f"{version}_iteration.md"
+    is_arc = path.parent == ARC_DOC_ROOT
+    algorithm = "evidencerank_arc" if is_arc else "evidencerank"
+    title = "EvidRank-ARC" if is_arc else "EvidenceRank"
+    text = f"""# {title} {version} Iteration
 
 - Created: {_now()}
 - Hypothesis: {args.hypothesis}
-- Algorithm: `evidencerank`
+- Algorithm: `{algorithm}`
 - Dataset: `rcabench`
 
 ## Scope
@@ -1054,7 +1086,7 @@ def cmd_new_note(args: argparse.Namespace) -> None:
 
 ```bash
 uv run --package evidencerank python VibeResearchTools/evidrank_lab.py guard
-uv run --package evidencerank python algorithms/evidencerank/main.py eval batch -a evidencerank -d rcabench --clear --use-cpus 32
+uv run --package evidencerank python algorithms/evidencerank/main.py eval batch -a {algorithm} -d rcabench --clear --use-cpus 48
 uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
 ```
 

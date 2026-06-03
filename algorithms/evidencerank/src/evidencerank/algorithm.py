@@ -102,6 +102,12 @@ TRACE_ENDPOINT_POST_GATE_FACTOR = 1.75
 ADAPTIVE_MODALITY_SPAN = 0.08
 ADAPTIVE_MODALITY_MIN_FACTOR = 0.92
 ADAPTIVE_MODALITY_MAX_FACTOR = 1.08
+ARC_SUPPORT_WEIGHT = 0.20
+ARC_CONCENTRATION_WEIGHT = 0.25
+ARC_CONTRAST_WEIGHT = 0.25
+ARC_TOP_GAP_WEIGHT = 0.15
+ARC_AGREEMENT_WEIGHT = 0.15
+ARC_CASE_SCALE_CLIP = 3.0
 
 
 def _safe_read_parquet(path: Path) -> pd.DataFrame:
@@ -621,6 +627,143 @@ def _modality_reliability(scores: np.ndarray) -> float | None:
     return 0.45 * concentration + 0.35 * contrast + 0.20 * support
 
 
+def _feature_modality(feature_name: str) -> str | None:
+    for modality, feature_names in MODALITY_FEATURES.items():
+        if feature_name in feature_names:
+            return modality
+    return None
+
+
+def _robust_case_feature_matrix(matrix: np.ndarray) -> np.ndarray:
+    clean_matrix = np.nan_to_num(matrix, nan=0.0, posinf=0.0, neginf=0.0)
+    clean_matrix = np.maximum(clean_matrix, 0.0)
+    scaled = np.zeros_like(clean_matrix, dtype=np.float32)
+    for idx in range(clean_matrix.shape[1]):
+        column = clean_matrix[:, idx]
+        positive = column[column > 0.0]
+        if positive.size == 0:
+            continue
+        scale = float(np.percentile(positive, 95)) if positive.size > 1 else float(positive[0])
+        if not math.isfinite(scale) or scale <= 0.0:
+            scale = float(np.max(positive))
+        if not math.isfinite(scale) or scale <= 0.0:
+            continue
+        scaled[:, idx] = np.clip(column / scale, 0.0, ARC_CASE_SCALE_CLIP)
+    return scaled
+
+
+def _cosine_similarity(left: np.ndarray, right: np.ndarray) -> float | None:
+    left_norm = float(np.linalg.norm(left))
+    right_norm = float(np.linalg.norm(right))
+    if left_norm <= 1e-12 or right_norm <= 1e-12:
+        return None
+    similarity = float(np.dot(left, right) / (left_norm * right_norm))
+    if not math.isfinite(similarity):
+        return None
+    return min(1.0, max(0.0, similarity))
+
+
+def _feature_agreement(
+    matrix: np.ndarray,
+    feature_idx: int,
+    enabled_features: tuple[str, ...],
+    modality_indices: dict[str, list[int]],
+) -> float:
+    feature_vector = matrix[:, feature_idx]
+    if not np.any(feature_vector > 0.0):
+        return 0.0
+
+    modality = _feature_modality(enabled_features[feature_idx])
+    agreement_scores: list[float] = []
+
+    peer_indices = [
+        idx
+        for idx in modality_indices.get(modality or "", [])
+        if idx != feature_idx and np.any(matrix[:, idx] > 0.0)
+    ]
+    if peer_indices:
+        peer_vector = matrix[:, peer_indices].mean(axis=1)
+        similarity = _cosine_similarity(feature_vector, peer_vector)
+        if similarity is not None:
+            agreement_scores.append(similarity)
+
+    cross_indices = [
+        idx
+        for other_modality, indices in modality_indices.items()
+        if other_modality != modality
+        for idx in indices
+        if np.any(matrix[:, idx] > 0.0)
+    ]
+    if cross_indices:
+        cross_vector = matrix[:, cross_indices].mean(axis=1)
+        similarity = _cosine_similarity(feature_vector, cross_vector)
+        if similarity is not None:
+            agreement_scores.append(similarity)
+
+    if not agreement_scores:
+        return 0.5
+    return float(np.mean(agreement_scores))
+
+
+def _feature_reliability(column: np.ndarray, agreement: float) -> float:
+    positive = column[np.isfinite(column) & (column > 0.0)]
+    if positive.size == 0:
+        return 0.0
+
+    support = min(1.0, math.sqrt(float(positive.size) / 3.0))
+
+    if positive.size == 1:
+        concentration = 1.0
+        top_gap = 1.0
+    else:
+        total = float(positive.sum())
+        if not math.isfinite(total) or total <= 0.0:
+            return 0.0
+        probabilities = positive / total
+        entropy = -float(np.sum(probabilities * np.log(probabilities + 1e-12)))
+        concentration = 1.0 - entropy / math.log(float(positive.size))
+        concentration = min(1.0, max(0.0, concentration))
+
+        ordered = np.sort(positive)[::-1]
+        top_gap = float((ordered[0] - ordered[1]) / (ordered[0] + ordered[1] + 1e-6))
+        top_gap = min(1.0, max(0.0, top_gap))
+
+    p95 = float(np.percentile(positive, 95))
+    median = float(np.median(positive))
+    contrast = (p95 - median) / (p95 + median + 1e-6)
+    contrast = min(1.0, max(0.0, contrast))
+
+    agreement = min(1.0, max(0.0, agreement))
+    return (
+        ARC_SUPPORT_WEIGHT * support
+        + ARC_CONCENTRATION_WEIGHT * concentration
+        + ARC_CONTRAST_WEIGHT * contrast
+        + ARC_TOP_GAP_WEIGHT * top_gap
+        + ARC_AGREEMENT_WEIGHT * agreement
+    )
+
+
+def _arc_unsupervised_feature_weights(
+    matrix: np.ndarray,
+    enabled_features: tuple[str, ...],
+) -> np.ndarray:
+    modality_indices: dict[str, list[int]] = {}
+    for idx, feature_name in enumerate(enabled_features):
+        modality = _feature_modality(feature_name) or "other"
+        modality_indices.setdefault(modality, []).append(idx)
+
+    weights = np.zeros(len(enabled_features), dtype=np.float32)
+    for idx in range(len(enabled_features)):
+        agreement = _feature_agreement(matrix, idx, enabled_features, modality_indices)
+        weights[idx] = _feature_reliability(matrix[:, idx], agreement)
+
+    positive = weights[weights > 0.0]
+    if positive.size == 0:
+        return weights
+    weights = weights / float(np.mean(positive))
+    return weights.astype(np.float32)
+
+
 def _adaptive_feature_weights(
     matrix: np.ndarray,
     enabled_features: tuple[str, ...],
@@ -795,6 +938,58 @@ class EvidenceRank(Algorithm):
             )
             if _top_ranked_service(adaptive_scores) == _top_ranked_service(scores):
                 scores = adaptive_scores
+        sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+
+        answers = [
+            AlgorithmAnswer(level="service", name=name, rank=rank)
+            for rank, (name, _score) in enumerate(sorted_scores, start=1)
+        ]
+        return answers
+
+
+class EvidenceRankARC(Algorithm):
+    """EvidRank-ARC: Adaptive Reliability Calibration."""
+
+    _modalities: frozenset[str] = ALL_MODALITIES
+
+    def __init__(self):
+        all_enabled = frozenset().union(*(MODALITY_FEATURES[m] for m in self._modalities))
+        self._enabled_features = tuple(
+            name for name in BASE_FEATURE_NAMES if name in all_enabled
+        )
+        self._parent_context_weight = PARENT_CONTEXT_WEIGHT if "trace" in self._modalities else 0.0
+
+    def needs_cpu_count(self) -> int | None:
+        return 1
+
+    @timeit()
+    def __call__(self, args: AlgorithmArgs) -> list[AlgorithmAnswer]:
+        input_folder = args.input_folder
+
+        frames = _load_input_frames(input_folder)
+        services = _collect_services_from_frames(frames)
+        if not services:
+            return []
+
+        matrix, trace_edges = _build_feature_matrix(
+            frames,
+            services,
+            self._enabled_features,
+            self._modalities,
+        )
+        case_matrix = _robust_case_feature_matrix(matrix)
+        feature_weights = _arc_unsupervised_feature_weights(
+            case_matrix,
+            self._enabled_features,
+        )
+        scores = _heuristic_scores(
+            services,
+            case_matrix,
+            self._enabled_features,
+            feature_weights,
+            trace_edges,
+            self._parent_context_weight,
+        )
         sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
 
         answers = [
