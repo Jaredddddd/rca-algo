@@ -783,7 +783,7 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-04T13:47:13+08:00_
+_Last refreshed: 2026-06-04T22:11:49+08:00_
 
 ## EvidenceRank Document Index
 
@@ -866,6 +866,8 @@ _Last refreshed: 2026-06-04T13:47:13+08:00_
 | note | [docs/EvidRank_evolve/V20_family_calibration_methodology.md](../docs/EvidRank_evolve/V20_family_calibration_methodology.md) | 2026-06-03T00:31:00+08:00 |
 | iteration | [docs/EvidRank_evolve/V20_iteration.md](../docs/EvidRank_evolve/V20_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V20_summary.md](../docs/EvidRank_evolve/V20_summary.md) | 2026-06-02T23:38:55+08:00 |
+| summary | [docs/EvidRank_evolve/V22_NEUTRAL_ALL_summary.md](../docs/EvidRank_evolve/V22_NEUTRAL_ALL_summary.md) | 2026-06-04T21:35:51+08:00 |
+| iteration | [docs/EvidRank_evolve/V22_iteration.md](../docs/EvidRank_evolve/V22_iteration.md) | 2026-06-04T22:11:37+08:00 |
 | iteration | [docs/EvidRank_evolve/V2_iteration.md](../docs/EvidRank_evolve/V2_iteration.md) | 2026-06-01T18:29:32+08:00 |
 | summary | [docs/EvidRank_evolve/V2_summary.md](../docs/EvidRank_evolve/V2_summary.md) | 2026-06-01T18:29:32+08:00 |
 | iteration | [docs/EvidRank_evolve/V3_iteration.md](../docs/EvidRank_evolve/V3_iteration.md) | 2026-06-01T18:29:32+08:00 |
@@ -909,6 +911,11 @@ _Last refreshed: 2026-06-04T13:47:13+08:00_
 | compare | [docs/EvidRank_evolve/compare_V18_vs_V19.md](../docs/EvidRank_evolve/compare_V18_vs_V19.md) | 2026-06-02T22:31:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V19_vs_V20.md](../docs/EvidRank_evolve/compare_V19_vs_V20.md) | 2026-06-02T23:39:26+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V1_vs_V2.md](../docs/EvidRank_evolve/compare_V1_vs_V2.md) | 2026-06-01T18:29:32+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V21_PARAM_BASELINE_vs_V22_NEUTRAL_ALL.md](../docs/EvidRank_evolve/compare_V21_PARAM_BASELINE_vs_V22_NEUTRAL_ALL.md) | 2026-06-04T21:36:12+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V21_PARAM_BASELINE_vs_V23_NO_PARENT.md](../docs/EvidRank_evolve/compare_V21_PARAM_BASELINE_vs_V23_NO_PARENT.md) | 2026-06-04T21:44:29+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V21_PARAM_BASELINE_vs_V24_NO_ENDPOINT.md](../docs/EvidRank_evolve/compare_V21_PARAM_BASELINE_vs_V24_NO_ENDPOINT.md) | 2026-06-04T21:53:09+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V21_PARAM_BASELINE_vs_V25_NO_ADAPTIVE.md](../docs/EvidRank_evolve/compare_V21_PARAM_BASELINE_vs_V25_NO_ADAPTIVE.md) | 2026-06-04T22:00:58+08:00 |
+| compare | [docs/EvidRank_evolve/compare_V21_PARAM_BASELINE_vs_V26_REMOVE_ADAPTIVE.md](../docs/EvidRank_evolve/compare_V21_PARAM_BASELINE_vs_V26_REMOVE_ADAPTIVE.md) | 2026-06-04T22:10:33+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V2_vs_V3.md](../docs/EvidRank_evolve/compare_V2_vs_V3.md) | 2026-06-01T18:29:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V3_vs_V4.md](../docs/EvidRank_evolve/compare_V3_vs_V4.md) | 2026-06-01T18:29:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V4_vs_V5.md](../docs/EvidRank_evolve/compare_V4_vs_V5.md) | 2026-06-01T21:03:50+08:00 |
@@ -961,6 +968,12 @@ _Last refreshed: 2026-06-04T13:47:13+08:00_
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V19` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V2` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V20` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V21_PARAM_BASELINE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V22_NEUTRAL_ALL` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V23_NO_PARENT` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V24_NO_ENDPOINT` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V25_NO_ADAPTIVE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/V26_REMOVE_ADAPTIVE` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V3` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V4` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V5` |
@@ -1003,6 +1016,7 @@ _Last refreshed: 2026-06-04T13:47:13+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/V19` |
 | report | `output/rcabench-platform-v2/evolve_reports/V2` |
 | report | `output/rcabench-platform-v2/evolve_reports/V20` |
+| report | `output/rcabench-platform-v2/evolve_reports/V22_NEUTRAL_ALL` |
 | report | `output/rcabench-platform-v2/evolve_reports/V3` |
 | report | `output/rcabench-platform-v2/evolve_reports/V3_research` |
 | report | `output/rcabench-platform-v2/evolve_reports/V4` |
@@ -1052,6 +1066,11 @@ _Last refreshed: 2026-06-04T13:47:13+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V18_vs_V19` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V19_vs_V20` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V1_vs_V2` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V21_PARAM_BASELINE_vs_V22_NEUTRAL_ALL` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V21_PARAM_BASELINE_vs_V23_NO_PARENT` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V21_PARAM_BASELINE_vs_V24_NO_ENDPOINT` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V21_PARAM_BASELINE_vs_V25_NO_ADAPTIVE` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_V21_PARAM_BASELINE_vs_V26_REMOVE_ADAPTIVE` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V2_vs_V3` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V3_vs_V4` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V4_vs_V5` |

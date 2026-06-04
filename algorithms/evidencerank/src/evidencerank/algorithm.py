@@ -150,9 +150,6 @@ TRACE_ENDPOINT_SUPPORT_STATUS_FACTOR = 2.0
 TRACE_ENDPOINT_SUPPORT_RISE_FACTOR = 1.5
 TRACE_ENDPOINT_UNSUPPORTED_PENALTY = 0.5
 TRACE_ENDPOINT_POST_GATE_FACTOR = 1.75
-ADAPTIVE_MODALITY_SPAN = 0.08
-ADAPTIVE_MODALITY_MIN_FACTOR = 0.92
-ADAPTIVE_MODALITY_MAX_FACTOR = 1.08
 ARC_CASE_SCALE_CLIP = 3.0
 ARC_DIRECTIONAL_MUTATION_FEATURES = frozenset({
     "metric_count_drop_shift",
@@ -665,31 +662,6 @@ def _build_feature_matrix(
     return matrix, trace_edges
 
 
-def _modality_reliability(scores: np.ndarray) -> float | None:
-    positive = scores[np.isfinite(scores) & (scores > 0.0)]
-    if positive.size == 0:
-        return None
-
-    total = float(positive.sum())
-    if not math.isfinite(total) or total <= 0.0:
-        return None
-
-    if positive.size == 1:
-        concentration = 1.0
-    else:
-        probabilities = positive / total
-        entropy = -float(np.sum(probabilities * np.log(probabilities + 1e-12)))
-        concentration = 1.0 - entropy / math.log(float(positive.size))
-        concentration = min(1.0, max(0.0, concentration))
-
-    p95 = float(np.percentile(positive, 95))
-    median = float(np.median(positive))
-    contrast = (p95 - median) / (p95 + median + 1e-6)
-    contrast = min(1.0, max(0.0, contrast))
-    support = min(1.0, math.sqrt(float(positive.size) / 3.0))
-    return 0.45 * concentration + 0.35 * contrast + 0.20 * support
-
-
 def _feature_modality(feature_name: str) -> str | None:
     for modality, feature_names in MODALITY_FEATURES.items():
         if feature_name in feature_names:
@@ -1128,47 +1100,6 @@ def _apply_arc_top_neighbor_pairwise_contrast(
     return {service: float(adjusted[idx]) for idx, service in enumerate(services)}
 
 
-def _adaptive_feature_weights(
-    matrix: np.ndarray,
-    enabled_features: tuple[str, ...],
-    base_weights: np.ndarray,
-) -> np.ndarray:
-    clean_matrix = np.nan_to_num(matrix, nan=0.0, posinf=0.0, neginf=0.0)
-    reliabilities: dict[str, float] = {}
-    modality_indices: dict[str, list[int]] = {}
-
-    for modality, feature_names in MODALITY_FEATURES.items():
-        indices = [
-            idx
-            for idx, name in enumerate(enabled_features)
-            if name in feature_names and base_weights[idx] > 0.0
-        ]
-        if not indices:
-            continue
-        modality_scores = (clean_matrix[:, indices] * base_weights[indices]).sum(axis=1)
-        reliability = _modality_reliability(modality_scores)
-        if reliability is None:
-            continue
-        reliabilities[modality] = reliability
-        modality_indices[modality] = indices
-
-    if len(reliabilities) < 2:
-        return base_weights
-
-    center = float(np.mean(list(reliabilities.values())))
-    adjusted = base_weights.astype(np.float32, copy=True)
-    for modality, reliability in reliabilities.items():
-        factor = 1.0 + ADAPTIVE_MODALITY_SPAN * (reliability - center)
-        factor = min(ADAPTIVE_MODALITY_MAX_FACTOR, max(ADAPTIVE_MODALITY_MIN_FACTOR, factor))
-        adjusted[modality_indices[modality]] = base_weights[modality_indices[modality]] * factor
-    return adjusted
-
-
-def _top_ranked_service(scores: dict[str, float]) -> str | None:
-    ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
-    return ranked[0][0] if ranked else None
-
-
 def _heuristic_scores(
     services: list[str],
     matrix: np.ndarray,
@@ -1337,11 +1268,6 @@ class EvidenceRank(Algorithm):
             self._enabled_features,
             self._modalities,
         )
-        feature_weights = _adaptive_feature_weights(
-            matrix,
-            self._enabled_features,
-            self._feature_weights,
-        )
         scores = _heuristic_scores(
             services,
             matrix,
@@ -1350,17 +1276,6 @@ class EvidenceRank(Algorithm):
             trace_edges,
             self._parent_context_weight,
         )
-        if not np.array_equal(feature_weights, self._feature_weights):
-            adaptive_scores = _heuristic_scores(
-                services,
-                matrix,
-                self._enabled_features,
-                feature_weights,
-                trace_edges,
-                self._parent_context_weight,
-            )
-            if _top_ranked_service(adaptive_scores) == _top_ranked_service(scores):
-                scores = adaptive_scores
         sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)
 
         answers = [
