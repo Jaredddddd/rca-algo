@@ -652,6 +652,268 @@ Any monotonic numeric values work if used directly as linear weights.
 
 The direct `0,1,1,1,2,5,10,15` ladder lost about `46` top-1 hits versus the accepted synthesized ladder. It is acceptable as a displayed ordinal severity ID, but not as the direct scorer weight.
 
+## BASE_FEATURE_NAMES Ablation Summary
+
+Detailed record: `docs/EvidRank_evolve/FW_FEATURE_ABLATION_iteration.md`
+
+Artifacts:
+
+```text
+output/rcabench-platform-v2/evolve_reweights/FW_FEATURE_ABLATION_SYNTH_LADDER/
+```
+
+The ablation used the same `FW_FEATURE_CACHE_BASE` raw feature cache and the accepted synthesized ladder. It evaluated:
+
+- leave-one-feature-out;
+- single-feature-only;
+- priority tier ablations;
+- modality ablations;
+- feature-family ablations;
+- targeted combined removals;
+- label-guided offline greedy backward elimination.
+
+### Most Useful Features In Current Scorer
+
+These features have the largest positive marginal contribution. Removing them causes the largest AC@1 drop:
+
+| feature removed | AC@1 after removal | delta AC@1 | interpretation |
+| --- | ---: | ---: | --- |
+| `trace_status_code_shift` | 0.715893 | -0.085091 | critical status/protocol mutation |
+| `trace_self_duration_relative_shift` | 0.719409 | -0.081575 | local service-side latency mutation |
+| `trace_count_rise_shift` | 0.745429 | -0.055556 | traffic/entry rise and endpoint support |
+| `log_count_delta` | 0.759494 | -0.041491 | log-volume corroboration |
+| `trace_endpoint_shift` | 0.760197 | -0.040788 | endpoint distribution mutation |
+| `metric_max_z` | 0.764416 | -0.036568 | metric spike evidence |
+| `metric_mean_z` | 0.767932 | -0.033052 | sustained metric shift |
+| `log_template_delta` | 0.769339 | -0.031646 | log pattern distribution shift |
+| `abnormal_trace_rows` | 0.779887 | -0.021097 | trace support / sample confidence |
+
+Medium/weak but still positive:
+
+```text
+trace_duration_delta
+trace_count_delta
+metric_value_delta
+metric_anomaly_count
+metric_count_drop_shift
+trace_count_drop_shift
+```
+
+### Harmful Feature Candidate
+
+`trace_duration_z` is the only feature whose removal improved all headline metrics in the cache replay:
+
+| experiment | AC@1 | MRR | AC@3 | AC@5 |
+| --- | ---: | ---: | ---: | ---: |
+| all features | 0.800985 | 0.874517 | 0.942335 | 0.975387 |
+| remove `trace_duration_z` | 0.816456 | 0.884112 | 0.945851 | 0.976793 |
+
+Case movement:
+
+| regressed_from_hit1 | improved_to_hit1 |
+| ---: | ---: |
+| 15 | 37 |
+
+Interpretation: `trace_duration_z` has standalone anomaly-detection power, but in the fused RCA scorer it behaves like a propagation/victim latency symptom. `trace_duration_delta` and `trace_self_duration_relative_shift` preserve more useful latency information.
+
+### Currently Neutral Or Unused
+
+| feature | reason |
+| --- | --- |
+| `trace_error_rate` | no top-1 or MRR effect in this cache replay; single-feature-only AC@1 is `0`. |
+| `log_error_rate` | no top-1 marginal effect, tiny negative MRR effect when removed. |
+| `abnormal_metric_rows` | no top-1 marginal effect, tiny positive MRR when removed. |
+| `topology_in_degree` | default `evidencerank` weight is `0`; no conclusion about ARC. |
+| `topology_out_degree` | default `evidencerank` weight is `0`; no conclusion about ARC. |
+
+### Group-Level Findings
+
+| ablation | AC@1 after removal | delta AC@1 | interpretation |
+| --- | ---: | ---: | --- |
+| remove trace modality | 0.443741 | -0.357243 | trace is the most important modality |
+| remove metric modality | 0.617440 | -0.183544 | metric is important |
+| remove log modality | 0.704641 | -0.096343 | log is auxiliary but useful |
+| remove BACKGROUND priority | 0.534459 | -0.266526 | background metric/log signals are collectively essential |
+| remove HIGH priority | 0.689873 | -0.111111 | endpoint/count rise signals are very important |
+| remove CRITICAL priority | 0.715893 | -0.085091 | status mutation is critical |
+| remove LOCAL priority | 0.719409 | -0.081575 | self-duration/local latency is important |
+
+### Greedy Backward Result
+
+The offline greedy elimination selected exactly one improving removal:
+
+```text
+remove trace_duration_z
+```
+
+No additional single feature removal improved AC@1/MRR after that step.
+
+No default algorithm change was made in the ablation turn. If this candidate is accepted later, it should be run as a normal versioned algorithm iteration with full eval, snapshot, summary, compare, and guard.
+
+## Comprehensive Priority And Ladder Search
+
+Detailed record: `docs/EvidRank_evolve/FW_PRIORITY_COMPREHENSIVE_SEARCH_iteration.md`
+
+Dedicated case-movement and variant interpretation: `docs/EvidRank_evolve/FW_PRIORITY_VARIANTS_CASE_MOVEMENT.md`
+
+Artifacts:
+
+```text
+output/rcabench-platform-v2/evolve_reweights/FW_PRIORITY_COMPREHENSIVE_SEARCH/
+```
+
+This experiment asked a broader question:
+
+```text
+Without changing EvidenceRank scoring logic, how far can offline label-guided search push performance
+by changing only FEATURE_PRIORITIES assignments and FEATURE_PRIORITY_LADDER values?
+```
+
+Safety boundary:
+
+- This is an offline label-guided upper-bound and sensitivity study.
+- It used labels only to compute metrics and case movement.
+- No default `algorithm.py` change was made.
+- The best candidate should not be copied into runtime as-is without mechanism-level justification and full eval.
+
+### Search Space
+
+The search evaluated:
+
+- single-feature priority reassignment across all `FeaturePriority` tiers;
+- greedy coordinate search over priority assignments;
+- ladder coordinate search after the greedy assignment;
+- targeted combinations around previously observed weak points;
+- post-analysis preset scans with clean ladders such as `0,1,1,1,2,5,10,15`;
+- one-level ladder range scans to estimate AC@1 plateaus;
+- key candidate case movement versus baseline.
+
+The first search pass recorded `eval_count=1105`; the post-analysis pass added `170` replay evaluations.
+
+### Best Offline Candidate
+
+Best label-guided replay candidate:
+
+```text
+Priority changes:
+trace_duration_z: BASELINE -> DISABLED
+topology_in_degree: DISABLED -> SUPPORT
+log_count_delta: BACKGROUND -> LOCAL
+trace_count_delta: BASELINE -> BACKGROUND
+log_error_rate: BACKGROUND -> LOCAL
+metric_count_drop_shift: ROOT -> HIGH
+
+Ladder changes:
+LOCAL: 1.5 -> 2.0
+CRITICAL: 16 -> 20
+```
+
+Metrics:
+
+| config | AC@1 | MRR | AC@3 | AC@5 |
+| --- | ---: | ---: | ---: | ---: |
+| current priorities + current synthesized ladder | 0.800985 | 0.874517 | 0.942335 | 0.975387 |
+| greedy priorities + current ladder | 0.830520 | 0.892995 | 0.947961 | 0.976793 |
+| greedy priorities + `LOCAL=2, CRITICAL=20` | 0.839662 | 0.898061 | 0.950070 | 0.974684 |
+
+Case movement versus baseline:
+
+| candidate | improved_to_hit1 | regressed_from_hit1 | rank_improved | rank_regressed | unchanged |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| disable `trace_duration_z` | 37 | 15 | 23 | 7 | 1340 |
+| greedy priorities + current ladder | 61 | 19 | 54 | 31 | 1257 |
+| greedy priorities + best ladder | 68 | 13 | 55 | 30 | 1256 |
+| greedy priorities + clean ladder | 67 | 45 | 43 | 47 | 1220 |
+
+### Greedy Path
+
+| step | change | AC@1 | MRR |
+| ---: | --- | ---: | ---: |
+| 1 | `trace_duration_z: BASELINE -> DISABLED` | 0.816456 | 0.884112 |
+| 2 | `topology_in_degree: DISABLED -> SUPPORT` | 0.821378 | 0.887160 |
+| 3 | `log_count_delta: BACKGROUND -> LOCAL` | 0.826301 | 0.890430 |
+| 4 | `trace_count_delta: BASELINE -> BACKGROUND` | 0.828411 | 0.891963 |
+| 5 | `log_error_rate: BACKGROUND -> LOCAL` | 0.829817 | 0.892886 |
+| 6 | `metric_count_drop_shift: ROOT -> HIGH` | 0.830520 | 0.892995 |
+| ladder 1 | `LOCAL: 1.5 -> 2.0` | 0.836850 | 0.896024 |
+| ladder 2 | `CRITICAL: 16 -> 20` | 0.839662 | 0.898061 |
+
+The dominant single change is still disabling `trace_duration_z`. The next changes are plausible, but more label-guided: weak topology support, local log corroboration, demotion of raw trace count, and a very small one-case gain from demoting metric count drop.
+
+### Clean Ladder Check
+
+| assignment | ladder | AC@1 | MRR | result |
+| --- | --- | ---: | ---: | --- |
+| current priorities | `0,1,1,1,2,5,10,15` | 0.768636 | 0.858448 | loses many top-1 hits |
+| disable `trace_duration_z` only | `0,1,1,1,2,5,10,15` | 0.796062 | 0.874065 | still below current |
+| greedy priorities | `0,1,1,1,2,5,10,15` | 0.816456 | 0.884331 | better, but below best |
+| greedy priorities | `0,0.75,1,1.25,2,6,10,20` | 0.839662 | 0.898061 | best offline candidate |
+
+This answers the priority-only question:
+
+```text
+FeaturePriority ordering carries real diagnostic information,
+but ordering alone is not sufficient under the current linear scorer.
+The nonlinear spacing between tiers still decides many boundary cases.
+```
+
+### Ladder Plateau Findings
+
+For current priorities and the accepted ladder:
+
+| tier | exact best values | within one-case values | interpretation |
+| --- | --- | --- | --- |
+| BACKGROUND | 0.75 | 0.75 | highly sensitive |
+| BASELINE | 1 | 1 | moderately sensitive |
+| SUPPORT | 1.25 | 1.25 | mildly sensitive |
+| LOCAL | 1.5 | 1.5 | sensitive |
+| HIGH | 6 | 6 | sensitive |
+| ROOT | 8, 10 | 8, 10, 12, 14, 16 | tolerant |
+| CRITICAL | 16 | 16 | sensitive |
+
+For greedy priorities and the best ladder:
+
+| tier | exact best values | within one-case values | interpretation |
+| --- | --- | --- | --- |
+| BACKGROUND | 0.75 | 0.75 | still sensitive |
+| BASELINE | 1 | 1 | stable but exact |
+| SUPPORT | 1.25 | 1.25 | stable but exact |
+| LOCAL | 2 | 2, 2.25 | modest plateau |
+| HIGH | 6 | 6 | still sensitive |
+| ROOT | 6, 8, 10, 12, 14, 16, 20 | same | irrelevant after demoting the only root feature |
+| CRITICAL | 20 | 20 | still sensitive |
+
+So the search did not prove that exact numeric values are irrelevant. It showed a narrower claim:
+
+```text
+Some tiers, especially ROOT after the greedy reassignment, become insensitive.
+But BACKGROUND/HIGH/CRITICAL remain sensitive because large-scale context features and small-scale root-specific features compete in one linear sum.
+```
+
+### Mechanism Takeaways
+
+Most defensible mechanism:
+
+```text
+Raw global trace-duration extremeness behaves like a propagation/victim latency symptom.
+It should be gated, downweighted, or replaced by a local/self-duration and topology-contrast latency signal.
+```
+
+Secondary mechanisms:
+
+- Raw trace count deltas are propagation-prone and benefit from demotion.
+- Logs can be useful local corroboration after victim-latency evidence is controlled.
+- Weak topology support can help default `evidencerank`, but ARC has separate topology/reliability logic, so this should not be generalized blindly.
+- `metric_count_drop_shift: ROOT -> HIGH` is too small a gain to trust as a standalone conclusion.
+
+Recommended next accepted-code experiment:
+
+```text
+Do not directly paste the best label-guided assignment into algorithm.py.
+Instead, test a mechanism version that suppresses or gates `trace_duration_z` using unsupervised agreement:
+self-duration, endpoint/status mutation, log corroboration, or trace-direction neighbor contrast.
+```
+
 ## Appendix A: Reproduce Scale Compensation Scans
 
 This script reproduces the main scale compensation variants from the cached feature matrix. It is intentionally offline and reads labels only for metric reporting.

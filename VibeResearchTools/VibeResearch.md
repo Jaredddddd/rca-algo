@@ -783,7 +783,7 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-04T02:13:50+08:00_
+_Last refreshed: 2026-06-04T13:47:13+08:00_
 
 ## EvidenceRank Document Index
 
@@ -827,7 +827,9 @@ _Last refreshed: 2026-06-04T02:13:50+08:00_
 | compare | [docs/EvidRank-ARC-Evolve/compare_ARC7_vs_ARC8.md](../docs/EvidRank-ARC-Evolve/compare_ARC7_vs_ARC8.md) | 2026-06-03T21:48:46+08:00 |
 | compare | [docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC1.md](../docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC1.md) | 2026-06-03T15:14:00+08:00 |
 | compare | [docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md](../docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md) | 2026-06-03T13:52:33+08:00 |
+| iteration | [docs/EvidRank_evolve/FW_FEATURE_ABLATION_iteration.md](../docs/EvidRank_evolve/FW_FEATURE_ABLATION_iteration.md) | 2026-06-04T02:32:02+08:00 |
 | summary | [docs/EvidRank_evolve/FW_NUMERIC_BASELINE_summary.md](../docs/EvidRank_evolve/FW_NUMERIC_BASELINE_summary.md) | 2026-06-03T23:08:56+08:00 |
+| iteration | [docs/EvidRank_evolve/FW_PRIORITY_COMPREHENSIVE_SEARCH_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_COMPREHENSIVE_SEARCH_iteration.md) | 2026-06-04T11:13:40+08:00 |
 | iteration | [docs/EvidRank_evolve/FW_PRIORITY_LADDER_ABLATION_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_LADDER_ABLATION_iteration.md) | 2026-06-04T02:04:59+08:00 |
 | iteration | [docs/EvidRank_evolve/FW_PRIORITY_LINEAR_0_7_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_LINEAR_0_7_iteration.md) | 2026-06-04T00:45:50+08:00 |
 | summary | [docs/EvidRank_evolve/FW_PRIORITY_LINEAR_0_7_summary.md](../docs/EvidRank_evolve/FW_PRIORITY_LINEAR_0_7_summary.md) | 2026-06-03T23:32:35+08:00 |
@@ -836,6 +838,7 @@ _Last refreshed: 2026-06-04T02:13:50+08:00_
 | summary | [docs/EvidRank_evolve/FW_PRIORITY_PRIOR_summary.md](../docs/EvidRank_evolve/FW_PRIORITY_PRIOR_summary.md) | 2026-06-03T23:17:48+08:00 |
 | iteration | [docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_iteration.md) | 2026-06-04T02:04:32+08:00 |
 | summary | [docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_summary.md](../docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_summary.md) | 2026-06-04T02:05:18+08:00 |
+| note | [docs/EvidRank_evolve/FW_PRIORITY_VARIANTS_CASE_MOVEMENT.md](../docs/EvidRank_evolve/FW_PRIORITY_VARIANTS_CASE_MOVEMENT.md) | 2026-06-04T13:46:57+08:00 |
 | guide | [docs/EvidRank_evolve/README.md](../docs/EvidRank_evolve/README.md) | 2026-06-01T18:29:32+08:00 |
 | iteration | [docs/EvidRank_evolve/V10_iteration.md](../docs/EvidRank_evolve/V10_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V10_summary.md](../docs/EvidRank_evolve/V10_summary.md) | 2026-06-02T11:24:53+08:00 |
