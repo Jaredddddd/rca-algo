@@ -30,7 +30,7 @@ The simple EvidenceRank scoring form is not enough as a top-conference method be
 ## Current Status
 
 - `CERA3` is the current accepted standalone CERA version.
-- Implementation module: `algorithms/evidencerank/src/evidencerank/cera.py`
+- Implementation module: `algorithms/evidencerank/src/evidencerank/cera.py` is self-contained and does not import runtime helpers from `evidencerank.algorithm`.
 - Registry name: `cera`
 - Default EvidenceRank implementation remains unchanged.
 - CERA3 full eval on `rcabench`: `total=1422`, `error=0`, `AC@1=0.850211`, `MRR=0.904032`, `AC@3=0.950774`, `AC@5=0.976090`.

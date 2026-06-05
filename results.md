@@ -1,11 +1,18 @@
+ljw@R740-3:~/paper/aegis/rca-algo-contrib$ uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
+发现 32706 个算法输出文件
+
+包含算法: RUN, baro, causalrca, cera, evidencerank, evidencerank_arc, evidencerank_log, evidencerank_log_trace, evidencerank_metric, evidencerank_metric_log, evidencerank_metric_trace, evidencerank_trace, evidencerank_v13, herosas, microdig, microhecl, microrank, microrca, nezha, rcd, shapleyiq, simplerca, ton
+总 datapack 结果: 1139510 行
+
+shape: (23, 13)
 ┌───────────────────────────┬───────┬───────┬─────────────────────┬──────────┬────────────┬────────────┬────────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
 │ algorithm                 ┆ total ┆ error ┆ runtime.seconds:avg ┆      MRR ┆ AC@1.count ┆ AC@3.count ┆ AC@5.count ┆     AC@1 ┆     AC@3 ┆     AC@5 ┆    Avg@3 ┆    Avg@5 │
 │ ---                       ┆   --- ┆   --- ┆                 --- ┆      --- ┆        --- ┆        --- ┆        --- ┆      --- ┆      --- ┆      --- ┆      --- ┆      --- │
 │ str                       ┆   u32 ┆   u32 ┆                 f64 ┆      f64 ┆        f64 ┆        f64 ┆        f64 ┆      f64 ┆      f64 ┆      f64 ┆      f64 ┆      f64 │
 ╞═══════════════════════════╪═══════╪═══════╪═════════════════════╪══════════╪════════════╪════════════╪════════════╪══════════╪══════════╪══════════╪══════════╪══════════╡
+│ cera                      ┆ 1,422 ┆     0 ┆            9.979881 ┆ 0.904032 ┆    1,209.0 ┆    1,352.0 ┆    1,388.0 ┆ 0.850211 ┆ 0.950774 ┆  0.97609 ┆ 0.907173 ┆ 0.933755 │
 │ evidencerank_arc          ┆ 1,422 ┆     0 ┆            9.549299 ┆ 0.893267 ┆    1,182.0 ┆    1,348.0 ┆    1,387.0 ┆ 0.831224 ┆ 0.947961 ┆ 0.975387 ┆   0.8985 ┆ 0.927286 │
 │ evidencerank              ┆ 1,422 ┆     0 ┆            8.277946 ┆ 0.891195 ┆    1,177.0 ┆    1,347.0 ┆    1,386.0 ┆ 0.827707 ┆ 0.947257 ┆ 0.974684 ┆ 0.896624 ┆  0.92616 │
-│ cera                      ┆ 1,422 ┆     0 ┆            9.688974 ┆ 0.842955 ┆    1,070.0 ┆    1,317.0 ┆    1,367.0 ┆ 0.752461 ┆  0.92616 ┆ 0.961322 ┆  0.85068 ┆ 0.892827 │
 │ evidencerank_metric_trace ┆ 1,422 ┆     0 ┆            7.988058 ┆ 0.835326 ┆    1,043.0 ┆    1,330.0 ┆    1,374.0 ┆ 0.733474 ┆ 0.935302 ┆ 0.966245 ┆ 0.847867 ┆ 0.893108 │
 │ evidencerank_v13          ┆ 1,422 ┆     0 ┆            9.733532 ┆ 0.801983 ┆      954.0 ┆    1,316.0 ┆    1,385.0 ┆ 0.670886 ┆ 0.925457 ┆  0.97398 ┆ 0.819737 ┆ 0.878481 │
 │ evidencerank_log_trace    ┆ 1,422 ┆     0 ┆            9.239672 ┆ 0.733098 ┆      907.0 ┆    1,121.0 ┆    1,195.0 ┆ 0.637834 ┆ 0.788326 ┆ 0.840366 ┆ 0.723863 ┆ 0.766104 │
@@ -29,5 +36,4 @@
 └───────────────────────────┴───────┴───────┴─────────────────────┴──────────┴────────────┴────────────┴────────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
 
 合并报告已保存: output/rcabench-platform-v2/meta/rcabench/dataset.perf.combined.parquet
-ljw@R740-3:~/paper/aegis/rca-algo-contrib$ 
-[evidrank]0:bash*                                                                                                                                    "R740-3" 14:14 05-Jun-26
+ljw@R740-3:~/paper/aegis/rca-algo-contrib$

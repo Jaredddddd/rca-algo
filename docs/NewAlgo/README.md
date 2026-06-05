@@ -51,7 +51,7 @@ docs/EvidRank_evolve/V20_iteration.md
 | `CERA2` | 0.752461 | 0.842955 | 0.926160 | 0.961322 | 0 | Strong milestone passed; no hand-crafted role weights |
 | `CERA3` | 0.850211 | 0.904032 | 0.950774 | 0.976090 | 0 | Target passed; ordinal causal evidence, no hand-crafted numeric weights |
 
-Implementation: `algorithms/evidencerank/src/evidencerank/cera.py`
+Implementation: `algorithms/evidencerank/src/evidencerank/cera.py` is self-contained and does not import runtime helpers from `evidencerank.algorithm`.
 
 Iteration notes: `docs/NewAlgo/CERA1_iteration.md`, `docs/NewAlgo/CERA2_iteration.md`, `docs/NewAlgo/CERA3_iteration.md`
 

@@ -131,3 +131,21 @@ The accepted interpretation is:
 - runtime ranking does not use labels, injection metadata, previous outputs, or case/service/fault-specific rules.
 
 Next work can target paper-quality robustness analysis and ablations. If further accuracy work is needed, focus on pod-failure/bandwidth cases through generic infrastructure-local evidence rather than restoring hand-tuned constants.
+
+## Maintenance Note
+
+On 2026-06-05, `algorithms/evidencerank/src/evidencerank/cera.py` was made self-contained:
+
+- removed runtime imports from `evidencerank.algorithm`;
+- inlined the generic metric/trace/log feature extraction, ARC endpoint support gate, and parent-context helper used by CERA3;
+- removed unused CERA2-era family-burden and counterfactual explain-away helpers from the active file;
+- verified `compileall`, `guard`, cache scoring, sampled raw-parquet feature extraction parity, and full eval.
+
+Verification after refactor:
+
+| check | result |
+| --- | --- |
+| full eval | `total=1422`, `error=0`, `AC@1=0.850211`, `MRR=0.904032`, `AC@3=0.950774`, `AC@5=0.976090` |
+| cache scoring | `AC@1=0.850211`, `MRR=0.904032`, `AC@3=0.950774`, `AC@5=0.976090` |
+| sampled feature parity | 12 datapacks, `max_abs_diff=0.000000000`, no edge mismatch |
+| guard | no high-risk overfitting warnings |
