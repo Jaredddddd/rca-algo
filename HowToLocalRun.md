@@ -616,6 +616,85 @@ uv run --package evidencerank python algorithms/evidencerank/main.py \
   -d rcabench --clear --use-cpus 45
 ```
 
+### CERA
+
+CERA 是 `evidencerank` package 中注册的新算法，默认融合 metric + trace + log 三模态：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch -a cera -d rcabench --clear --use-cpus 32
+```
+
+Report:
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
+```
+
+#### CERA Multimodal Ablation (多模态消融)
+
+CERA 提供与 EvidenceRank 对齐的 6 个多模态消融变体，覆盖所有单模态和双模态组合：
+
+| 变体名 | 使用模态 | CERA active feature 维度 |
+|--------|---------|--------------------------|
+| `cera_metric` | metric only | 6 |
+| `cera_log` | log only | 3 |
+| `cera_trace` | trace + topology | 12 |
+| `cera_metric_log` | metric + log | 9 |
+| `cera_metric_trace` | metric + trace + topology | 18 |
+| `cera_log_trace` | log + trace + topology | 15 |
+
+一次运行全部 CERA 消融变体：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch \
+  -a cera_metric \
+  -a cera_log \
+  -a cera_trace \
+  -a cera_metric_log \
+  -a cera_metric_trace \
+  -a cera_log_trace \
+  -d rcabench --clear --use-cpus 45
+```
+
+也可以与完整 CERA 一起运行对比：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch \
+  -a cera \
+  -a cera_metric \
+  -a cera_log \
+  -a cera_trace \
+  -a cera_metric_log \
+  -a cera_metric_trace \
+  -a cera_log_trace \
+  -d rcabench --clear --use-cpus 32
+```
+
+如果只跑 held-out split，把 `-d rcabench` 换成 `-d rcabench_test`：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch \
+  -a cera \
+  -a cera_metric \
+  -a cera_log \
+  -a cera_trace \
+  -a cera_metric_log \
+  -a cera_metric_trace \
+  -a cera_log_trace \
+  -d rcabench_test --clear --use-cpus 32
+```
+
+Report 和汇总排序：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
+uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
+```
+
 ### HeroSAS
 
 HeroSAS is adapted from the original Bank metric tool in `algorithms/herosas/metric_tools.py`.

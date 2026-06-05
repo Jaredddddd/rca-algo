@@ -893,3 +893,39 @@ class CERA(Algorithm):
             AlgorithmAnswer(level="service", name=name, rank=rank)
             for rank, (name, _score) in enumerate(sorted_scores, start=1)
         ]
+
+
+class CERAMetric(CERA):
+    """CERA ablation using only metric evidence."""
+
+    _modalities = frozenset({"metric"})
+
+
+class CERALog(CERA):
+    """CERA ablation using only log evidence."""
+
+    _modalities = frozenset({"log"})
+
+
+class CERATrace(CERA):
+    """CERA ablation using only trace evidence."""
+
+    _modalities = frozenset({"trace"})
+
+
+class CERAMetricLog(CERA):
+    """CERA ablation using metric and log evidence."""
+
+    _modalities = frozenset({"metric", "log"})
+
+
+class CERAMetricTrace(CERA):
+    """CERA ablation using metric and trace evidence."""
+
+    _modalities = frozenset({"metric", "trace"})
+
+
+class CERALogTrace(CERA):
+    """CERA ablation using log and trace evidence."""
+
+    _modalities = frozenset({"log", "trace"})

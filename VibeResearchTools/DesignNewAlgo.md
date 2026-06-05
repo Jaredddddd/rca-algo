@@ -32,6 +32,7 @@ The simple EvidenceRank scoring form is not enough as a top-conference method be
 - `CERA3` is the current accepted standalone CERA version.
 - Implementation module: `algorithms/evidencerank/src/evidencerank/cera.py` is self-contained and does not import runtime helpers from `evidencerank.algorithm`.
 - Registry name: `cera`
+- Multimodal ablation registry names: `cera_metric`, `cera_log`, `cera_trace`, `cera_metric_log`, `cera_metric_trace`, `cera_log_trace`.
 - Default EvidenceRank implementation remains unchanged.
 - CERA3 full eval on `rcabench`: `total=1422`, `error=0`, `AC@1=0.850211`, `MRR=0.904032`, `AC@3=0.950774`, `AC@5=0.976090`.
 - CERA3 mechanism: raw log-normalized incident features are mapped to ordinal causal evidence tiers; the numeric energy ladder is synthesized from tier ordering and tier count; ARC endpoint support is derived from current rank agreement; parent-context strength is derived from trace graph sink share.
@@ -97,5 +98,7 @@ If the final registry name is not `cera`, replace `cera` consistently in all com
 - [CERA2 Summary](../docs/EvidRank_evolve/CERA2_summary.md)
 - [CERA1 vs CERA2 Compare](../docs/EvidRank_evolve/compare_CERA1_vs_CERA2.md)
 - [CERA3 Iteration](../docs/NewAlgo/CERA3_iteration.md)
+- [CERA3 Effectiveness Analysis](../docs/NewAlgo/CERA3_effectiveness_analysis.md)
+- [CERA3 vs EvidenceRank Comparison](../docs/NewAlgo/CERA3_vs_EvidenceRank_comparison.md)
 - [CERA3 Summary](../docs/EvidRank_evolve/CERA3_summary.md)
 - [CERA2 vs CERA3 Compare](../docs/EvidRank_evolve/compare_CERA2_vs_CERA3.md)

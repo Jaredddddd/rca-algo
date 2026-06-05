@@ -17,7 +17,15 @@ from src.evidencerank.algorithm import (
     EvidenceRankTrace,
     EvidenceRankARC,
 )
-from src.evidencerank.cera import CERA
+from src.evidencerank.cera import (
+    CERA,
+    CERALog,
+    CERALogTrace,
+    CERAMetric,
+    CERAMetricLog,
+    CERAMetricTrace,
+    CERATrace,
+)
 
 if __name__ == "__main__":
     registry = global_algorithm_registry()
@@ -30,5 +38,11 @@ if __name__ == "__main__":
     registry["evidencerank_log_trace"] = EvidenceRankLogTrace
     registry["evidencerank_arc"] = EvidenceRankARC
     registry["cera"] = CERA
+    registry["cera_metric"] = CERAMetric
+    registry["cera_log"] = CERALog
+    registry["cera_trace"] = CERATrace
+    registry["cera_metric_log"] = CERAMetricLog
+    registry["cera_metric_trace"] = CERAMetricTrace
+    registry["cera_log_trace"] = CERALogTrace
 
     main(enable_builtin_algorithms=False)

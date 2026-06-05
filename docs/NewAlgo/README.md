@@ -53,7 +53,13 @@ docs/EvidRank_evolve/V20_iteration.md
 
 Implementation: `algorithms/evidencerank/src/evidencerank/cera.py` is self-contained and does not import runtime helpers from `evidencerank.algorithm`.
 
+Registered multimodal ablations: `cera_metric`, `cera_log`, `cera_trace`, `cera_metric_log`, `cera_metric_trace`, `cera_log_trace`.
+
 Iteration notes: `docs/NewAlgo/CERA1_iteration.md`, `docs/NewAlgo/CERA2_iteration.md`, `docs/NewAlgo/CERA3_iteration.md`
+
+Effectiveness and redundancy analysis: `docs/NewAlgo/CERA3_effectiveness_analysis.md`
+
+CERA vs EvidenceRank comparison: `docs/NewAlgo/CERA3_vs_EvidenceRank_comparison.md`
 
 ## Suggested Method Line
 

@@ -149,3 +149,16 @@ Verification after refactor:
 | cache scoring | `AC@1=0.850211`, `MRR=0.904032`, `AC@3=0.950774`, `AC@5=0.976090` |
 | sampled feature parity | 12 datapacks, `max_abs_diff=0.000000000`, no edge mismatch |
 | guard | no high-risk overfitting warnings |
+
+## Multimodal Ablation Registration
+
+On 2026-06-06, CERA added the same multimodal ablation registry surface as EvidenceRank:
+
+- `cera_metric`
+- `cera_log`
+- `cera_trace`
+- `cera_metric_log`
+- `cera_metric_trace`
+- `cera_log_trace`
+
+These variants are thin subclasses over the accepted CERA3 implementation. They only override `_modalities`, so the full `cera` path, ordinal evidence tiers, endpoint support gate, and sink-share parent context remain unchanged. Trace-dependent logic is naturally disabled when the trace modality is not enabled because `_build_feature_matrix` returns no trace edges for non-trace variants.
