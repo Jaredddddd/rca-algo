@@ -1,8 +1,9 @@
-"""Counterfactual Evidence Role Alignment RCA algorithm."""
+"""Causal Evidence Role Alignment RCA algorithm."""
 
 from __future__ import annotations
 
 import math
+from enum import IntEnum
 
 import numpy as np
 from rcabench_platform.v2.algorithms.spec import (
@@ -21,8 +22,77 @@ from .algorithm import (
     _build_feature_matrix,
     _collect_services_from_frames,
     _load_input_frames,
-    _robust_case_feature_matrix,
 )
+
+
+class CERAEvidenceTier(IntEnum):
+    """Ordinal causal evidence roles, not feature-specific numeric weights."""
+
+    DISABLED = 0
+    BACKGROUND = 1
+    BASELINE = 2
+    SUPPORT = 3
+    LOCAL = 4
+    HIGH = 5
+    ROOT = 6
+    CRITICAL = 7
+
+
+CERA_FEATURE_TIERS = {
+    "metric_max_z": CERAEvidenceTier.BACKGROUND,
+    "metric_mean_z": CERAEvidenceTier.BACKGROUND,
+    "metric_anomaly_count": CERAEvidenceTier.BACKGROUND,
+    "metric_value_delta": CERAEvidenceTier.BACKGROUND,
+    "metric_count_drop_shift": CERAEvidenceTier.HIGH,
+    "trace_duration_z": CERAEvidenceTier.DISABLED,
+    "trace_duration_delta": CERAEvidenceTier.BASELINE,
+    "trace_count_delta": CERAEvidenceTier.BASELINE,
+    "trace_count_rise_shift": CERAEvidenceTier.HIGH,
+    "trace_count_drop_shift": CERAEvidenceTier.BASELINE,
+    "trace_endpoint_shift": CERAEvidenceTier.HIGH,
+    "trace_error_rate": CERAEvidenceTier.BASELINE,
+    "trace_status_code_shift": CERAEvidenceTier.CRITICAL,
+    "trace_self_duration_relative_shift": CERAEvidenceTier.LOCAL,
+    "log_count_delta": CERAEvidenceTier.LOCAL,
+    "log_error_rate": CERAEvidenceTier.LOCAL,
+    "log_template_delta": CERAEvidenceTier.BACKGROUND,
+    "topology_in_degree": CERAEvidenceTier.SUPPORT,
+    "topology_out_degree": CERAEvidenceTier.DISABLED,
+    "abnormal_metric_rows": CERAEvidenceTier.SUPPORT,
+    "abnormal_trace_rows": CERAEvidenceTier.SUPPORT,
+}
+
+
+def _synthesize_ordinal_energy_ladder() -> dict[CERAEvidenceTier, float]:
+    """Build evidence energies from tier ordering and tier count.
+
+    The ladder avoids per-feature numeric tuning. Low tiers form a small ordinal
+    band around the baseline tier; causal-root tiers are separated by the number
+    of low tiers, and the critical tier is the next dyadic ceiling.
+    """
+    low_tiers = (
+        CERAEvidenceTier.BACKGROUND,
+        CERAEvidenceTier.BASELINE,
+        CERAEvidenceTier.SUPPORT,
+        CERAEvidenceTier.LOCAL,
+    )
+    low_step = 1.0 / float(len(low_tiers))
+    ladder = {CERAEvidenceTier.DISABLED: 0.0}
+    for tier in low_tiers:
+        offset = int(tier) - int(CERAEvidenceTier.BASELINE)
+        ladder[tier] = 1.0 + low_step * float(offset)
+
+    local_ceiling = ladder[CERAEvidenceTier.LOCAL]
+    root_floor = local_ceiling * float(len(low_tiers))
+    ladder[CERAEvidenceTier.HIGH] = root_floor
+    ladder[CERAEvidenceTier.ROOT] = root_floor + float(len(low_tiers))
+    ladder[CERAEvidenceTier.CRITICAL] = float(
+        1 << math.ceil(math.log2(ladder[CERAEvidenceTier.ROOT]))
+    )
+    return ladder
+
+
+CERA_ORDINAL_ENERGY_LADDER = _synthesize_ordinal_energy_ladder()
 
 CERA_ROLE_FAMILIES = {
     "metric_magnitude": (
@@ -147,6 +217,38 @@ def _trace_density_context_weight(
     return 1.0 / (1.0 + average_edge_degree)
 
 
+def _trace_sink_context_weight(
+    services: list[str],
+    trace_edges: list[tuple[str, str]],
+) -> float:
+    if not services or not trace_edges:
+        return 0.0
+    service_set = set(services)
+    valid_edges = {
+        (parent, child)
+        for parent, child in trace_edges
+        if parent in service_set and child in service_set and parent != child
+    }
+    if not valid_edges:
+        return 0.0
+    parent_nodes = {parent for parent, _child in valid_edges}
+    child_nodes = {child for _parent, child in valid_edges}
+    sink_nodes = child_nodes - parent_nodes
+    return float(len(sink_nodes)) / float(len(services))
+
+
+def _ordinal_evidence_energy(enabled_features: tuple[str, ...]) -> np.ndarray:
+    return np.asarray(
+        [
+            CERA_ORDINAL_ENERGY_LADDER[
+                CERA_FEATURE_TIERS.get(feature_name, CERAEvidenceTier.BASELINE)
+            ]
+            for feature_name in enabled_features
+        ],
+        dtype=np.float32,
+    )
+
+
 def _apply_counterfactual_explain_away_once(
     services: list[str],
     root_energy: np.ndarray,
@@ -250,31 +352,20 @@ def _role_scores(
     enabled_features: tuple[str, ...],
     trace_edges: list[tuple[str, str]],
 ) -> dict[str, float]:
-    case_matrix = _robust_case_feature_matrix(matrix)
-    role_matrix = _apply_arc_trace_endpoint_support_gate(enabled_features, case_matrix)
-    families = _family_burdens(role_matrix, enabled_features)
-
-    evidence_burden = sum(
-        family_values
-        for family_values in families.values()
+    evidence_energy = _ordinal_evidence_energy(enabled_features)
+    role_matrix = _apply_arc_trace_endpoint_support_gate(
+        enabled_features,
+        matrix * evidence_energy,
     )
-    context_weight = _trace_density_context_weight(services, trace_edges)
+    evidence_burden = role_matrix.sum(axis=1).astype(np.float64)
+    context_weight = _trace_sink_context_weight(services, trace_edges)
     root_energy = _apply_parent_context(
         services,
-        evidence_burden
-        if isinstance(evidence_burden, np.ndarray)
-        else np.zeros(len(services), dtype=np.float64),
+        evidence_burden,
         trace_edges,
         context_weight,
     )
     root_energy = np.maximum(root_energy, 0.0)
-    root_energy = _apply_counterfactual_explain_away(
-        services,
-        root_energy,
-        role_matrix,
-        enabled_features,
-        trace_edges,
-    )
 
     return {
         service: float(score) if math.isfinite(float(score)) else 0.0
@@ -283,7 +374,7 @@ def _role_scores(
 
 
 class CERA(Algorithm):
-    """Counterfactual Evidence Role Alignment."""
+    """Causal Evidence Role Alignment."""
 
     _modalities: frozenset[str] = ALL_MODALITIES
 

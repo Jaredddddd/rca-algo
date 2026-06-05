@@ -29,27 +29,27 @@ The simple EvidenceRank scoring form is not enough as a top-conference method be
 
 ## Current Status
 
-- `CERA2` is the current accepted standalone CERA version.
+- `CERA3` is the current accepted standalone CERA version.
 - Implementation module: `algorithms/evidencerank/src/evidencerank/cera.py`
 - Registry name: `cera`
 - Default EvidenceRank implementation remains unchanged.
-- CERA2 full eval on `rcabench`: `total=1422`, `error=0`, `AC@1=0.752461`, `MRR=0.842955`, `AC@3=0.926160`, `AC@5=0.961322`.
-- CERA2 mechanism: robust case-scaled raw evidence is aggregated into unweighted semantic family burdens, topology context strength is derived from current trace graph density, and trace-neighbor counterfactual explain-away transfers score using current mutation/propagation shares rather than fixed blend constants.
-- Key CERA2 lesson: removing hand-crafted role weights can still pass the strong `AC@1 >= 0.75` milestone, but the sharper counterfactual update slightly reduces AC@3/AC@5. The next iteration should recover candidate preservation using incident-derived uncertainty, not manual family weights.
+- CERA3 full eval on `rcabench`: `total=1422`, `error=0`, `AC@1=0.850211`, `MRR=0.904032`, `AC@3=0.950774`, `AC@5=0.976090`.
+- CERA3 mechanism: raw log-normalized incident features are mapped to ordinal causal evidence tiers; the numeric energy ladder is synthesized from tier ordering and tier count; ARC endpoint support is derived from current rank agreement; parent-context strength is derived from trace graph sink share.
+- Key CERA3 lesson: the route to a publishable no-handcrafted-numeric-weight algorithm is not free rank fusion. It is a semantic ordinal evidence taxonomy plus incident-derived topology support. Remaining weaknesses are mainly pod-failure, bandwidth, and other low-mutation infrastructure cases.
 
 ## Proposed Method Line
 
-Working name: **CERA**, Counterfactual Evidence Role Alignment.
+Working name: **CERA**, Causal Evidence Role Alignment.
 
 Alternative paper-facing names may be chosen later, but the coding agent should initially use `cera` or `latent_role_rca` as the registry name so it is evaluated separately from `evidencerank`.
 
 Core idea:
 
-1. Treat each service as a latent role variable: root, propagation victim, or background.
-2. Convert raw metrics, traces, logs, and topology into role evidence families, reusing EvidenceRank's extraction logic where appropriate.
-3. Learn case-local view reliability from support, concentration, peak contrast, rank gap, and cross-view agreement.
-4. Infer root posterior scores with an unsupervised energy / EM-style loop.
-5. Add topology counterfactual explain-away: a root candidate should explain adjacent propagation-heavy victims better than those victims explain the root.
+1. Treat observability features as ordinal causal evidence roles rather than per-feature numeric weights.
+2. Convert raw metrics, traces, logs, and topology into incident evidence energy, reusing EvidenceRank's raw extraction logic where appropriate.
+3. Derive endpoint support from current endpoint/status/traffic-rank agreement.
+4. Derive topology parent-context strength from the current trace graph's sink share.
+5. Rank services by root-causal evidence energy after incident-derived endpoint and topology alignment.
 6. Use EvidenceRank as a probe and behavioral target during research, but do not call EvidenceRank or copy its final weighted-sum scoring as the new algorithm.
 
 ## Work Standard
@@ -96,3 +96,6 @@ If the final registry name is not `cera`, replace `cera` consistently in all com
 - [CERA2 Iteration](../docs/NewAlgo/CERA2_iteration.md)
 - [CERA2 Summary](../docs/EvidRank_evolve/CERA2_summary.md)
 - [CERA1 vs CERA2 Compare](../docs/EvidRank_evolve/compare_CERA1_vs_CERA2.md)
+- [CERA3 Iteration](../docs/NewAlgo/CERA3_iteration.md)
+- [CERA3 Summary](../docs/EvidRank_evolve/CERA3_summary.md)
+- [CERA2 vs CERA3 Compare](../docs/EvidRank_evolve/compare_CERA2_vs_CERA3.md)

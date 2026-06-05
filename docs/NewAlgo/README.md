@@ -43,25 +43,26 @@ docs/EvidRank_evolve/V20_iteration.md
 
 ## Current Version
 
-`CERA2` is accepted as the current standalone version:
+`CERA3` is accepted as the current standalone version:
 
 | version | AC@1 | MRR | AC@3 | AC@5 | error | note |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | `CERA1` | 0.691280 | 0.814367 | 0.933193 | 0.966245 | 0 | Work milestone passed |
 | `CERA2` | 0.752461 | 0.842955 | 0.926160 | 0.961322 | 0 | Strong milestone passed; no hand-crafted role weights |
+| `CERA3` | 0.850211 | 0.904032 | 0.950774 | 0.976090 | 0 | Target passed; ordinal causal evidence, no hand-crafted numeric weights |
 
 Implementation: `algorithms/evidencerank/src/evidencerank/cera.py`
 
-Iteration notes: `docs/NewAlgo/CERA1_iteration.md`, `docs/NewAlgo/CERA2_iteration.md`
+Iteration notes: `docs/NewAlgo/CERA1_iteration.md`, `docs/NewAlgo/CERA2_iteration.md`, `docs/NewAlgo/CERA3_iteration.md`
 
 ## Suggested Method Line
 
-The initial proposed method is CERA, Counterfactual Evidence Role Alignment. It is described in `CERA_design_brief.md`, and the full prompt for the next coding agent is in `CodingAgentPrompt.md`.
+The current method line is CERA, Causal Evidence Role Alignment. It is described in `CERA_design_brief.md`, and the full prompt for the next coding agent is in `CodingAgentPrompt.md`.
 
 The short version:
 
-- infer latent roles for services: root, propagation victim, background;
-- learn evidence-family reliability inside each incident;
+- express observability features as ordinal causal evidence roles;
+- synthesize evidence energy from tier ordering rather than per-feature numeric weights;
 - distinguish mutation/local evidence from propagation evidence;
-- use trace topology to explain away victim symptoms through adjacent root-like services;
-- iterate from a simple working version to a stronger EM-style or energy-based model.
+- use trace topology sink share to suppress downstream victims;
+- use endpoint/status/traffic agreement as incident-derived endpoint support.

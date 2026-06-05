@@ -1,30 +1,30 @@
 # CERA Design Brief
 
-CERA stands for Counterfactual Evidence Role Alignment. It is a proposed unsupervised RCA algorithm intended to fit the capability envelope discovered by EvidenceRank while looking and behaving like a genuinely new method.
+CERA stands for Causal Evidence Role Alignment. It is a proposed unsupervised RCA algorithm intended to fit the capability envelope discovered by EvidenceRank while looking and behaving like a genuinely new method.
 
 ## Motivation
 
 Current EvidenceRank is valuable as a probe because its performance shows that high-quality RCA needs multimodal evidence, robust normalization, endpoint mutation signals, topology context, and root-victim separation. But a feature-priority weighted sum is difficult to position as a new ICSE/FSE-level method.
 
-CERA reframes the same empirical lessons as latent causal-role inference:
+CERA reframes the same empirical lessons as causal evidence-role inference:
 
 - a root service should exhibit local mutation evidence;
 - a victim service often exhibits propagation evidence such as latency, traffic, and high observability volume;
-- topology should not simply boost central services, but should explain away propagation-heavy neighbors;
-- modality weights should be learned from the current incident's evidence geometry, not fixed by labels.
+- topology should not simply boost central services, but should suppress downstream victims when the trace graph contains many terminal sink nodes;
+- numeric evidence strength should be synthesized from ordinal causal evidence tiers, not manually assigned as feature-specific weights.
 
 ## Core Variables
 
-For each service `s`, infer a latent role distribution:
+For each service `s`, infer a root-causal evidence energy:
 
 ```text
-q_s(root), q_s(victim), q_s(background)
+E_s(root)
 ```
 
-For each evidence family `f`, infer a case-local reliability:
+For each feature `x_j`, define an ordinal causal evidence tier:
 
 ```text
-r_f in [0, 1]
+tier_j in {disabled, background, baseline, support, local, high, root, critical}
 ```
 
 Recommended evidence families:
@@ -44,37 +44,36 @@ Recommended evidence families:
 
 1. Load raw frames and collect services exactly as EvidenceRank does.
 2. Build a nonnegative service-feature matrix from raw metrics, traces, logs, and trace edges.
-3. Apply robust per-case scaling: positive p95 scaling, clipping, and finite-value cleanup.
-4. Aggregate features into role views:
-   - root mutation view: availability drop + protocol mutation + log locality + local metric magnitude;
-   - victim propagation view: latency + traffic + observability volume;
-   - background view: low evidence or diffuse evidence.
-5. Initialize `q(root)` from mutation and local evidence after subtracting propagation dominance.
-6. Estimate family reliability from support, evidence concentration, peak contrast, top gap, and rank agreement with the current root posterior.
-7. Update role posteriors with an energy function:
+3. Preserve raw log-normalized incident feature scale because magnitude and volume are operational evidence.
+4. Synthesize the numeric energy ladder from ordinal tier ordering and tier count, not from per-feature constants.
+5. Apply endpoint support using current incident agreement between endpoint, status, and traffic-rise rank views.
+6. Apply parent-context smoothing with a strength derived from trace graph sink share:
+
+```text
+context_weight = sink_nodes / service_count
+sink_nodes = trace children that are not trace parents
+```
+
+7. Rank services with an energy function:
 
 ```text
 E_root(s) =
-  reliable_mutation(s)
-  + reliable_local_log_metric(s)
-  - propagation_dominance(s)
-  + topology_explain_away_gain(s)
-  + multimodal_redundancy(s)
+  sum_j ordinal_energy(tier_j) * raw_feature_j(s)
+  aligned by endpoint support and sink-share topology context
 ```
 
-8. Run a small fixed number of EM-style updates, for example 3 to 8 iterations.
-9. Rank services by `q_s(root)` or by a monotonic root energy.
+8. Rank services by monotonic root energy.
 
-## Counterfactual Explain-Away
+## Topology Role Alignment
 
-For each trace edge `(parent, child)`, CERA should test both possible explanations:
+Earlier CERA variants tested counterfactual transfer on each trace edge:
 
 ```text
 parent root explains child victim
 child root explains parent victim
 ```
 
-The better explanation is the one where the root candidate has stronger mutation/local evidence and the victim candidate has stronger propagation evidence. Transfer or suppress score accordingly. This is the publishable step: topology is used as counterfactual role alignment, not as centrality.
+CERA3 found a more robust mechanism: derive parent-context strength from the current graph's sink share. When many nodes are terminal downstream children, leaf symptoms are more likely to be propagation victims, so parent context is stronger. When the graph has few sinks, CERA preserves the local evidence ranking. This keeps topology incident-derived rather than a centrality prior or a fixed blend constant.
 
 ## How To Fit EvidenceRank Without Copying It
 
@@ -100,22 +99,21 @@ The desired fit is behavioral: CERA should learn the same kind of RCA competence
 | --- | --- |
 | `CERA0` | implementation scaffold, registry, smoke test |
 | `CERA1` | robust scaled role-energy model, AC@1 >= 0.60 |
-| `CERA2` | family reliability and EM-style updates, AC@1 >= 0.70 |
-| `CERA3` | topology counterfactual explain-away, AC@1 >= 0.75 |
-| `CERA4+` | teacher-probe analysis and ablations toward 0.80 |
+| `CERA2` | no-handcrafted-weight robust burden, AC@1 >= 0.75 |
+| `CERA3` | ordinal causal evidence + sink-share topology, AC@1 >= 0.80 |
+| `CERA4+` | robustness ablations and infrastructure-local evidence |
 
 ## Paper Framing
 
 Possible paper contribution claim:
 
 ```text
-We propose Counterfactual Evidence Role Alignment, an unsupervised RCA framework that turns heterogeneous observability signals into latent causal roles and uses topology as an explain-away constraint rather than a centrality prior. CERA learns incident-specific evidence reliability from internal agreement and uses counterfactual neighbor role assignments to distinguish root causes from propagation victims.
+We propose Causal Evidence Role Alignment, an unsupervised RCA framework that turns heterogeneous observability signals into ordinal causal evidence roles and uses incident-derived topology context rather than fixed feature weights. CERA synthesizes evidence energy from role ordering and derives parent-context strength from trace graph sink share to distinguish root causes from downstream propagation victims.
 ```
 
 Key experiments:
 
 - compare against EvidenceRank, EvidRank-ARC, MicroRCA, MicroHECL, MicroRank, BARO, and other existing outputs;
-- ablate latent roles, reliability learning, explain-away, endpoint/status mutation, and log evidence;
-- evaluate whether CERA reaches AC@1 >= 0.60 first, then iterates toward 0.80;
+- ablate ordinal tiers, synthesized energy ladder, endpoint/status mutation support, sink-share topology, and raw-vs-robust scaling;
+- evaluate CERA1/CERA2/CERA3 progression through AC@1 >= 0.60, 0.75, and 0.80;
 - report false-case groups and regressions, not just aggregate metrics.
-
