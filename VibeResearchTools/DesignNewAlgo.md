@@ -29,13 +29,13 @@ The simple EvidenceRank scoring form is not enough as a top-conference method be
 
 ## Current Status
 
-- `CERA1` is the first working standalone CERA version.
+- `CERA2` is the current accepted standalone CERA version.
 - Implementation module: `algorithms/evidencerank/src/evidencerank/cera.py`
 - Registry name: `cera`
 - Default EvidenceRank implementation remains unchanged.
-- CERA1 full eval on `rcabench`: `total=1422`, `error=0`, `AC@1=0.691280`, `MRR=0.814367`, `AC@3=0.933193`, `AC@5=0.966245`.
-- CERA1 mechanism: robust case-scaled raw evidence is aggregated into semantic family burdens, initialized as an evidence-burden root posterior, lightly aligned toward root-like mutation/local/log evidence, penalized for propagation dominance, and corrected with trace-neighbor counterfactual explain-away.
-- Key CERA1 lesson: over-normalizing every family view made true roots appear in top-3/top-5 but too often failed top-1. CERA2 should learn family reliability as a calibration on top of the evidence-burden posterior, not as a replacement for it.
+- CERA2 full eval on `rcabench`: `total=1422`, `error=0`, `AC@1=0.752461`, `MRR=0.842955`, `AC@3=0.926160`, `AC@5=0.961322`.
+- CERA2 mechanism: robust case-scaled raw evidence is aggregated into unweighted semantic family burdens, topology context strength is derived from current trace graph density, and trace-neighbor counterfactual explain-away transfers score using current mutation/propagation shares rather than fixed blend constants.
+- Key CERA2 lesson: removing hand-crafted role weights can still pass the strong `AC@1 >= 0.75` milestone, but the sharper counterfactual update slightly reduces AC@3/AC@5. The next iteration should recover candidate preservation using incident-derived uncertainty, not manual family weights.
 
 ## Proposed Method Line
 
@@ -93,3 +93,6 @@ If the final registry name is not `cera`, replace `cera` consistently in all com
 - [CERA1 Iteration](../docs/NewAlgo/CERA1_iteration.md)
 - [CERA1 Summary](../docs/EvidRank_evolve/CERA1_summary.md)
 - [CERA1 RAW vs CERA1 Compare](../docs/EvidRank_evolve/compare_CERA1_RAW_vs_CERA1.md)
+- [CERA2 Iteration](../docs/NewAlgo/CERA2_iteration.md)
+- [CERA2 Summary](../docs/EvidRank_evolve/CERA2_summary.md)
+- [CERA1 vs CERA2 Compare](../docs/EvidRank_evolve/compare_CERA1_vs_CERA2.md)

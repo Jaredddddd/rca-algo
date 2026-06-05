@@ -43,15 +43,16 @@ docs/EvidRank_evolve/V20_iteration.md
 
 ## Current Version
 
-`CERA1` is accepted as the first working standalone version:
+`CERA2` is accepted as the current standalone version:
 
 | version | AC@1 | MRR | AC@3 | AC@5 | error | note |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | `CERA1` | 0.691280 | 0.814367 | 0.933193 | 0.966245 | 0 | Work milestone passed |
+| `CERA2` | 0.752461 | 0.842955 | 0.926160 | 0.961322 | 0 | Strong milestone passed; no hand-crafted role weights |
 
 Implementation: `algorithms/evidencerank/src/evidencerank/cera.py`
 
-Iteration note: `docs/NewAlgo/CERA1_iteration.md`
+Iteration notes: `docs/NewAlgo/CERA1_iteration.md`, `docs/NewAlgo/CERA2_iteration.md`
 
 ## Suggested Method Line
 

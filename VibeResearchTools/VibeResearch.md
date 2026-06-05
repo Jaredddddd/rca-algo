@@ -783,7 +783,7 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-05T01:31:28+08:00_
+_Last refreshed: 2026-06-05T12:56:53+08:00_
 
 ## EvidenceRank Document Index
 
@@ -793,8 +793,11 @@ _Last refreshed: 2026-06-05T01:31:28+08:00_
 | summary | [docs/EvidRank-ARC-Evolve/ARC10_summary.md](../docs/EvidRank-ARC-Evolve/ARC10_summary.md) | 2026-06-03T22:32:51+08:00 |
 | iteration | [docs/EvidRank-ARC-Evolve/ARC11_iteration.md](../docs/EvidRank-ARC-Evolve/ARC11_iteration.md) | 2026-06-03T22:52:30+08:00 |
 | summary | [docs/EvidRank-ARC-Evolve/ARC11_summary.md](../docs/EvidRank-ARC-Evolve/ARC11_summary.md) | 2026-06-03T22:41:19+08:00 |
+| summary | [docs/EvidRank-ARC-Evolve/ARC12_CURRENT_summary.md](../docs/EvidRank-ARC-Evolve/ARC12_CURRENT_summary.md) | 2026-06-05T12:30:52+08:00 |
 | iteration | [docs/EvidRank-ARC-Evolve/ARC12_iteration.md](../docs/EvidRank-ARC-Evolve/ARC12_iteration.md) | 2026-06-03T22:52:30+08:00 |
 | summary | [docs/EvidRank-ARC-Evolve/ARC12_summary.md](../docs/EvidRank-ARC-Evolve/ARC12_summary.md) | 2026-06-03T22:48:40+08:00 |
+| iteration | [docs/EvidRank-ARC-Evolve/ARC13_iteration.md](../docs/EvidRank-ARC-Evolve/ARC13_iteration.md) | 2026-06-05T12:55:47+08:00 |
+| summary | [docs/EvidRank-ARC-Evolve/ARC13_summary.md](../docs/EvidRank-ARC-Evolve/ARC13_summary.md) | 2026-06-05T12:55:57+08:00 |
 | iteration | [docs/EvidRank-ARC-Evolve/ARC1_iteration.md](../docs/EvidRank-ARC-Evolve/ARC1_iteration.md) | 2026-06-03T15:12:37+08:00 |
 | summary | [docs/EvidRank-ARC-Evolve/ARC1_summary.md](../docs/EvidRank-ARC-Evolve/ARC1_summary.md) | 2026-06-03T15:10:59+08:00 |
 | iteration | [docs/EvidRank-ARC-Evolve/ARC2_iteration.md](../docs/EvidRank-ARC-Evolve/ARC2_iteration.md) | 2026-06-03T17:14:15+08:00 |
@@ -816,6 +819,8 @@ _Last refreshed: 2026-06-05T01:31:28+08:00_
 | summary | [docs/EvidRank-ARC-Evolve/EvidRank_ARC_67_summary.md](../docs/EvidRank-ARC-Evolve/EvidRank_ARC_67_summary.md) | 2026-06-03T13:52:23+08:00 |
 | note | [docs/EvidRank-ARC-Evolve/EvidRank_ARC_baseline.md](../docs/EvidRank-ARC-Evolve/EvidRank_ARC_baseline.md) | 2026-06-03T22:55:09+08:00 |
 | compare | [docs/EvidRank-ARC-Evolve/compare_ARC11_vs_ARC12.md](../docs/EvidRank-ARC-Evolve/compare_ARC11_vs_ARC12.md) | 2026-06-03T22:54:10+08:00 |
+| compare | [docs/EvidRank-ARC-Evolve/compare_ARC12_CURRENT_vs_ARC13.md](../docs/EvidRank-ARC-Evolve/compare_ARC12_CURRENT_vs_ARC13.md) | 2026-06-05T12:56:07+08:00 |
+| compare | [docs/EvidRank-ARC-Evolve/compare_ARC12_vs_ARC13.md](../docs/EvidRank-ARC-Evolve/compare_ARC12_vs_ARC13.md) | 2026-06-05T12:56:17+08:00 |
 | compare | [docs/EvidRank-ARC-Evolve/compare_ARC1_vs_ARC2.md](../docs/EvidRank-ARC-Evolve/compare_ARC1_vs_ARC2.md) | 2026-06-03T17:15:44+08:00 |
 | compare | [docs/EvidRank-ARC-Evolve/compare_ARC2_vs_ARC3.md](../docs/EvidRank-ARC-Evolve/compare_ARC2_vs_ARC3.md) | 2026-06-03T18:06:02+08:00 |
 | compare | [docs/EvidRank-ARC-Evolve/compare_ARC3_vs_ARC5.md](../docs/EvidRank-ARC-Evolve/compare_ARC3_vs_ARC5.md) | 2026-06-03T19:35:32+08:00 |
@@ -829,6 +834,7 @@ _Last refreshed: 2026-06-05T01:31:28+08:00_
 | compare | [docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md](../docs/EvidRank-ARC-Evolve/compare_ARC_BASELINE_vs_ARC_67.md) | 2026-06-03T13:52:33+08:00 |
 | summary | [docs/EvidRank_evolve/CERA1_RAW_summary.md](../docs/EvidRank_evolve/CERA1_RAW_summary.md) | 2026-06-05T01:09:06+08:00 |
 | summary | [docs/EvidRank_evolve/CERA1_summary.md](../docs/EvidRank_evolve/CERA1_summary.md) | 2026-06-05T01:27:32+08:00 |
+| summary | [docs/EvidRank_evolve/CERA2_summary.md](../docs/EvidRank_evolve/CERA2_summary.md) | 2026-06-05T11:11:28+08:00 |
 | iteration | [docs/EvidRank_evolve/FW_FEATURE_ABLATION_iteration.md](../docs/EvidRank_evolve/FW_FEATURE_ABLATION_iteration.md) | 2026-06-04T02:32:02+08:00 |
 | summary | [docs/EvidRank_evolve/FW_NUMERIC_BASELINE_summary.md](../docs/EvidRank_evolve/FW_NUMERIC_BASELINE_summary.md) | 2026-06-03T23:08:56+08:00 |
 | iteration | [docs/EvidRank_evolve/FW_PRIORITY_COMPREHENSIVE_SEARCH_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_COMPREHENSIVE_SEARCH_iteration.md) | 2026-06-04T11:13:40+08:00 |
@@ -887,6 +893,7 @@ _Last refreshed: 2026-06-05T01:31:28+08:00_
 | iteration | [docs/EvidRank_evolve/V9_iteration.md](../docs/EvidRank_evolve/V9_iteration.md) | 2026-06-02T23:35:33+08:00 |
 | summary | [docs/EvidRank_evolve/V9_summary.md](../docs/EvidRank_evolve/V9_summary.md) | 2026-06-02T10:22:26+08:00 |
 | compare | [docs/EvidRank_evolve/compare_CERA1_RAW_vs_CERA1.md](../docs/EvidRank_evolve/compare_CERA1_RAW_vs_CERA1.md) | 2026-06-05T01:27:54+08:00 |
+| compare | [docs/EvidRank_evolve/compare_CERA1_vs_CERA2.md](../docs/EvidRank_evolve/compare_CERA1_vs_CERA2.md) | 2026-06-05T11:11:28+08:00 |
 | compare | [docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_LINEAR_0_7.md](../docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_LINEAR_0_7.md) | 2026-06-04T00:47:14+08:00 |
 | compare | [docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_POWER2_TIER.md](../docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_POWER2_TIER.md) | 2026-06-04T00:47:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_PRIOR.md](../docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_PRIOR.md) | 2026-06-03T23:21:38+08:00 |
@@ -940,6 +947,8 @@ _Last refreshed: 2026-06-05T01:31:28+08:00_
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/ARC10` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/ARC11` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/ARC12` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/ARC12_CURRENT` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/ARC13` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/ARC2` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/ARC3` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/ARC5` |
@@ -950,6 +959,7 @@ _Last refreshed: 2026-06-05T01:31:28+08:00_
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/ARC_BASELINE` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/CERA1` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/CERA1_RAW` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/CERA2` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_NUMERIC_BASELINE` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_PRIORITY_LINEAR_0_7` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_PRIORITY_POWER2_TIER` |
@@ -990,6 +1000,8 @@ _Last refreshed: 2026-06-05T01:31:28+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/ARC10` |
 | report | `output/rcabench-platform-v2/evolve_reports/ARC11` |
 | report | `output/rcabench-platform-v2/evolve_reports/ARC12` |
+| report | `output/rcabench-platform-v2/evolve_reports/ARC12_CURRENT` |
+| report | `output/rcabench-platform-v2/evolve_reports/ARC13` |
 | report | `output/rcabench-platform-v2/evolve_reports/ARC2` |
 | report | `output/rcabench-platform-v2/evolve_reports/ARC3` |
 | report | `output/rcabench-platform-v2/evolve_reports/ARC5` |
@@ -1000,6 +1012,7 @@ _Last refreshed: 2026-06-05T01:31:28+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/ARC_BASELINE` |
 | report | `output/rcabench-platform-v2/evolve_reports/CERA1` |
 | report | `output/rcabench-platform-v2/evolve_reports/CERA1_RAW` |
+| report | `output/rcabench-platform-v2/evolve_reports/CERA2` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_NUMERIC_BASELINE` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_PRIORITY_LINEAR_0_7` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_PRIORITY_POWER2_TIER` |
@@ -1034,6 +1047,8 @@ _Last refreshed: 2026-06-05T01:31:28+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/V8` |
 | report | `output/rcabench-platform-v2/evolve_reports/V9` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_ARC11_vs_ARC12` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_ARC12_CURRENT_vs_ARC13` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_ARC12_vs_ARC13` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_ARC1_vs_ARC2` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_ARC2_vs_ARC3` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_ARC3_vs_ARC5` |
@@ -1045,6 +1060,7 @@ _Last refreshed: 2026-06-05T01:31:28+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/compare_ARC7_vs_ARC8` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_ARC_BASELINE_vs_ARC1` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_CERA1_RAW_vs_CERA1` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_CERA1_vs_CERA2` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_LINEAR_0_7` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_POWER2_TIER` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_PRIOR` |
