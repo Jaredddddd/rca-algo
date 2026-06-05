@@ -1286,7 +1286,7 @@ class EvidenceRank(Algorithm):
 
 
 class EvidenceRankARC(Algorithm):
-    """EvidRank-ARC: Adaptive Reliability Calibration."""
+    """EvidRank-ARC: ordinal root evidence with local reliability contrast."""
 
     _modalities: frozenset[str] = ALL_MODALITIES
 
@@ -1294,6 +1294,10 @@ class EvidenceRankARC(Algorithm):
         all_enabled = frozenset().union(*(MODALITY_FEATURES[m] for m in self._modalities))
         self._enabled_features = tuple(
             name for name in BASE_FEATURE_NAMES if name in all_enabled
+        )
+        self._feature_weights = np.asarray(
+            [FEATURE_WEIGHTS.get(name, 1.0) for name in self._enabled_features],
+            dtype=np.float32,
         )
         self._parent_context_weight = PARENT_CONTEXT_WEIGHT if "trace" in self._modalities else 0.0
 
@@ -1320,50 +1324,24 @@ class EvidenceRankARC(Algorithm):
             case_matrix,
             self._enabled_features,
         )
-        feature_weights = _arc_active_feature_weights(feature_reliability)
+        active_feature_weights = _arc_active_feature_weights(feature_reliability)
         scores = _heuristic_scores(
             services,
-            case_matrix,
+            matrix,
             self._enabled_features,
-            feature_weights,
+            self._feature_weights,
             trace_edges,
             self._parent_context_weight,
-            endpoint_gate="arc",
+            endpoint_gate="legacy",
         )
-        weighted_matrix = _apply_arc_trace_endpoint_support_gate(
+        contrast_matrix = _apply_arc_trace_endpoint_support_gate(
             self._enabled_features,
-            case_matrix * feature_weights,
-        )
-        family_reliability_weights, effective_family_count = _arc_family_reliability_weights(
-            feature_reliability,
-            self._enabled_features,
-        )
-        family_feature_weights = feature_weights * family_reliability_weights
-        family_scores = _heuristic_scores(
-            services,
-            case_matrix,
-            self._enabled_features,
-            family_feature_weights,
-            trace_edges,
-            self._parent_context_weight,
-            endpoint_gate="arc",
-        )
-        family_weighted_matrix = _apply_arc_trace_endpoint_support_gate(
-            self._enabled_features,
-            case_matrix * family_feature_weights,
-        )
-        scores = _apply_arc_family_consensus(
-            services,
-            scores,
-            family_scores,
-            family_weighted_matrix,
-            self._enabled_features,
-            effective_family_count,
+            case_matrix * active_feature_weights,
         )
         scores = _apply_arc_top_neighbor_pairwise_contrast(
             services,
             scores,
-            weighted_matrix,
+            contrast_matrix,
             self._enabled_features,
             trace_edges,
         )

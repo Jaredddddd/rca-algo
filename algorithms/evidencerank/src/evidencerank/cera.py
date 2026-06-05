@@ -17,6 +17,7 @@ from .algorithm import (
     BASE_FEATURE_NAMES,
     MODALITY_FEATURES,
     _apply_arc_trace_endpoint_support_gate,
+    _apply_parent_context,
     _build_feature_matrix,
     _collect_services_from_frames,
     _load_input_frames,
@@ -59,7 +60,36 @@ CERA_ROLE_FAMILIES = {
         "abnormal_metric_rows",
         "abnormal_trace_rows",
     ),
+    "topology_context": (
+        "topology_in_degree",
+        "topology_out_degree",
+    ),
 }
+
+CERA_COUNTERFACTUAL_MUTATION_FEATURES = frozenset({
+    "metric_count_drop_shift",
+    "trace_count_drop_shift",
+    "trace_endpoint_shift",
+    "trace_error_rate",
+    "trace_status_code_shift",
+})
+
+CERA_COUNTERFACTUAL_PROPAGATION_FEATURES = frozenset({
+    "trace_duration_z",
+    "trace_duration_delta",
+    "trace_self_duration_relative_shift",
+    "trace_count_delta",
+    "trace_count_rise_shift",
+    "abnormal_trace_rows",
+    "log_count_delta",
+    "log_template_delta",
+})
+
+CERA_COUNTERFACTUAL_ROLE_FAMILIES = tuple(
+    family
+    for family in CERA_ROLE_FAMILIES
+    if family not in {"observability_volume", "topology_context"}
+)
 
 
 def _family_indices(enabled_features: tuple[str, ...]) -> dict[str, list[int]]:
@@ -85,11 +115,43 @@ def _family_burdens(
     }
 
 
-def _apply_counterfactual_explain_away(
+def _positive_p95_scaled_sum(
+    matrix: np.ndarray,
+    indices: list[int],
+) -> np.ndarray:
+    if not indices:
+        return np.zeros(matrix.shape[0], dtype=np.float64)
+    values = matrix[:, indices].sum(axis=1).astype(np.float64)
+    positive = values[np.isfinite(values) & (values > 0.0)]
+    if positive.size == 0:
+        return np.zeros(matrix.shape[0], dtype=np.float64)
+    scale = float(np.percentile(positive, 95)) if positive.size > 1 else float(positive[0])
+    if not math.isfinite(scale) or scale <= 0.0:
+        return np.zeros(matrix.shape[0], dtype=np.float64)
+    return np.clip(values / scale, 0.0, float(len(indices)))
+
+
+def _trace_density_context_weight(
+    services: list[str],
+    trace_edges: list[tuple[str, str]],
+) -> float:
+    if not services:
+        return 0.0
+    service_set = set(services)
+    valid_edges = {
+        (parent, child)
+        for parent, child in trace_edges
+        if parent in service_set and child in service_set and parent != child
+    }
+    average_edge_degree = float(len(valid_edges)) / float(len(services))
+    return 1.0 / (1.0 + average_edge_degree)
+
+
+def _apply_counterfactual_explain_away_once(
     services: list[str],
     root_energy: np.ndarray,
-    root_anchor: np.ndarray,
-    victim_energy: np.ndarray,
+    role_matrix: np.ndarray,
+    enabled_features: tuple[str, ...],
     trace_edges: list[tuple[str, str]],
 ) -> np.ndarray:
     if not trace_edges or root_energy.size == 0:
@@ -97,47 +159,44 @@ def _apply_counterfactual_explain_away(
 
     service_to_idx = {service: idx for idx, service in enumerate(services)}
     adjusted = root_energy.astype(np.float64, copy=True)
-    anchor = np.nan_to_num(
-        root_anchor.astype(np.float64, copy=False),
-        nan=0.0,
-        posinf=0.0,
-        neginf=0.0,
-    )
-    victim = np.nan_to_num(
-        victim_energy.astype(np.float64, copy=False),
-        nan=0.0,
-        posinf=0.0,
-        neginf=0.0,
-    )
+    mutation_indices = [
+        idx
+        for idx, name in enumerate(enabled_features)
+        if name in CERA_COUNTERFACTUAL_MUTATION_FEATURES
+    ]
+    propagation_indices = [
+        idx
+        for idx, name in enumerate(enabled_features)
+        if name in CERA_COUNTERFACTUAL_PROPAGATION_FEATURES
+    ]
+    if not mutation_indices or not propagation_indices:
+        return root_energy
+
+    mutation = _positive_p95_scaled_sum(role_matrix, mutation_indices)
+    propagation = _positive_p95_scaled_sum(role_matrix, propagation_indices)
     candidate_pairs: list[tuple[int, int, float]] = []
 
     def add_pair(root_idx: int, victim_idx: int) -> None:
-        if root_idx == victim_idx:
+        if root_idx == victim_idx or adjusted[victim_idx] <= adjusted[root_idx]:
             return
 
-        anchor_excess = max(0.0, float(anchor[root_idx] - anchor[victim_idx]))
-        victim_excess = max(0.0, float(victim[victim_idx] - victim[root_idx]))
-        if anchor_excess <= 0.0 or victim_excess <= 0.0:
+        mutation_excess = max(0.0, float(mutation[root_idx] - mutation[victim_idx]))
+        propagation_excess = max(0.0, float(propagation[victim_idx] - propagation[root_idx]))
+        if mutation_excess <= 0.0 or propagation_excess <= 0.0:
             return
 
-        anchor_share = anchor_excess / (
-            float(anchor[root_idx] + anchor[victim_idx]) + 1e-6
+        mutation_share = mutation_excess / (
+            float(mutation[root_idx] + mutation[victim_idx]) + 1e-12
         )
-        victim_share = victim_excess / (
-            float(victim[victim_idx] + victim[root_idx]) + 1e-6
+        propagation_share = propagation_excess / (
+            float(propagation[victim_idx] + propagation[root_idx]) + 1e-12
         )
-        score_excess = max(0.0, float(adjusted[victim_idx] - adjusted[root_idx]))
-        pair_strength = anchor_share * victim_share
+        pair_strength = mutation_share * propagation_share
         if not math.isfinite(pair_strength) or pair_strength <= 0.0:
             return
 
-        transfer_base = score_excess
-        if transfer_base <= 0.0:
-            transfer_base = 0.05 * min(
-                float(anchor[root_idx]),
-                float(victim[victim_idx]),
-            )
-        transfer = transfer_base * pair_strength
+        score_excess = float(adjusted[victim_idx] - adjusted[root_idx])
+        transfer = score_excess * pair_strength
         if math.isfinite(transfer) and transfer > 0.0:
             candidate_pairs.append((root_idx, victim_idx, transfer))
 
@@ -158,9 +217,31 @@ def _apply_counterfactual_explain_away(
 
     for root_idx, victim_idx, transfer in best_by_victim.values():
         adjusted[root_idx] += transfer
-        adjusted[victim_idx] -= 0.75 * transfer
+        adjusted[victim_idx] -= transfer
 
     return np.maximum(adjusted, 0.0)
+
+
+def _apply_counterfactual_explain_away(
+    services: list[str],
+    root_energy: np.ndarray,
+    role_matrix: np.ndarray,
+    enabled_features: tuple[str, ...],
+    trace_edges: list[tuple[str, str]],
+) -> np.ndarray:
+    adjusted = root_energy.astype(np.float64, copy=True)
+    for _family in CERA_COUNTERFACTUAL_ROLE_FAMILIES:
+        updated = _apply_counterfactual_explain_away_once(
+            services,
+            adjusted,
+            role_matrix,
+            enabled_features,
+            trace_edges,
+        )
+        if np.linalg.norm(updated - adjusted) <= 1e-12 * (np.linalg.norm(adjusted) + 1e-12):
+            return updated
+        adjusted = updated
+    return adjusted
 
 
 def _role_scores(
@@ -173,45 +254,25 @@ def _role_scores(
     role_matrix = _apply_arc_trace_endpoint_support_gate(enabled_features, case_matrix)
     families = _family_burdens(role_matrix, enabled_features)
 
-    metric = families["metric_magnitude"]
-    availability = families["availability_drop"]
-    protocol = families["trace_protocol_mutation"]
-    latency = families["trace_latency"]
-    traffic = families["trace_traffic"]
-    local_latency = families["trace_local_latency"]
-    log = families["log_locality"]
-    volume = families["observability_volume"]
-
-    evidence_burden = (
-        metric
-        + availability
-        + protocol
-        + latency
-        + traffic
-        + local_latency
-        + log
-        + volume
+    evidence_burden = sum(
+        family_values
+        for family_values in families.values()
     )
-    root_anchor = (
-        availability
-        + protocol
-        + log
-        + local_latency
-        + 0.5 * metric
-    )
-    victim_energy = latency + traffic + 0.5 * volume
-    propagation_dominance = np.maximum(0.0, victim_energy - root_anchor)
-    root_energy = (
+    context_weight = _trace_density_context_weight(services, trace_edges)
+    root_energy = _apply_parent_context(
+        services,
         evidence_burden
-        + 0.10 * root_anchor
-        - 0.05 * propagation_dominance
+        if isinstance(evidence_burden, np.ndarray)
+        else np.zeros(len(services), dtype=np.float64),
+        trace_edges,
+        context_weight,
     )
     root_energy = np.maximum(root_energy, 0.0)
     root_energy = _apply_counterfactual_explain_away(
         services,
         root_energy,
-        root_anchor,
-        victim_energy,
+        role_matrix,
+        enabled_features,
         trace_edges,
     )
 

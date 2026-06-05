@@ -395,3 +395,15 @@ guard 已通过：无 high-risk 过拟合告警；`algorithm.py` 没有残留实
 适用范围：所有需要把 RCA 权重从“手工常数”转化为“可解释语义先验 + 无标签自动校准”的算法版本。该经验不证明完全无监督权重学习已经足够，而是支持把无标签学习限制在 family-level multiplier/regularizer。
 
 目前尝试自适应权重最好的是 V13 和 V19。
+
+### ARC reliability 只适合局部校准，不适合替代主排序先验
+
+触发信号：EvidRank-ARC ARC12 使用 `feature_weights = (reliability > 0)`、family consensus 和 pairwise contrast 后，AC@1 停在 `0.734880`；把 reliability 改成连续权重或 rank-fusion 的离线实验反而进一步下降。
+
+根因 / 约束：单 case 内的无标签 reliability 会高估传播、入口流量、受害者延迟和日志尖峰。即使 reliability 不是 0/1 mask，只要让它替代根因语义先验做全局排序，就会把多个传播症状一起激活并抹平根因差异。family consensus 还会继续把分数向邻近/同族症状扩散。
+
+正确做法：ARC 主排序应保留 raw multi-modal root evidence 和 ordinal semantic priority；数值 ladder 可以由优先级顺序自动合成，但不要让 case-local reliability 自由替代主排序权重。ARC reliability 更适合构造 robust case-scaled 的局部 trace-neighbor contrast，用于解释高分受害者和邻接根因之间的错排。
+
+验证方式：ARC13 将主排序改为 raw ordinal semantic prior，只把 reliability-active case matrix 用于最终 neighbor pairwise contrast。full eval 1422 case、error 0；相对 ARC12_CURRENT，AC@1 `0.734880 -> 0.831224`，MRR `0.839508 -> 0.893267`，AC@3 `0.936006 -> 0.947961`，AC@5 `0.971871 -> 0.975387`。guard 无 high-risk。
+
+适用范围：所有 EvidRank-ARC、CERA 或新 RCA 算法中试图用单 incident 的无标签 reliability、agreement、concentration、rank gap 直接生成全局 feature weights 的实验。该经验不禁止 reliability，但要求把它限制为局部校准、置信度门控或 regularizer。
