@@ -17,6 +17,7 @@ from src.evidencerank.algorithm import (
     EvidenceRankTrace,
     EvidenceRankARC,
 )
+from src.evidencerank.cera import CERA
 
 if __name__ == "__main__":
     registry = global_algorithm_registry()
@@ -28,5 +29,6 @@ if __name__ == "__main__":
     registry["evidencerank_metric_trace"] = EvidenceRankMetricTrace
     registry["evidencerank_log_trace"] = EvidenceRankLogTrace
     registry["evidencerank_arc"] = EvidenceRankARC
+    registry["cera"] = CERA
 
     main(enable_builtin_algorithms=False)
