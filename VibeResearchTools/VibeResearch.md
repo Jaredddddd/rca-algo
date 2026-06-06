@@ -783,7 +783,7 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-05T14:40:12+08:00_
+_Last refreshed: 2026-06-06T10:52:21+08:00_
 
 ## EvidenceRank Document Index
 
@@ -836,6 +836,14 @@ _Last refreshed: 2026-06-05T14:40:12+08:00_
 | summary | [docs/EvidRank_evolve/CERA1_summary.md](../docs/EvidRank_evolve/CERA1_summary.md) | 2026-06-05T01:27:32+08:00 |
 | summary | [docs/EvidRank_evolve/CERA2_summary.md](../docs/EvidRank_evolve/CERA2_summary.md) | 2026-06-05T11:11:28+08:00 |
 | summary | [docs/EvidRank_evolve/CERA3_summary.md](../docs/EvidRank_evolve/CERA3_summary.md) | 2026-06-05T14:40:01+08:00 |
+| summary | [docs/EvidRank_evolve/CREST1_RAW_summary.md](../docs/EvidRank_evolve/CREST1_RAW_summary.md) | 2026-06-06T01:33:36+08:00 |
+| iteration | [docs/EvidRank_evolve/CREST1_iteration.md](../docs/EvidRank_evolve/CREST1_iteration.md) | 2026-06-06T02:14:37+08:00 |
+| summary | [docs/EvidRank_evolve/CREST1_summary.md](../docs/EvidRank_evolve/CREST1_summary.md) | 2026-06-06T02:12:25+08:00 |
+| iteration | [docs/EvidRank_evolve/CREST2_iteration.md](../docs/EvidRank_evolve/CREST2_iteration.md) | 2026-06-06T03:31:42+08:00 |
+| summary | [docs/EvidRank_evolve/CREST2_summary.md](../docs/EvidRank_evolve/CREST2_summary.md) | 2026-06-06T03:20:00+08:00 |
+| iteration | [docs/EvidRank_evolve/CREST3_iteration.md](../docs/EvidRank_evolve/CREST3_iteration.md) | 2026-06-06T04:13:36+08:00 |
+| summary | [docs/EvidRank_evolve/CREST3_summary.md](../docs/EvidRank_evolve/CREST3_summary.md) | 2026-06-06T03:49:11+08:00 |
+| note | [docs/EvidRank_evolve/CREST4_attempt.md](../docs/EvidRank_evolve/CREST4_attempt.md) | 2026-06-06T10:51:48+08:00 |
 | iteration | [docs/EvidRank_evolve/FW_FEATURE_ABLATION_iteration.md](../docs/EvidRank_evolve/FW_FEATURE_ABLATION_iteration.md) | 2026-06-04T02:32:02+08:00 |
 | summary | [docs/EvidRank_evolve/FW_NUMERIC_BASELINE_summary.md](../docs/EvidRank_evolve/FW_NUMERIC_BASELINE_summary.md) | 2026-06-03T23:08:56+08:00 |
 | iteration | [docs/EvidRank_evolve/FW_PRIORITY_COMPREHENSIVE_SEARCH_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_COMPREHENSIVE_SEARCH_iteration.md) | 2026-06-04T11:13:40+08:00 |
@@ -896,6 +904,11 @@ _Last refreshed: 2026-06-05T14:40:12+08:00_
 | compare | [docs/EvidRank_evolve/compare_CERA1_RAW_vs_CERA1.md](../docs/EvidRank_evolve/compare_CERA1_RAW_vs_CERA1.md) | 2026-06-05T01:27:54+08:00 |
 | compare | [docs/EvidRank_evolve/compare_CERA1_vs_CERA2.md](../docs/EvidRank_evolve/compare_CERA1_vs_CERA2.md) | 2026-06-05T11:11:28+08:00 |
 | compare | [docs/EvidRank_evolve/compare_CERA2_vs_CERA3.md](../docs/EvidRank_evolve/compare_CERA2_vs_CERA3.md) | 2026-06-05T14:40:01+08:00 |
+| compare | [docs/EvidRank_evolve/compare_CREST1_RAW_vs_CREST1.md](../docs/EvidRank_evolve/compare_CREST1_RAW_vs_CREST1.md) | 2026-06-06T02:12:48+08:00 |
+| compare | [docs/EvidRank_evolve/compare_CREST1_RAW_vs_CREST2.md](../docs/EvidRank_evolve/compare_CREST1_RAW_vs_CREST2.md) | 2026-06-06T03:20:11+08:00 |
+| compare | [docs/EvidRank_evolve/compare_CREST1_vs_CREST2.md](../docs/EvidRank_evolve/compare_CREST1_vs_CREST2.md) | 2026-06-06T03:20:11+08:00 |
+| compare | [docs/EvidRank_evolve/compare_CREST1_vs_CREST3.md](../docs/EvidRank_evolve/compare_CREST1_vs_CREST3.md) | 2026-06-06T03:49:22+08:00 |
+| compare | [docs/EvidRank_evolve/compare_CREST2_vs_CREST3.md](../docs/EvidRank_evolve/compare_CREST2_vs_CREST3.md) | 2026-06-06T03:49:21+08:00 |
 | compare | [docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_LINEAR_0_7.md](../docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_LINEAR_0_7.md) | 2026-06-04T00:47:14+08:00 |
 | compare | [docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_POWER2_TIER.md](../docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_POWER2_TIER.md) | 2026-06-04T00:47:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_PRIOR.md](../docs/EvidRank_evolve/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_PRIOR.md) | 2026-06-03T23:21:38+08:00 |
@@ -963,6 +976,10 @@ _Last refreshed: 2026-06-05T14:40:12+08:00_
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/CERA1_RAW` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/CERA2` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/CERA3` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/CREST1` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/CREST1_RAW` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/CREST2` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/CREST3` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_NUMERIC_BASELINE` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_PRIORITY_LINEAR_0_7` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_PRIORITY_POWER2_TIER` |
@@ -1017,6 +1034,10 @@ _Last refreshed: 2026-06-05T14:40:12+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/CERA1_RAW` |
 | report | `output/rcabench-platform-v2/evolve_reports/CERA2` |
 | report | `output/rcabench-platform-v2/evolve_reports/CERA3` |
+| report | `output/rcabench-platform-v2/evolve_reports/CREST1` |
+| report | `output/rcabench-platform-v2/evolve_reports/CREST1_RAW` |
+| report | `output/rcabench-platform-v2/evolve_reports/CREST2` |
+| report | `output/rcabench-platform-v2/evolve_reports/CREST3` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_NUMERIC_BASELINE` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_PRIORITY_LINEAR_0_7` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_PRIORITY_POWER2_TIER` |
@@ -1066,6 +1087,11 @@ _Last refreshed: 2026-06-05T14:40:12+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/compare_CERA1_RAW_vs_CERA1` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_CERA1_vs_CERA2` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_CERA2_vs_CERA3` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_CREST1_RAW_vs_CREST1` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_CREST1_RAW_vs_CREST2` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_CREST1_vs_CREST2` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_CREST1_vs_CREST3` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_CREST2_vs_CREST3` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_LINEAR_0_7` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_POWER2_TIER` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_FW_NUMERIC_BASELINE_vs_FW_PRIORITY_PRIOR` |

@@ -26,6 +26,12 @@ from src.evidencerank.cera import (
     CERAMetricTrace,
     CERATrace,
 )
+from src.evidencerank.crest import (
+    CREST,
+    CRESTLocal,
+    CRESTNoCF,
+    CRESTNoCalib,
+)
 
 if __name__ == "__main__":
     registry = global_algorithm_registry()
@@ -44,5 +50,9 @@ if __name__ == "__main__":
     registry["cera_metric_log"] = CERAMetricLog
     registry["cera_metric_trace"] = CERAMetricTrace
     registry["cera_log_trace"] = CERALogTrace
+    registry["crest"] = CREST
+    registry["crest_local"] = CRESTLocal
+    registry["crest_nocf"] = CRESTNoCF
+    registry["crest_nocalib"] = CRESTNoCalib
 
     main(enable_builtin_algorithms=False)
