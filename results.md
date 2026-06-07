@@ -1,10 +1,10 @@
-ljw@R740-3:~/paper/aegis/rca-algo-contrib$ uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
-发现 41238 个算法输出文件
+(rca-algo-contrib) ljw@R740-3:~/paper/aegis/rca-algo-contrib$ uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
+发现 46926 个算法输出文件
 
-包含算法: RUN, baro, causalrca, cera, cera_log, cera_log_trace, cera_metric, cera_metric_log, cera_metric_trace, cera_trace, evidencerank, evidencerank_arc, evidencerank_log, evidencerank_log_trace, evidencerank_metric, evidencerank_metric_log, evidencerank_metric_trace, evidencerank_trace, evidencerank_v13, herosas, microdig, microhecl, microrank, microrca, nezha, rcd, shapleyiq, simplerca, ton
-总 datapack 结果: 1557614 行
+包含算法: RUN, baro, causalrca, cera, cera_log, cera_log_trace, cera_metric, cera_metric_log, cera_metric_trace, cera_trace, crest, crest_local, crest_nocalib, crest_nocf, evidencerank, evidencerank_arc, evidencerank_log, evidencerank_log_trace, evidencerank_metric, evidencerank_metric_log, evidencerank_metric_trace, evidencerank_trace, evidencerank_v13, herosas, microdig, microhecl, microrank, microrca, nezha, rcd, shapleyiq, simplerca, ton
+总 datapack 结果: 1836350 行
 
-shape: (29, 13)
+shape: (33, 13)
 ┌───────────────────────────┬───────┬───────┬─────────────────────┬──────────┬────────────┬────────────┬────────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
 │ algorithm                 ┆ total ┆ error ┆ runtime.seconds:avg ┆      MRR ┆ AC@1.count ┆ AC@3.count ┆ AC@5.count ┆     AC@1 ┆     AC@3 ┆     AC@5 ┆    Avg@3 ┆    Avg@5 │
 │ ---                       ┆   --- ┆   --- ┆                 --- ┆      --- ┆        --- ┆        --- ┆        --- ┆      --- ┆      --- ┆      --- ┆      --- ┆      --- │
@@ -13,7 +13,10 @@ shape: (29, 13)
 │ cera                      ┆ 1,422 ┆     0 ┆            9.673971 ┆ 0.904032 ┆    1,209.0 ┆    1,352.0 ┆    1,388.0 ┆ 0.850211 ┆ 0.950774 ┆  0.97609 ┆ 0.907173 ┆ 0.933755 │
 │ evidencerank_arc          ┆ 1,422 ┆     0 ┆            9.549299 ┆ 0.893267 ┆    1,182.0 ┆    1,348.0 ┆    1,387.0 ┆ 0.831224 ┆ 0.947961 ┆ 0.975387 ┆   0.8985 ┆ 0.927286 │
 │ evidencerank              ┆ 1,422 ┆     0 ┆            8.277946 ┆ 0.891195 ┆    1,177.0 ┆    1,347.0 ┆    1,386.0 ┆ 0.827707 ┆ 0.947257 ┆ 0.974684 ┆ 0.896624 ┆  0.92616 │
+│ crest                     ┆ 1,422 ┆     0 ┆            9.972156 ┆ 0.875744 ┆    1,138.0 ┆    1,345.0 ┆    1,383.0 ┆ 0.800281 ┆ 0.945851 ┆ 0.972574 ┆ 0.884435 ┆ 0.918003 │
+│ crest_nocalib             ┆ 1,422 ┆     0 ┆             9.66089 ┆ 0.875326 ┆    1,138.0 ┆    1,343.0 ┆    1,382.0 ┆ 0.800281 ┆ 0.944444 ┆ 0.971871 ┆ 0.883497 ┆   0.9173 │
 │ evidencerank_metric_trace ┆ 1,422 ┆     0 ┆            7.988058 ┆ 0.835326 ┆    1,043.0 ┆    1,330.0 ┆    1,374.0 ┆ 0.733474 ┆ 0.935302 ┆ 0.966245 ┆ 0.847867 ┆ 0.893108 │
+│ crest_local               ┆ 1,422 ┆     0 ┆            9.678741 ┆ 0.824138 ┆    1,003.0 ┆    1,336.0 ┆    1,376.0 ┆ 0.705345 ┆ 0.939522 ┆ 0.967651 ┆ 0.844351 ┆ 0.891421 │
 │ cera_metric_trace         ┆ 1,422 ┆     0 ┆            7.961692 ┆ 0.820948 ┆      997.0 ┆    1,334.0 ┆    1,380.0 ┆ 0.701125 ┆ 0.938115 ┆ 0.970464 ┆ 0.839428 ┆ 0.890295 │
 │ evidencerank_v13          ┆ 1,422 ┆     0 ┆            9.733532 ┆ 0.801983 ┆      954.0 ┆    1,316.0 ┆    1,385.0 ┆ 0.670886 ┆ 0.925457 ┆  0.97398 ┆ 0.819737 ┆ 0.878481 │
 │ cera_log_trace            ┆ 1,422 ┆     0 ┆            8.713957 ┆ 0.752574 ┆      947.0 ┆    1,131.0 ┆    1,216.0 ┆ 0.665963 ┆ 0.795359 ┆ 0.855134 ┆ 0.740506 ┆ 0.781857 │
@@ -23,6 +26,7 @@ shape: (29, 13)
 │ cera_trace                ┆ 1,422 ┆     0 ┆             7.39324 ┆ 0.678662 ┆      747.0 ┆    1,137.0 ┆    1,234.0 ┆ 0.525316 ┆ 0.799578 ┆ 0.867792 ┆  0.68331 ┆ 0.751758 │
 │ microdig                  ┆ 1,422 ┆     0 ┆           55.964886 ┆ 0.636075 ┆      732.0 ┆    1,065.0 ┆    1,116.0 ┆ 0.514768 ┆ 0.748945 ┆  0.78481 ┆  0.64721 ┆ 0.701125 │
 │ microhecl                 ┆ 1,422 ┆     0 ┆           24.342709 ┆ 0.514768 ┆      732.0 ┆      732.0 ┆      732.0 ┆ 0.514768 ┆ 0.514768 ┆ 0.514768 ┆ 0.514768 ┆ 0.514768 │
+│ crest_nocf                ┆ 1,422 ┆     0 ┆            9.693582 ┆ 0.665531 ┆      700.0 ┆    1,157.0 ┆    1,332.0 ┆ 0.492264 ┆ 0.813643 ┆ 0.936709 ┆  0.65729 ┆ 0.763291 │
 │ herosas                   ┆ 1,422 ┆     0 ┆           14.043679 ┆  0.61116 ┆      693.0 ┆      961.0 ┆    1,089.0 ┆ 0.487342 ┆ 0.675809 ┆ 0.765823 ┆ 0.588373 ┆ 0.650211 │
 │ cera_metric_log           ┆ 1,422 ┆     0 ┆            3.847107 ┆ 0.596157 ┆      643.0 ┆      950.0 ┆    1,107.0 ┆  0.45218 ┆ 0.668073 ┆ 0.778481 ┆ 0.567979 ┆ 0.642053 │
 │ evidencerank_metric_log   ┆ 1,422 ┆     0 ┆            4.722548 ┆ 0.596045 ┆      643.0 ┆      950.0 ┆    1,107.0 ┆  0.45218 ┆ 0.668073 ┆ 0.778481 ┆ 0.567745 ┆ 0.641913 │
@@ -40,7 +44,40 @@ shape: (29, 13)
 │ nezha                     ┆ 1,422 ┆     0 ┆           35.374271 ┆ 0.071097 ┆       63.0 ┆      143.0 ┆      154.0 ┆ 0.044304 ┆ 0.100563 ┆ 0.108298 ┆ 0.075481 ┆ 0.088186 │
 │ RUN                       ┆ 1,422 ┆     1 ┆          667.981132 ┆ 0.069558 ┆        0.0 ┆       31.0 ┆       75.0 ┆      0.0 ┆   0.0218 ┆ 0.052743 ┆ 0.007267 ┆ 0.019269 │
 └───────────────────────────┴───────┴───────┴─────────────────────┴──────────┴────────────┴────────────┴────────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
-2026-06-06 01:13:16.938 | DEBUG    | rcabench_platform.v2.utils.serde:save_parquet:89 - saved parquet (len(df)=29) to output/rcabench-platform-v2/meta/rcabench/dataset.perf.combined.parquet
+2026-06-06 21:16:28.360 | DEBUG    | rcabench_platform.v2.utils.serde:save_parquet:89 - saved parquet (len(df)=33) to output/rcabench-platform-v2/meta/rcabench/dataset.perf.combined.parquet
 
 合并报告已保存: output/rcabench-platform-v2/meta/rcabench/dataset.perf.combined.parquet
-ljw@R740-3:~/paper/aegis/rca-algo-contrib$ 
+(rca-algo-contrib) ljw@R740-3:~/paper/aegis/rca-algo-contrib$ 
+
+
+
+(rca-algo-contrib) ljw@R740-3:~/paper/aegis/rca-algo-contrib$ uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
+发现 46926 个算法输出文件
+
+包含算法: RUN, baro, causalrca, cera, cera_log, cera_log_trace, cera_metric, cera_metric_log, cera_metric_trace, cera_trace, crest, crest_local, crest_nocalib, crest_nocf, evidencerank, evidencerank_arc, evidencerank_log, evidencerank_log_trace, evidencerank_metric, evidencerank_metric_log, evidencerank_metric_trace, evidencerank_trace, evidencerank_v13, herosas, microdig, microhecl, microrank, microrca, nezha, rcd, shapleyiq, simplerca, ton
+总 datapack 结果: 1836350 行
+
+shape: (33, 13)
+┌───────────────────────────┬───────┬───────┬─────────────────────┬──────────┬────────────┬────────────┬────────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
+│ algorithm                 ┆ total ┆ error ┆ runtime.seconds:avg ┆      MRR ┆ AC@1.count ┆ AC@3.count ┆ AC@5.count ┆     AC@1 ┆     AC@3 ┆     AC@5 ┆    Avg@3 ┆    Avg@5 │
+│ ---                       ┆   --- ┆   --- ┆                 --- ┆      --- ┆        --- ┆        --- ┆        --- ┆      --- ┆      --- ┆      --- ┆      --- ┆      --- │
+│ str                       ┆   u32 ┆   u32 ┆                 f64 ┆      f64 ┆        f64 ┆        f64 ┆        f64 ┆      f64 ┆      f64 ┆      f64 ┆      f64 ┆      f64 │
+╞═══════════════════════════╪═══════╪═══════╪═════════════════════╪══════════╪════════════╪════════════╪════════════╪══════════╪══════════╪══════════╪══════════╪══════════╡
+│ crest                     ┆ 1,422 ┆     0 ┆            9.972156 ┆ 0.875744 ┆    1,138.0 ┆    1,345.0 ┆    1,383.0 ┆ 0.800281 ┆ 0.945851 ┆ 0.972574 ┆ 0.884435 ┆ 0.918003 │
+│ crest_nocalib             ┆ 1,422 ┆     0 ┆             9.66089 ┆ 0.875326 ┆    1,138.0 ┆    1,343.0 ┆    1,382.0 ┆ 0.800281 ┆ 0.944444 ┆ 0.971871 ┆ 0.883497 ┆   0.9173 │
+│ crest_local               ┆ 1,422 ┆     0 ┆            9.678741 ┆ 0.824138 ┆    1,003.0 ┆    1,336.0 ┆    1,376.0 ┆ 0.705345 ┆ 0.939522 ┆ 0.967651 ┆ 0.844351 ┆ 0.891421 │
+│ microrca                  ┆ 1,422 ┆     0 ┆           24.493223 ┆ 0.609371 ┆      750.0 ┆      853.0 ┆    1,011.0 ┆ 0.527426 ┆ 0.599859 ┆  0.71097 ┆ 0.566104 ┆ 0.619831 │
+│ microdig                  ┆ 1,422 ┆     0 ┆           55.964886 ┆ 0.636075 ┆      732.0 ┆    1,065.0 ┆    1,116.0 ┆ 0.514768 ┆ 0.748945 ┆  0.78481 ┆  0.64721 ┆ 0.701125 │
+│ microhecl                 ┆ 1,422 ┆     0 ┆           24.342709 ┆ 0.514768 ┆      732.0 ┆      732.0 ┆      732.0 ┆ 0.514768 ┆ 0.514768 ┆ 0.514768 ┆ 0.514768 ┆ 0.514768 │
+│ crest_nocf                ┆ 1,422 ┆     0 ┆            9.693582 ┆ 0.665531 ┆      700.0 ┆    1,157.0 ┆    1,332.0 ┆ 0.492264 ┆ 0.813643 ┆ 0.936709 ┆  0.65729 ┆ 0.763291 │
+│ herosas                   ┆ 1,422 ┆     0 ┆           14.043679 ┆  0.61116 ┆      693.0 ┆      961.0 ┆    1,089.0 ┆ 0.487342 ┆ 0.675809 ┆ 0.765823 ┆ 0.588373 ┆ 0.650211 │
+│ baro                      ┆ 1,422 ┆     0 ┆            1.050853 ┆ 0.537925 ┆      586.0 ┆      847.0 ┆      993.0 ┆ 0.412096 ┆  0.59564 ┆ 0.698312 ┆ 0.511955 ┆ 0.578622 │
+│ simplerca                 ┆ 1,422 ┆     0 ┆            1.883833 ┆ 0.541069 ┆      472.0 ┆    1,014.0 ┆    1,272.0 ┆ 0.331927 ┆  0.71308 ┆ 0.894515 ┆ 0.538912 ┆ 0.668214 │
+│ shapleyiq                 ┆ 1,422 ┆     0 ┆           55.681971 ┆ 0.461462 ┆      445.0 ┆      714.0 ┆      950.0 ┆  0.31294 ┆  0.50211 ┆ 0.668073 ┆ 0.406001 ┆ 0.495078 │
+│ causalrca                 ┆ 1,422 ┆     0 ┆          134.398712 ┆ 0.293611 ┆      233.0 ┆      508.0 ┆      555.0 ┆ 0.163854 ┆ 0.357243 ┆ 0.390295 ┆ 0.276371 ┆ 0.318284 │
+│ ton                       ┆ 1,422 ┆     0 ┆            23.40372 ┆ 0.284954 ┆      216.0 ┆      401.0 ┆      582.0 ┆ 0.151899 ┆ 0.281997 ┆ 0.409283 ┆ 0.207923 ┆ 0.274965 │
+│ microrank                 ┆ 1,422 ┆     0 ┆           24.852426 ┆ 0.298642 ┆      192.0 ┆      456.0 ┆      645.0 ┆ 0.135021 ┆ 0.320675 ┆ 0.453586 ┆  0.23699 ┆ 0.311674 │
+│ rcd                       ┆ 1,422 ┆     0 ┆           30.470458 ┆ 0.091643 ┆       81.0 ┆      178.0 ┆      201.0 ┆ 0.056962 ┆ 0.125176 ┆  0.14135 ┆  0.09564 ┆ 0.113643 │
+│ nezha                     ┆ 1,422 ┆     0 ┆           35.374271 ┆ 0.071097 ┆       63.0 ┆      143.0 ┆      154.0 ┆ 0.044304 ┆ 0.100563 ┆ 0.108298 ┆ 0.075481 ┆ 0.088186 │
+│ RUN                       ┆ 1,422 ┆     1 ┆          667.981132 ┆ 0.069558 ┆        0.0 ┆       31.0 ┆       75.0 ┆      0.0 ┆   0.0218 ┆ 0.052743 ┆ 0.007267 ┆ 0.019269 │
+└───────────────────────────┴───────┴───────┴─────────────────────┴──────────┴────────────┴────────────┴────────────┴──────────┴──────────┴──────────┴──────────┴──────────┘

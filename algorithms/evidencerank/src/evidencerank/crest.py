@@ -9,7 +9,6 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -33,22 +32,6 @@ from .cera import (
     _series_service,
 )
 
-
-CREST_LOCAL_MODALITY_FEATURES: dict[str, tuple[str, ...]] = {
-    modality: tuple(
-        feature
-        for feature in BASE_FEATURE_NAMES
-        if feature in features
-        and feature not in {"topology_in_degree", "topology_out_degree"}
-    )
-    for modality, features in MODALITY_FEATURES.items()
-}
-
-CREST_LOCAL_FEATURES = tuple(
-    feature
-    for feature in BASE_FEATURE_NAMES
-    if any(feature in features for features in CREST_LOCAL_MODALITY_FEATURES.values())
-)
 
 CREST_ROLE_FAMILIES: dict[str, tuple[str, ...]] = {
     "metric_shift": (
@@ -113,7 +96,6 @@ CREST_COUNTERFACTUAL_ITERATION_FAMILIES = tuple(
 
 CREST_CASE_SCALE_CLIP = 3.0
 CREST_DENOISED_CHANNEL_EXCLUDES = frozenset({"trace_duration_z"})
-CREST_CALIBRATION_FLOOR = 0.96
 
 
 def _finite_nonnegative_array(values: np.ndarray) -> np.ndarray:
@@ -149,59 +131,6 @@ def _saturating_incident_scale(values: np.ndarray) -> np.ndarray:
     if peak > 1e-12:
         scaled = scaled / peak
     return np.clip(scaled, 0.0, 1.0)
-
-
-def _feature_probability_matrix(matrix: np.ndarray) -> np.ndarray:
-    if matrix.size == 0:
-        return matrix.astype(np.float64, copy=True)
-
-    result = np.zeros(matrix.shape, dtype=np.float64)
-    for column_idx in range(matrix.shape[1]):
-        result[:, column_idx] = _saturating_incident_scale(matrix[:, column_idx])
-    return result
-
-
-def _rms(values: np.ndarray, axis: int) -> np.ndarray:
-    if values.size == 0:
-        return np.asarray([], dtype=np.float64)
-    return np.sqrt(np.mean(np.square(values), axis=axis))
-
-
-def _modality_scores(
-    feature_scores: np.ndarray,
-    enabled_features: tuple[str, ...],
-    enabled_modalities: frozenset[str],
-) -> tuple[np.ndarray, tuple[str, ...]]:
-    columns: list[np.ndarray] = []
-    names: list[str] = []
-    feature_to_idx = {feature: idx for idx, feature in enumerate(enabled_features)}
-
-    for modality in ("metric", "trace", "log"):
-        if modality not in enabled_modalities:
-            continue
-        indices = [
-            feature_to_idx[feature]
-            for feature in CREST_LOCAL_MODALITY_FEATURES[modality]
-            if feature in feature_to_idx
-        ]
-        if not indices:
-            continue
-        block = feature_scores[:, indices]
-        if not np.any(block > 0.0):
-            continue
-        columns.append(_rms(block, axis=1))
-        names.append(modality)
-
-    if not columns:
-        return np.zeros((feature_scores.shape[0], 0), dtype=np.float64), tuple()
-    return np.vstack(columns).T, tuple(names)
-
-
-def _local_abnormality(modality_matrix: np.ndarray) -> np.ndarray:
-    if modality_matrix.size == 0 or modality_matrix.shape[1] == 0:
-        return np.zeros(modality_matrix.shape[0], dtype=np.float64)
-    energy = _rms(modality_matrix, axis=1)
-    return _saturating_incident_scale(energy)
 
 
 def _robust_case_feature_matrix(matrix: np.ndarray) -> np.ndarray:
@@ -549,31 +478,15 @@ def _pagerank_explanatory_power(
     return _saturating_incident_scale(rank)
 
 
-def _cross_modal_consistency(modality_matrix: np.ndarray) -> np.ndarray:
-    if modality_matrix.size == 0 or modality_matrix.shape[1] <= 1:
-        return np.ones(modality_matrix.shape[0], dtype=np.float64)
-    mean = np.mean(modality_matrix, axis=1)
-    std = np.std(modality_matrix, axis=1)
-    coefficient = np.divide(std, mean + 1e-9)
-    agreement = 1.0 / (1.0 + coefficient)
-    coverage = np.mean(modality_matrix > 0.0, axis=1)
-    raw_consistency = np.clip(np.sqrt(coverage) * agreement, 0.0, 1.0)
-    calibrated = CREST_CALIBRATION_FLOOR + (
-        1.0 - CREST_CALIBRATION_FLOOR
-    ) * raw_consistency
-    return np.clip(calibrated, CREST_CALIBRATION_FLOOR, 1.0)
-
-
 def score_crest_services(
     input_folder: Path,
     enabled_modalities: frozenset[str] = ALL_MODALITIES,
     graph_mode: str = "counterfactual",
-    use_calibration: bool = False,
 ) -> pd.DataFrame:
     frames = _load_input_frames(input_folder)
     services = _collect_services_from_frames(frames)
     if not services:
-        return pd.DataFrame(columns=["service", "A", "F", "C", "score"])
+        return pd.DataFrame(columns=["service", "A", "F", "S", "score"])
 
     enabled_feature_set = frozenset().union(
         *(MODALITY_FEATURES[modality] for modality in enabled_modalities)
@@ -598,13 +511,6 @@ def score_crest_services(
         include_topology=True,
     )
     local_abnormality = _saturating_incident_scale(local_energy)
-
-    feature_scores = _feature_probability_matrix(role_matrix)
-    modality_matrix, _modality_names = _modality_scores(
-        feature_scores,
-        enabled_features,
-        enabled_modalities,
-    )
 
     graph = _weighted_trace_graph(frames, services) if "trace" in enabled_modalities else {}
     denoised_support = np.zeros_like(local_abnormality, dtype=np.float64)
@@ -650,14 +556,9 @@ def score_crest_services(
         )
         denoised_support = _saturating_incident_scale(denoised_structural)
 
-    calibration = (
-        _cross_modal_consistency(modality_matrix)
-        if use_calibration
-        else np.ones_like(local_abnormality, dtype=np.float64)
-    )
-    score = local_abnormality * explanatory_power * calibration
+    score = local_abnormality * explanatory_power
     if graph_mode == "counterfactual":
-        score = score + denoised_support * calibration
+        score = score + denoised_support
     if not np.any(score > 0.0) and np.any(local_abnormality > 0.0):
         score = local_abnormality.copy()
 
@@ -666,7 +567,6 @@ def score_crest_services(
             "service": services,
             "A": local_abnormality,
             "F": explanatory_power,
-            "C": calibration,
             "S": denoised_support,
             "score": score,
         }
@@ -679,11 +579,10 @@ def score_crest_services(
 
 
 class CREST(Algorithm):
-    """CREST ranking with counterfactual structural support and mild calibration."""
+    """CREST ranking with counterfactual structural support."""
 
     _modalities: frozenset[str] = ALL_MODALITIES
     _graph_mode = "counterfactual"
-    _use_calibration = True
 
     def needs_cpu_count(self) -> int | None:
         return 1
@@ -694,7 +593,6 @@ class CREST(Algorithm):
             args.input_folder,
             enabled_modalities=self._modalities,
             graph_mode=self._graph_mode,
-            use_calibration=self._use_calibration,
         )
         return [
             AlgorithmAnswer(level="service", name=str(row.service), rank=rank)
@@ -706,7 +604,6 @@ class CRESTLocal(CREST):
     """CREST-Local ablation: Module 1 only."""
 
     _graph_mode = "local"
-    _use_calibration = False
 
 
 class CRESTNoCF(CREST):
@@ -715,11 +612,37 @@ class CRESTNoCF(CREST):
     _graph_mode = "pagerank"
 
 
-class CRESTNoCalib(CREST):
-    """CREST-NoCalib ablation entrypoint.
+class CRESTMetric(CREST):
+    """CREST ablation using only metric evidence."""
 
-    This keeps the counterfactual structural support term but removes the
-    cross-modal uncertainty calibration factor.
-    """
+    _modalities = frozenset({"metric"})
 
-    _use_calibration = False
+
+class CRESTTrace(CREST):
+    """CREST ablation using only trace evidence."""
+
+    _modalities = frozenset({"trace"})
+
+
+class CRESTLog(CREST):
+    """CREST ablation using only log evidence."""
+
+    _modalities = frozenset({"log"})
+
+
+class CRESTMetricTrace(CREST):
+    """CREST ablation using metric and trace evidence."""
+
+    _modalities = frozenset({"metric", "trace"})
+
+
+class CRESTMetricLog(CREST):
+    """CREST ablation using metric and log evidence."""
+
+    _modalities = frozenset({"metric", "log"})
+
+
+class CRESTLogTrace(CREST):
+    """CREST ablation using log and trace evidence."""
+
+    _modalities = frozenset({"log", "trace"})

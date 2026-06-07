@@ -695,6 +695,79 @@ uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-r
 uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
 ```
 
+### CREST
+
+CREST 也注册在 `evidencerank` package 中。当前默认 `crest` 不调用 CERA
+`_role_scores` 先验，运行时只读取当前 datapack 的 metric / trace / log telemetry。它使用
+local abnormality、trace parent context、counterfactual explain-away 和 denoised support
+完成排序，不包含 calibration 通道。
+
+```bash
+LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch -a crest -d rcabench --clear --use-cpus 32
+```
+
+Report:
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
+```
+
+#### CREST Ablation (消融实验)
+
+CREST 当前默认入口不再包含 calibration；保留的核心模块是 local abnormality、
+trace parent context、counterfactual explain-away 和 denoised support。消融入口分为
+结构模块消融和模态消融。
+
+结构模块消融：
+
+| 变体名 | 说明 |
+|--------|------|
+| `crest_local` | 只使用 Module 1 local abnormality |
+| `crest_nocf` | 用 PageRank-style topology 替代 counterfactual propagation |
+
+模态消融：
+
+| 变体名 | 说明 |
+|--------|------|
+| `crest_metric` | 只使用 metric evidence |
+| `crest_trace` | 只使用 trace evidence |
+| `crest_log` | 只使用 log evidence |
+| `crest_metric_trace` | 使用 metric + trace |
+| `crest_metric_log` | 使用 metric + log |
+| `crest_log_trace` | 使用 log + trace |
+
+一次运行完整 CREST 和所有结构 / 模态消融变体：
+
+```bash
+LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch \
+  -a crest \
+  -a crest_local \
+  -a crest_nocf \
+  -a crest_metric \
+  -a crest_trace \
+  -a crest_log \
+  -a crest_metric_trace \
+  -a crest_metric_log \
+  -a crest_log_trace \
+  -d rcabench --clear --use-cpus 32
+```
+
+如果只跑 held-out split，把 `-d rcabench` 换成 `-d rcabench_test`：
+
+```bash
+LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch -a crest -d rcabench_test --clear --use-cpus 32
+```
+
+Report 和汇总排序：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
+uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
+```
+
 ### HeroSAS
 
 HeroSAS is adapted from the original Bank metric tool in `algorithms/herosas/metric_tools.py`.
