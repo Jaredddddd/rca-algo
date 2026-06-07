@@ -406,11 +406,235 @@ uv run --package <uv-package> python algorithms/<algorithm>/main.py \
 Outputs go to:
 
 ```text
-output/rcabench-platform-v2/<dataset>/<datapack>/<algorithm>/
+output/rcabench-platform-v2/data/<dataset>/<datapack>/<algorithm>/
 ├── output.parquet
 ├── perf.parquet
 └── .finished
 ```
+
+## 在 AIOpsChallenge2025 上运行已有算法
+
+本地已经把 AIOpsChallenge2025 转成了 RCABench v2 的 service-only 数据集，数据集名是：
+
+```text
+aiopschallenge2025_rcabench_service
+```
+
+对应路径：
+
+```text
+data/rcabench-platform-v2/data/aiopschallenge2025_rcabench_service
+data/rcabench-platform-v2/meta/aiopschallenge2025_rcabench_service/index.parquet
+data/rcabench-platform-v2/meta/aiopschallenge2025_rcabench_service/labels.parquet
+```
+
+当前转换结果：
+
+```text
+groundtruth 总数:       400
+生成 datapack:          281
+跳过 node case:         82
+跳过空窗口 service/pod: 37
+service labels:         349
+```
+
+注意时区：`groundtruth.jsonl` 和 parquet 行时间都是 UTC；`2025-06-06` 这类日期目录以及小时文件名是 UTC+8 桶。转换脚本已经处理这个映射，不要手工按 UTC 日期目录去找文件。
+
+如果需要重新生成数据集：
+
+```bash
+cd /home/ljw/paper/aegis/rca-algo-contrib
+uv run --package evidencerank python scripts/build_aiopschallenge2025_rcabench.py --overwrite
+```
+
+### 运行规则
+
+对无需训练的已有算法，基本规则就是把原来命令里的：
+
+```text
+-d rcabench
+```
+
+替换成：
+
+```text
+-d aiopschallenge2025_rcabench_service
+```
+
+建议先设置：
+
+```bash
+cd /home/ljw/paper/aegis/rca-algo-contrib
+export DATASET=aiopschallenge2025_rcabench_service
+export CPUS=16
+export LOGURU_LEVEL=WARNING
+```
+
+输出会写到：
+
+```text
+output/rcabench-platform-v2/data/aiopschallenge2025_rcabench_service/<datapack>/<algorithm>/
+```
+
+### 推荐先跑 CREST smoke test
+
+CREST 已经在该数据集上跑通过，适合作为新数据集的首个连通性检查：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch -a crest -d "$DATASET" --clear --use-cpus "$CPUS"
+
+uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval perf-report "$DATASET"
+```
+
+已验证结果：
+
+```text
+total: 281
+error: 0
+MRR:   0.445155
+AC@1:  0.323843
+AC@3:  0.501779
+AC@5:  0.555160
+```
+
+### 运行常用无需训练算法
+
+Baro:
+
+```bash
+uv run --package baro python algorithms/baro/main.py \
+  eval batch -a baro -d "$DATASET" --clear --use-cpus "$CPUS"
+```
+
+Nezha:
+
+```bash
+uv run --package nezha python algorithms/nezha/main.py \
+  eval batch -a nezha -d "$DATASET" --clear --use-cpus "$CPUS"
+```
+
+MicroDig:
+
+```bash
+uv run --package MicroDig python algorithms/microdig/main.py \
+  eval batch -a microdig -d "$DATASET" --clear --use-cpus "$CPUS"
+```
+
+RCD:
+
+```bash
+uv run --package rcaeval-rcd python algorithms/rcd/main.py \
+  eval batch -a rcd -d "$DATASET" --clear --use-cpus "$CPUS"
+```
+
+SimpleRCA:
+
+```bash
+uv run --package SimpleRCA python algorithms/simplerca/main.py \
+  eval batch -a simplerca -d "$DATASET" --clear --use-cpus "$CPUS"
+```
+
+HeroSAS:
+
+```bash
+uv run --package herosas python algorithms/herosas/main.py \
+  eval batch -a herosas -d "$DATASET" --clear --use-cpus "$CPUS"
+```
+
+ShapleyIQ family:
+
+```bash
+uv run --package shapleyiq python algorithms/shapleyiq/main.py \
+  eval batch \
+  -a shapleyiq \
+  -a ton \
+  -a microrank \
+  -a microhecl \
+  -a microrca \
+  -d "$DATASET" \
+  --clear \
+  --use-cpus "$CPUS"
+```
+
+EvidenceRank / CERA / CREST 可以一起跑：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch \
+  -a evidencerank \
+  -a cera \
+  -a crest \
+  -d "$DATASET" \
+  --clear \
+  --use-cpus "$CPUS"
+```
+
+如果要跑 CREST 消融：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch \
+  -a crest \
+  -a crest_local \
+  -a crest_nocf \
+  -a crest_metric \
+  -a crest_trace \
+  -a crest_log \
+  -a crest_metric_trace \
+  -a crest_metric_log \
+  -a crest_log_trace \
+  -d "$DATASET" \
+  --clear \
+  --use-cpus "$CPUS"
+```
+
+### 运行依赖较重的算法
+
+CausalRCA 和 RUN 也使用同样的数据集参数，但需要先准备各自依赖：
+
+```bash
+uv sync --frozen --package rcaeval_causalrca
+uv run --package rcaeval_causalrca python algorithms/causalrca/main.py \
+  eval batch -a causalrca -d "$DATASET" --clear --use-cpus "$CPUS"
+
+uv sync --frozen --package rcaeval_run
+uv run --package rcaeval_run python algorithms/run/main.py \
+  eval batch -a RUN -d "$DATASET" --clear --use-cpus "$CPUS"
+```
+
+`RUN` 的算法名必须大写为 `RUN`。
+
+### 生成报告和汇总表
+
+单个算法的 `perf-report` 用注册该算法的 entrypoint 生成。例如：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report "$DATASET"
+uv run --package baro python algorithms/baro/main.py eval perf-report "$DATASET"
+uv run --package shapleyiq python algorithms/shapleyiq/main.py eval perf-report "$DATASET"
+```
+
+生成多算法汇总表：
+
+```bash
+./scripts/combined_report.sh "$DATASET"
+uv run --package baro python scripts/combined_report.py "$DATASET" --sort-by AC@1
+```
+
+报告输出：
+
+```text
+output/rcabench-platform-v2/meta/aiopschallenge2025_rcabench_service/output.parquet
+output/rcabench-platform-v2/meta/aiopschallenge2025_rcabench_service/datapack.perf.parquet
+output/rcabench-platform-v2/meta/aiopschallenge2025_rcabench_service/dataset.perf.parquet
+```
+
+### 关于需要训练的算法
+
+ART、Eadro、DiagFusion 属于需要独立环境和训练产物的算法。它们原本文档里的命令主要面向 `rcabench_test` 和已有 RCABench train/test split；如果要严谨地在 AIOpsChallenge2025 上评估，需要先为
+`aiopschallenge2025_rcabench_service` 单独设计训练/验证策略或确认已有 checkpoint 可以跨数据集使用。不要直接把已有 RCABench checkpoint 的结果当成 AIOpsChallenge2025 上的公平评估。
 
 ## Full Dataset Commands
 
