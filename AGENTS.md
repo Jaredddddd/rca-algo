@@ -16,6 +16,7 @@
 
 - 计划、目标、约束、关键决策、经验教训、步骤或进度变化时，必须同步更新项目内 `docs/`。
 - EvidenceRank 迭代研究默认记录在 `docs/EvidRank_evolve/`。
+- CREST 后续迭代研究默认记录在 `docs/crest_evolve/`；prompt、iteration、summary、compare、ablation 和长期决策都以该目录为准。
 - Vibe Research 主页面为 `VibeResearchTools/VibeResearch.md`。所有 Vibe Research 相关入口信息、启动 prompt、长期决策、索引和导航都可以写入该文件。
 - `docs/EvidRank_evolve/` 中的详细文档必须能在 `VibeResearchTools/VibeResearch.md` 的 index 中被发现。生成或修改研究文档后运行：
 
@@ -407,3 +408,63 @@ guard 已通过：无 high-risk 过拟合告警；`algorithm.py` 没有残留实
 验证方式：ARC13 将主排序改为 raw ordinal semantic prior，只把 reliability-active case matrix 用于最终 neighbor pairwise contrast。full eval 1422 case、error 0；相对 ARC12_CURRENT，AC@1 `0.734880 -> 0.831224`，MRR `0.839508 -> 0.893267`，AC@3 `0.936006 -> 0.947961`，AC@5 `0.971871 -> 0.975387`。guard 无 high-risk。
 
 适用范围：所有 EvidRank-ARC、CERA 或新 RCA 算法中试图用单 incident 的无标签 reliability、agreement、concentration、rank gap 直接生成全局 feature weights 的实验。该经验不禁止 reliability，但要求把它限制为局部校准、置信度门控或 regularizer。
+
+### CREST residual 支持必须先有置信门控
+
+触发信号：CREST8 将弱根因 residual explainability 作为自由加性通道接入默认 `crest`，希望救回 pod failure、低可观测根因和基础设施局部故障。
+
+根因 / 约束：未门控的 residual 会把“安静的旁观节点”和“弱可观测根因”混在一起。低传播、低日志、低 trace 的服务可能只是辅助服务、背景低流量节点或 metric drift bystander；如果只看 symptom-light + root-like metric shift，它们会获得过高 residual 支持，压过原本正确的高置信 CREST 排名。
+
+正确做法：residual 只能作为显式 ablation 或被强置信 gate 保护的局部校准信号，不能直接 `score = A * F + S + R`。下一步若继续做 CREST residual，必须先证明候选的 trace/log silence 与异常窗口中新出现的邻域症状存在可解释关系，而不是背景低观测。
+
+验证方式：CREST8 full eval 1422 case、error 0。`crest_residual` / residual-as-default 为 `AC@1=0.340366, MRR=0.439628, AC@3=0.447257, AC@5=0.530942`，虽然有 45 个 `improved_to_hit1`，但产生 699 个 `regressed_from_hit1`。恢复默认 no-residual 后 `crest` 回到 `0.800281/0.875326/0.944444/0.971871`。
+
+适用范围：CREST-family 中所有试图用 residual reduction、weak-root rescue、quiet-node bonus 或 topology explainability 作为自由加性主排序通道的实验。该经验不否定 residual 思路，但要求 residual eligibility 先由无标签置信门控约束。
+
+### CREST additive residual 即使强门控也不宜作为默认排序通道
+
+触发信号：CREST9 在 CREST8 的负向结果后实现 `crest_gated_residual`，只允许 residual 在默认 top-2、near-tie 且 residual 双侧可比的候选之间仲裁。
+
+根因 / 约束：top-2 和 residual comparable gate 能阻止 CREST8 的深层旁观节点灾难，但它仍把“给 challenger 加分”作为核心动作。对于 request/response protocol mutation 这类原本 CREST 已经正确的 case，邻接服务可能也具备足够 residual explainability，于是 gate 会把正确 root 翻到相邻传播服务。也就是说，门控能降低 residual 的破坏面，但没有把 residual 从“支持候选”转化为“解释/抑制 victim”的因果对比。
+
+正确做法：不要继续通过收紧 scalar threshold、top-K window、near-tie ratio 或 residual ratio 来寻找默认提升。下一步 residual 应改成 pairwise victim suppression / contrast：只有当高可观测 victim 的传播症状能被邻接候选的更强 raw mutation evidence 解释时，才降低 victim，而不是直接给 challenger 加分。默认 `crest` 继续保持 no-residual。
+
+验证方式：CREST9 full eval 1422 case、error 0。`crest_gated_residual` 得到 `AC@1=0.797468, MRR=0.873919, AC@3=0.944444, AC@5=0.971871`，相对 `CREST9_DEFAULT` / `crest` 的 `0.800281/0.875326/0.944444/0.971871` 净损 4 个 hit@1；compare 显示 11 个 `improved_to_hit1`、15 个 `regressed_from_hit1`。guard 无 high-risk。
+
+适用范围：CREST-family 中所有 residual / weak-root rescue 方案，尤其是把 residual 作为 additive score、tie breaker 或 challenger bonus 的实验。
+
+### CREST victim suppression 必须先有强 root-victim eligibility
+
+触发信号：CREST10 将 residual bonus 改成 pairwise victim suppression：当相邻低分候选具备更强 mutation evidence、较高分服务具备更强 propagation evidence 时，只削弱 victim 分数，不给 challenger 加分。
+
+根因 / 约束：mutation/propagation contrast 本身仍不等于 root-victim 关系。许多正确 root 的邻居也会表现出局部 mutation/propagation 差异；如果 suppression 直接作用于所有 trace-adjacent pair，就会把已正确的 protocol mutation、response mutation 和多 GT case 翻到相邻服务。相比 additive residual，suppression 的语义更接近 explain-away，但 eligibility 仍然太宽。
+
+正确做法：不要把最终分数级 suppression 应用于所有邻接 contrast。下一步必须先得到更强的无标签 eligibility，例如 cluster-local competition、多个独立 victim symptoms 的一致可解释性、candidate 自身默认 CREST 置信保持、或 raw feature family 的 bootstrap stability。只有 eligibility 成立时才能改变 top-1；否则 residual/contrast 只能作为诊断解释输出。
+
+验证方式：CREST10 full eval 1422 case、error 0。`crest_victim_suppression` 得到 `AC@1=0.757384, MRR=0.841618, AC@3=0.917018, AC@5=0.950070`，相对 `CREST10_DEFAULT` / `crest` 的 `0.800281/0.875326/0.944444/0.971871` 明显下降；compare 显示 24 个 `improved_to_hit1`、85 个 `regressed_from_hit1`、41 个 `rank_improved`、46 个 `rank_regressed`。guard 无 high-risk。
+
+适用范围：CREST-family 中所有基于邻接拓扑、mutation/propagation contrast、victim explain-away 或 final-score suppression 的实验。
+
+### CREST root-victim contrast 只适合窄门控或局部症状簇仲裁
+
+触发信号：CREST11-CREST13 的 `A/F/S` stability fusion、family fusion 和 server protocol ownership rerank 都含有 rescue signal，但 broad rerank 大幅回归；CREST14 将动作缩小为默认 top-3 near-tie 中的 trace mutation / propagation contrast 仲裁；CREST15 进一步要求候选解释多个 incoming caller symptom surfaces。
+
+根因 / 约束：root-like raw signal 本身仍可能出现在 symptom surface、入口服务或相邻传播服务上。只有当候选已经接近默认 winner，且候选的 trace mutation 明显更强、trace propagation 明显更弱，或能解释多个 incoming caller 的高 propagation 症状时，这种 contrast 才足以安全改变 top-1。否则它会退化成 family rerank、protocol symptom rerank 或 two-hop topology centrality。
+
+正确做法：把 root-victim contrast 用作严格 eligibility predicate，而不是自由加分、全局 rerank 或 broad suppression。默认安全形态是：候选位于当前 top-k、分数 near-tie、mutation/propagation 角色强对比、只做单次仲裁；若扩大范围，必须扩大“解释了多少独立邻域症状”，不要放宽为全局 feature weight 或 two-hop ranker。
+
+验证方式：CREST15 `crest_cluster_arbitration` full eval 1422 case、error 0；相对旧 default `crest`，AC@1 `0.800281 -> 0.812940`，MRR `0.875326 -> 0.882065`，AC@3 `0.944444 -> 0.945148`，AC@5 保持 `0.971871`；compare 显示 18 个 `improved_to_hit1`、0 个 `regressed_from_hit1`、18 个 `rank_improved`、0 个 `rank_regressed`。该机制已提升为默认 `crest`，但仍未达到 `AC@1 >= 0.85`。
+
+适用范围：CREST-family 中所有基于 role contrast、trace mutation ownership、protocol mutation rescue、cluster-local explain-away、incoming caller symptom cluster 或 top-k arbitration 的实验。
+
+### CREST protocol/path drift 必须绑定结构 fan-in 与传播上限
+
+触发信号：CREST13/CREST16 的 server protocol drift 作为 scalar gate 会把入口服务、下游症状面和高可观测传播节点推到 top-1；CREST17 重新审视 accepted-default top-3 miss 后发现，只有当 path/method drift 与更广 incoming caller fan-in 同时出现时才足够安全。
+
+根因 / 约束：server span / method distribution drift 是真实异常信号，但它不天然区分 root-owned request mutation 与 symptom-surface protocol drift。入口或受害服务也会因为上游异常、重试、流量改道或错误路径集中而出现强 method/span TV。若只按 protocol drift、observability 或两者组合仲裁，AC@1 可涨但会产生大量 `regressed_from_hit1`。
+
+正确做法：protocol/path drift 只能作为近邻仲裁的 eligibility，而不是全局 rerank。CREST17 的安全形态是：候选位于当前 top-3 near-tie；server method/span TV 高于当前 winner；observability volume 高于 winner；incoming caller 数至少比 winner 多 1；trace propagation burden 不超过 winner 的 1.4x。动作仍然只是把一个 near-tie challenger bump 到 winner 上方，不给全局 bonus、不读取 label/injection/output/perf/conclusion、不使用服务名或 fault 名。
+
+验证方式：CREST17 `crest_path_fanin_arbitration` 和 promoted default `crest` full eval 均为 1422 case、error 0。相对 `CREST15_ACCEPTED`，AC@1 `0.812940 -> 0.825598`，MRR `0.882065 -> 0.888980`，AC@3/AC@5 保持 `0.945148/0.971871`；compare 显示 18 个 `improved_to_hit1`、0 个 `regressed_from_hit1`、1 个非 top-1 `rank_regressed`。guard 无 high-risk。运行时成本从约 `9.21s` 上升到约 `11.74s`。
+
+适用范围：CREST-family 中所有 request path、span name、HTTP method/status、server protocol、endpoint ownership、caller-cluster path consistency 或 protocol mutation rescue 实验。未来若继续扩展该方向，应增强结构解释性或缓存 raw trace TV，而不要放宽为 scalar protocol score。

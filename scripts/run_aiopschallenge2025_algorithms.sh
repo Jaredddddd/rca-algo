@@ -42,10 +42,10 @@ cd "$ROOT_DIR"
 
 DATASET="${1:-${DATASET:-aiopschallenge2025_rcabench_service}}"
 CPUS="${CPUS:-16}"
-CLEAR="${CLEAR:-1}"
+CLEAR="${CLEAR:-0}"
 SAMPLE="${SAMPLE:-}"
 FAIL_FAST="${FAIL_FAST:-0}"
-INCLUDE_CAUSALRCA="${INCLUDE_CAUSALRCA:-1}"
+INCLUDE_CAUSALRCA="${INCLUDE_CAUSALRCA:-0}"
 SYNC_CAUSALRCA="${SYNC_CAUSALRCA:-0}"
 RUN_COMBINED_REPORT="${RUN_COMBINED_REPORT:-1}"
 SORT_BY="${SORT_BY:-MRR}"
@@ -133,13 +133,13 @@ echo "TEMP_ROOT: $TEMP_ROOT"
 echo "CPUS: $CPUS"
 echo "CLEAR: $CLEAR"
 echo "DRY_RUN: $DRY_RUN"
-echo "Excluded: art, eadro, diagfusion, RUN"
+echo "Excluded: art, eadro, diagfusion, RUN, causalrca"
 
-run_eval_batch "baro" "baro" "algorithms/baro/main.py" \
-  baro
+# run_eval_batch "baro" "baro" "algorithms/baro/main.py" \
+#   baro
 
-run_eval_batch "nezha" "nezha" "algorithms/nezha/main.py" \
-  nezha
+# run_eval_batch "nezha" "nezha" "algorithms/nezha/main.py" \
+#   nezha
 
 run_eval_batch "microdig" "MicroDig" "algorithms/microdig/main.py" \
   microdig
