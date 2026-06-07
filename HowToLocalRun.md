@@ -440,6 +440,8 @@ service labels:         349
 
 注意时区：`groundtruth.jsonl` 和 parquet 行时间都是 UTC；`2025-06-06` 这类日期目录以及小时文件名是 UTC+8 桶。转换脚本已经处理这个映射，不要手工按 UTC 日期目录去找文件。
 
+Baro、RCD、CausalRCA 的 metric-only adapter 已按 RCABench-like datapack 布局兼容该数据集：即使数据集名不是 `rcabench*`，只要 datapack 中存在 `normal_metrics.parquet` / `abnormal_metrics.parquet`，就按 RCABench v2 方式读取；注入时间优先使用旧 RCABench `env.json` 字段，缺失时回退到 `abnormal_start_time` 或 `injection.json.start_time`。MicroDig 和 ShapleyIQ family 的 loader 也支持同样的 ISO 时间字段，并会在 trace 缺少 `attr.http.*` 可选列时自动补空列。
+
 如果需要重新生成数据集：
 
 ```bash
@@ -468,6 +470,31 @@ cd /home/ljw/paper/aegis/rca-algo-contrib
 export DATASET=aiopschallenge2025_rcabench_service
 export CPUS=16
 export LOGURU_LEVEL=WARNING
+```
+
+也可以直接使用批量脚本运行除 `art`、`eadro`、`DiagFusion`、`RUN` 之外的算法：
+
+```bash
+scripts/run_aiopschallenge2025_algorithms.sh
+```
+
+常用参数通过环境变量控制：
+
+```bash
+# 增加并行 worker；默认会 --clear 重跑每个算法
+CPUS=32 scripts/run_aiopschallenge2025_algorithms.sh
+
+# 不清空已有输出，继续跳过已完成 datapack
+CLEAR=0 scripts/run_aiopschallenge2025_algorithms.sh
+
+# CausalRCA 依赖较重，可以先跳过
+INCLUDE_CAUSALRCA=0 scripts/run_aiopschallenge2025_algorithms.sh
+
+# 快速抽样检查
+SAMPLE=10 scripts/run_aiopschallenge2025_algorithms.sh
+
+# 只打印命令，不实际运行
+DRY_RUN=1 scripts/run_aiopschallenge2025_algorithms.sh
 ```
 
 输出会写到：

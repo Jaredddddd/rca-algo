@@ -1,4 +1,6 @@
 from collections.abc import Callable
+from datetime import datetime, timezone
+import json
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +32,11 @@ class SimpleMetricsAdapter:
         self.func = func
 
     def __call__(self, args: AlgorithmArgs) -> list[AlgorithmAnswer]:
-        assert args.dataset == "rcaeval_re2_tt" or args.dataset.startswith("rcabench")
+        if not (
+            args.dataset == "rcaeval_re2_tt"
+            or is_rcabench_like_dataset(args.dataset, args.input_folder)
+        ):
+            raise NotImplementedError(f"unsupported dataset for simple metrics adapter: {args.dataset}")
 
         inject_time = load_inject_time(args.dataset, args.input_folder)
         df = preprocess(load_simple_metrics(args.dataset, args.input_folder))
@@ -54,6 +60,41 @@ class SimpleMetricsAdapter:
         return answers
 
 
+def is_rcabench_like_dataset(dataset: str, input_folder: Path) -> bool:
+    return dataset.startswith("rcabench") or (input_folder / "normal_metrics.parquet").exists()
+
+
+def parse_utc_datetime(value: str) -> datetime:
+    text = value.strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    dt = datetime.fromisoformat(text)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def load_rcabench_like_inject_time(input_folder: Path) -> datetime:
+    try:
+        return rcabench_load_inject_time(input_folder)
+    except (AssertionError, KeyError, FileNotFoundError, TypeError, ValueError):
+        pass
+
+    env_path = input_folder / "env.json"
+    if env_path.exists():
+        env = json.loads(env_path.read_text())
+        if "abnormal_start_time" in env:
+            return parse_utc_datetime(str(env["abnormal_start_time"]))
+
+    injection_path = input_folder / "injection.json"
+    if injection_path.exists():
+        injection = json.loads(injection_path.read_text())
+        if "start_time" in injection:
+            return parse_utc_datetime(str(injection["start_time"]))
+
+    raise KeyError(f"cannot infer injection time from {input_folder}")
+
+
 @timeit()
 def load_simple_metrics(dataset: str, input_folder: Path) -> pd.DataFrame:
     if dataset.startswith("rcaeval"):
@@ -62,7 +103,7 @@ def load_simple_metrics(dataset: str, input_folder: Path) -> pd.DataFrame:
         df = convert_simple_metrics(metrics)
         return df.to_pandas()
 
-    if dataset.startswith("rcabench"):
+    if is_rcabench_like_dataset(dataset, input_folder):
         normal_metrics = pl.scan_parquet(input_folder / "normal_metrics.parquet")
         abnormal_metrics = pl.scan_parquet(input_folder / "abnormal_metrics.parquet")
         metrics = pl.concat([normal_metrics, abnormal_metrics])
@@ -145,8 +186,8 @@ def convert_simple_metrics(lf: pl.LazyFrame) -> pl.DataFrame:
 def load_inject_time(dataset: str, input_folder: Path) -> int:
     if dataset.startswith("rcaeval"):
         inject_time = rcaeval_load_inject_time(input_folder)
-    elif dataset.startswith("rcabench"):
-        inject_time = rcabench_load_inject_time(input_folder)
+    elif is_rcabench_like_dataset(dataset, input_folder):
+        inject_time = load_rcabench_like_inject_time(input_folder)
     else:
         raise NotImplementedError
 

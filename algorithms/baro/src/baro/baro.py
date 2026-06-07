@@ -11,7 +11,7 @@ from rcabench_platform.v2.algorithms.spec import (
 from rcabench_platform.vendor.RCAEval.time_series import preprocess
 from sklearn.preprocessing import RobustScaler
 
-from ._common import SimpleMetricsAdapter
+from ._common import SimpleMetricsAdapter, is_rcabench_like_dataset
 
 
 def baro(
@@ -66,5 +66,12 @@ class Baro(Algorithm):
         return 4
 
     def __call__(self, args: AlgorithmArgs) -> list[AlgorithmAnswer]:
-        adapter = SimpleMetricsAdapter(partial(baro, dk_select_useful=True if args.dataset.startswith("rcabench") else False))
+        adapter = SimpleMetricsAdapter(
+            partial(
+                baro,
+                dk_select_useful=True
+                if is_rcabench_like_dataset(args.dataset, args.input_folder)
+                else False,
+            )
+        )
         return adapter(args)

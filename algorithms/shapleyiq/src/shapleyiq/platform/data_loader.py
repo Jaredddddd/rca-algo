@@ -37,6 +37,16 @@ def load_json(path: Path) -> dict:
         return json.load(f)
 
 
+def parse_utc_datetime(value: str) -> datetime.datetime:
+    text = value.strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    dt = datetime.datetime.fromisoformat(text)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(datetime.timezone.utc)
+
+
 def tt_add_op_name(lf: pl.LazyFrame) -> pl.LazyFrame:
     """Add operation name for Train Ticket traces"""
     return lf.with_columns(pl.col("span_name").alias("operation_name"))
@@ -53,6 +63,14 @@ def replace_enum_values(column: str, enum_values: list, start: int = 0) -> pl.Ex
 def load_inject_time(input_folder: Path) -> datetime.datetime:
     """Load injection time from env.json"""
     env = load_json(path=input_folder / "env.json")
+
+    if "abnormal_start_time" in env:
+        return parse_utc_datetime(str(env["abnormal_start_time"]))
+
+    if "ABNORMAL_START" not in env and (input_folder / "injection.json").exists():
+        injection = load_json(path=input_folder / "injection.json")
+        if "start_time" in injection:
+            return parse_utc_datetime(str(injection["start_time"]))
 
     normal_start = int(env["NORMAL_START"])
     normal_end = int(env["NORMAL_END"])
@@ -153,6 +171,18 @@ def load_traces(input_folder: Path) -> pl.LazyFrame:
     normal_traces = pl.scan_parquet(input_folder / "normal_traces.parquet")
     anomal_traces = pl.scan_parquet(input_folder / "abnormal_traces.parquet")
     lf = merge_two_time_ranges(normal_traces, anomal_traces)
+
+    optional_float_columns = [
+        "attr.http.response.status_code",
+        "attr.http.request.content_length",
+        "attr.http.response.content_length",
+    ]
+    schema_names = lf.collect_schema().names()
+    missing_columns = [name for name in optional_float_columns if name not in schema_names]
+    if missing_columns:
+        lf = lf.with_columns(
+            [pl.lit(None).cast(pl.Float64).alias(name) for name in missing_columns]
+        )
 
 
 
