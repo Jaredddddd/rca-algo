@@ -41,12 +41,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 DATASET="${1:-${DATASET:-aiopschallenge2025_rcabench_service}}"
-CPUS="${CPUS:-16}"
-CLEAR="${CLEAR:-0}"
+CPUS="${CPUS:-32}"
+CLEAR="${CLEAR:-1}"
 SAMPLE="${SAMPLE:-}"
 FAIL_FAST="${FAIL_FAST:-0}"
 INCLUDE_CAUSALRCA="${INCLUDE_CAUSALRCA:-0}"
-SYNC_CAUSALRCA="${SYNC_CAUSALRCA:-0}"
+SYNC_CAUSALRCA="${SYNC_CAUSALRCA:-2}"
 RUN_COMBINED_REPORT="${RUN_COMBINED_REPORT:-1}"
 SORT_BY="${SORT_BY:-MRR}"
 DRY_RUN="${DRY_RUN:-0}"
@@ -135,11 +135,22 @@ echo "CLEAR: $CLEAR"
 echo "DRY_RUN: $DRY_RUN"
 echo "Excluded: art, eadro, diagfusion, RUN, causalrca"
 
-# run_eval_batch "baro" "baro" "algorithms/baro/main.py" \
-#   baro
+run_eval_batch "crest family" "evidencerank" "algorithms/evidencerank/main.py" \
+  crest \
+  crest_local \
+  crest_nocf \
+  crest_metric \
+  crest_trace \
+  crest_log \
+  crest_metric_trace \
+  crest_metric_log \
+  crest_log_trace 
 
-# run_eval_batch "nezha" "nezha" "algorithms/nezha/main.py" \
-#   nezha
+run_eval_batch "baro" "baro" "algorithms/baro/main.py" \
+  baro
+
+run_eval_batch "nezha" "nezha" "algorithms/nezha/main.py" \
+  nezha
 
 run_eval_batch "microdig" "MicroDig" "algorithms/microdig/main.py" \
   microdig
@@ -160,18 +171,6 @@ run_eval_batch "simplerca" "SimpleRCA" "algorithms/simplerca/main.py" \
 run_eval_batch "herosas" "herosas" "algorithms/herosas/main.py" \
   herosas
 
-if [[ "$INCLUDE_CAUSALRCA" != "0" ]]; then
-  if [[ "$SYNC_CAUSALRCA" == "1" ]]; then
-    run_step "sync causalrca" \
-      uv sync --frozen --package rcaeval_causalrca
-  fi
-  run_eval_batch "causalrca" "rcaeval_causalrca" "algorithms/causalrca/main.py" \
-    causalrca
-else
-  echo
-  echo "=== causalrca: skipped because INCLUDE_CAUSALRCA=0 ==="
-fi
-
 run_eval_batch "evidencerank family" "evidencerank" "algorithms/evidencerank/main.py" \
   evidencerank \
   evidencerank_metric \
@@ -191,19 +190,19 @@ run_eval_batch "cera family" "evidencerank" "algorithms/evidencerank/main.py" \
   cera_metric_trace \
   cera_log_trace
 
-run_eval_batch "crest family" "evidencerank" "algorithms/evidencerank/main.py" \
-  crest \
-  crest_local \
-  crest_nocf \
-  crest_metric \
-  crest_trace \
-  crest_log \
-  crest_metric_trace \
-  crest_metric_log \
-  crest_log_trace \
-  crest_noresidual \
-  crest_residual \
-  crest_gated_residual
+
+
+if [[ "$INCLUDE_CAUSALRCA" != "0" ]]; then
+  if [[ "$SYNC_CAUSALRCA" == "1" ]]; then
+    run_step "sync causalrca" \
+      uv sync --frozen --package rcaeval_causalrca
+  fi
+  run_eval_batch "causalrca" "rcaeval_causalrca" "algorithms/causalrca/main.py" \
+    causalrca
+else
+  echo
+  echo "=== causalrca: skipped because INCLUDE_CAUSALRCA=0 ==="
+fi
 
 if [[ "$RUN_COMBINED_REPORT" != "0" ]]; then
   run_step "combined report" \

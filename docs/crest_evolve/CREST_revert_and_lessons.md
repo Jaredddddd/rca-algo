@@ -45,6 +45,23 @@ magic number 风格的超参数。根据最新要求，运行路径中的 CREST 
 | CREST17 path/fan-in arbitration | `AC@1=0.825598`，相对 CREST15 改善 18 个、0 个 hit@1 回归 | 当前最好结果，但依赖多个 path/fan-in 门控常数 | 已撤回 |
 | CREST18 weak-root sweep | 已停止 | 搜索方向继续堆阈值，不符合无 magic number 要求 | 否 |
 
+## CERA 先验边界检查
+
+历史记录中没有已接受的 `crest_cera` runtime ablation。与 CERA 相关的边界测试主要出现在
+`docs/EvidRank_evolve/CREST4_attempt.md`：
+
+| 检查项 | 结果 | 结论 |
+| --- | ---: | --- |
+| CERA ordinal shape applied to CREST-normalized matrix | `AC@1=0.464135` | 只把 CERA 的 ordinal shape 套到 CREST 特征矩阵上会严重退化 |
+| best blend of CERA modality variants without full CERA | `AC@1=0.838959` | 不使用 full CERA rank channel 时没有到 0.85，更没有到 0.88 |
+| crest + full CERA rank channel | `AC@1=0.850211` | 达到的是 CERA3 自身水平，不是 CREST 机制独立涨点 |
+| oracle over `crest`, `crest_local`, `crest_nocf`, `crest_nocalib` | `AC@1=0.874121` | 这是 oracle variant selection 上界，不是 CERA 先验，也不是可部署无监督算法 |
+
+因此，如果“0.88”指 `AC@1`，当前证据不支持“CREST 加入 CERA 先验可到
+0.88”。最接近的是不可接受的 oracle 上界 `0.874121`，以及 full CERA rank channel
+的 `0.850211`。如果“0.88”指 `MRR`，则 CREST17 已到 `MRR=0.888980`，
+CERA3 到 `MRR=0.904032`，但这不是 `AC@1=0.88`。
+
 ## 关键教训
 
 1. 宽泛重排不可靠。

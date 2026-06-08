@@ -61,6 +61,16 @@ uv run --package evidencerank python scripts/build_aiopschallenge2025_rcabench.p
   --overwrite
 ```
 
+By default the converter now drops service-level cases whose GT service is absent from every
+converted trace/log/metric `service_name` candidate. To keep these impossible service-level cases
+for diagnosis only:
+
+```bash
+uv run --package evidencerank python scripts/build_aiopschallenge2025_rcabench.py \
+  --keep-unobservable-labels \
+  --overwrite
+```
+
 ## Generated Shape
 
 Each datapack contains the RCABench v2 files used by the local eval pipeline:
@@ -99,8 +109,34 @@ The default dataset is service-only:
 - service faults use `service`
 - network faults label both `source` and `destination`
 - pod faults map pod names to their owning service
+- map raw trace service `redis` to label-compatible `redis-cart`
+- skip cases whose labels are not observable in any converted trace/log/metric service candidates
+  unless `--keep-unobservable-labels` is set
 
-## Current Conversion Result
+## Preserved Source Features
+
+The converter intentionally keeps more source information than the first conversion did:
+
+- trace: keeps raw `references`, `tags`, `logs`, `process`, `flags`, source start/duration fields,
+  raw service name, derived `parent_span_id`, and derived `parent_service`
+- trace status: derives `status_code` / `attr.status_code` from raw `error`, `status.code`,
+  `otel.status_code`, `http.status_code`, and error-like `status.message`; it no longer writes every
+  span as `Ok`
+- trace compatibility: also writes `status.code`, `status.message`, `http.status_code`,
+  `otel.status_code`, `error`, `attr.http.response.status_code`, and `attr.error`
+- log: preserves raw timestamp, agent, pod, namespace, node, and infers `level` from message text
+  instead of writing all logs as `INFO`
+- metric: preserves source metadata under `attr.aiops.*`, including `object_id`, `object_type`,
+  `instance`, `pod`, `device`, `mountpoint`, `cf`, `sql_type`, `type`, `kpi_key`, `kpi_name`,
+  metric group, and metric file
+
+This makes the RCABench-shaped parquet files larger, but keeps the raw evidence needed by algorithms
+that can use status/error tags, trace topology, pod metadata, or metric provenance.
+
+## Previous Conversion Result
+
+The following numbers are from the earlier conversion before trace-status preservation and
+unobservable-label filtering:
 
 ```text
 total groundtruth rows: 400
@@ -115,6 +151,47 @@ meta size:             136K
 `skipped_empty` means at least one required normal/abnormal trace or metric window was empty. The
 details are stored in `conversion_report.json`.
 
+## Current Converter Validation
+
+Validated on 2026-06-08:
+
+- `py_compile` passes for `scripts/build_aiopschallenge2025_rcabench.py`
+- smoke conversion with `--limit 2` writes trace/log/metric parquet with the expanded schemas
+- a `network corrupt` smoke case contains both `Ok` and `Error` trace statuses after conversion
+- old converted data contains 230 observable service-level cases and 51 unobservable service-level
+  cases
+- sampled unobservable cases such as `tidb-tikv` `io fault` and `tidb-pd` / `tidb-tidb`
+  `pod failure` are now returned as `skipped_unobservable_label`
+
+The 51 unobservable cases are not hard-coded as TiDB. They are skipped because their service-level
+GT label does not appear in any converted trace/log/metric `service_name` candidate, so a service
+ranking algorithm cannot hit them under the current RCABench service-level interface.
+
+## Output / Perf Report Pitfall
+
+`--overwrite` only replaces the generated dataset data/meta directories. It does not remove old
+algorithm outputs under:
+
+```text
+output/rcabench-platform-v2/data/aiopschallenge2025_rcabench_service
+```
+
+After the observable-label filter was enabled, the current dataset has 230 datapacks, while a
+workspace that evaluated the earlier 281-case conversion may still have 281 output datapack
+directories. Re-run the target algorithms with `eval batch ... --clear` after rebuilding the
+dataset, and use `eval perf-report ... --warn-missing` when intentionally aggregating partial
+algorithm runs.
+
+Current conversion summary:
+
+```text
+total_groundtruth=400
+converted=230
+skipped_node=82
+skipped_empty=37
+skipped_unobservable_label=51
+```
+
 ## CREST Smoke Test
 
 Commands:
@@ -128,18 +205,30 @@ LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidenceran
   eval perf-report aiopschallenge2025_rcabench_service
 ```
 
-Observed result:
+Observed current `perf-report` row after filtering to the 230 current datapacks:
 
 ```text
-crest/.finished:      281
-crest/output.parquet: 281
-crest/perf.parquet:   281
-error:                0
-runtime avg:          7.11812 seconds
-MRR:                  0.445155
-AC@1:                 0.323843
-AC@3:                 0.501779
-AC@5:                 0.555160
-Avg@3:                0.418742
-Avg@5:                0.469751
+total:       230
+error:       0
+runtime avg: 20.902668 seconds
+MRR:         0.503603
+AC@1:        0.334783
+AC@3:        0.600000
+AC@5:        0.669565
+Avg@3:       0.475362
+Avg@5:       0.545217
 ```
+
+## Follow-up Analysis
+
+CREST trace degradation analysis:
+
+```text
+docs/aiopschallenge2025_crest_trace_analysis.md
+```
+
+Key finding: raw aiops2025 trace tags contain non-OK status/error evidence, but the pre-fix
+conversion wrote all `attr.status_code` values as `Ok`. Raw Jaeger trace also covers only 8 services,
+about half of the service-level ground-truth label space. This made full CREST fusion over-emphasize
+entry/key-path traffic services on many resource, JVM, pod, and infra faults, while still helping
+network and DNS cases.

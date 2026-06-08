@@ -29,21 +29,58 @@ DEFAULT_SRC = Path("/home/ljw/paper/aiops-challenge-data/aiopschallenge2025")
 DEFAULT_DATA_ROOT = Path("data") / "rcabench-platform-v2"
 DEFAULT_DATASET = "aiopschallenge2025_rcabench_service"
 
+TAG_STRUCT = pl.Struct({"key": pl.String, "type": pl.String, "value": pl.String})
+TRACE_REFERENCE_STRUCT = pl.Struct({
+    "refType": pl.String,
+    "spanID": pl.String,
+    "traceID": pl.String,
+})
+TRACE_LOG_STRUCT = pl.Struct({
+    "fields": pl.List(TAG_STRUCT),
+    "timestamp": pl.Int64,
+})
+TRACE_PROCESS_STRUCT = pl.Struct({
+    "serviceName": pl.String,
+    "tags": pl.List(TAG_STRUCT),
+})
+
+SERVICE_ALIASES = {
+    "redis": "redis-cart",
+}
+
 
 TRACE_SCHEMA: dict[str, pl.DataType] = {
     "time": pl.Datetime("ns", "UTC"),
     "trace_id": pl.String,
     "span_id": pl.String,
     "parent_span_id": pl.String,
+    "parent_service": pl.String,
     "span_name": pl.String,
     "attr.span_kind": pl.String,
     "service_name": pl.String,
     "duration": pl.UInt64,
+    "status_code": pl.String,
+    "status.code": pl.String,
+    "status.message": pl.String,
+    "http.status_code": pl.String,
+    "otel.status_code": pl.String,
+    "error": pl.String,
     "attr.status_code": pl.String,
+    "attr.http.response.status_code": pl.String,
+    "attr.error": pl.String,
     "attr.k8s.pod.name": pl.String,
     "attr.k8s.service.name": pl.String,
     "attr.k8s.namespace.name": pl.String,
     "attr.k8s.node.name": pl.String,
+    "raw.flags": pl.Float64,
+    "raw.start_time": pl.Int64,
+    "raw.start_time_millis": pl.Int64,
+    "raw.duration": pl.Int64,
+    "raw.service_name": pl.String,
+    "raw.references": pl.List(TRACE_REFERENCE_STRUCT),
+    "raw.tags": pl.List(TAG_STRUCT),
+    "raw.logs": pl.List(TRACE_LOG_STRUCT),
+    "raw.process": TRACE_PROCESS_STRUCT,
 }
 
 LOG_SCHEMA: dict[str, pl.DataType] = {
@@ -54,9 +91,15 @@ LOG_SCHEMA: dict[str, pl.DataType] = {
     "service_name": pl.String,
     "message": pl.String,
     "attr.k8s.pod.name": pl.String,
+    "attr.k8s.container.name": pl.String,
     "attr.k8s.service.name": pl.String,
     "attr.k8s.namespace.name": pl.String,
     "attr.k8s.node.name": pl.String,
+    "raw.timestamp": pl.String,
+    "raw.agent_name": pl.String,
+    "raw.k8_pod": pl.String,
+    "raw.k8_namespace": pl.String,
+    "raw.k8_node_name": pl.String,
 }
 
 METRIC_SCHEMA: dict[str, pl.DataType] = {
@@ -74,6 +117,14 @@ METRIC_SCHEMA: dict[str, pl.DataType] = {
     "attr.aiops.object_id": pl.String,
     "attr.aiops.object_type": pl.String,
     "attr.aiops.instance": pl.String,
+    "attr.aiops.pod": pl.String,
+    "attr.aiops.device": pl.String,
+    "attr.aiops.mountpoint": pl.String,
+    "attr.aiops.cf": pl.String,
+    "attr.aiops.sql_type": pl.String,
+    "attr.aiops.type": pl.String,
+    "attr.aiops.kpi_key": pl.String,
+    "attr.aiops.kpi_name": pl.String,
     "attr.aiops.metric_group": pl.String,
     "attr.aiops.metric_file": pl.String,
 }
@@ -172,6 +223,11 @@ def clean_deleted_suffix(value: str) -> str:
     return re.sub(r"\s+\(deleted\)\s*$", "", value.strip())
 
 
+def canonical_service_name(value: Any) -> str:
+    text = clean_deleted_suffix(str(value or "")).strip()
+    return SERVICE_ALIASES.get(text, text)
+
+
 def service_from_pod(value: Any) -> str:
     text = clean_deleted_suffix(str(value or ""))
     if not text:
@@ -258,12 +314,57 @@ def parent_span_id(refs: Any) -> str:
         return ""
 
 
+def tag_value_expr(key: str, alias: str) -> pl.Expr:
+    return (
+        pl.col("tags")
+        .list.eval(
+            pl.when(pl.element().struct.field("key") == key)
+            .then(pl.element().struct.field("value"))
+        )
+        .list.drop_nulls()
+        .list.first()
+        .cast(pl.String)
+        .fill_null("")
+        .alias(alias)
+    )
+
+
+def child_of_span_expr() -> pl.Expr:
+    child_of = (
+        pl.col("references")
+        .list.eval(
+            pl.when(pl.element().struct.field("refType") == "CHILD_OF")
+            .then(pl.element().struct.field("spanID"))
+        )
+        .list.drop_nulls()
+        .list.first()
+    )
+    fallback = pl.col("references").list.first().struct.field("spanID")
+    return pl.coalesce([child_of, fallback, pl.lit("")]).cast(pl.String).alias("parent_span_id")
+
+
 def normalize_status(tags: Any) -> str:
     code = (get_tag(tags, "status.code") or "").strip()
+    otel_code = (get_tag(tags, "otel.status_code") or "").strip()
+    http_status = (get_tag(tags, "http.status_code") or "").strip()
     message = (get_tag(tags, "status.message") or "").strip()
-    if code.lower() in {"error", "2"}:
+    error = (get_tag(tags, "error") or "").strip().lower()
+    code_text = (otel_code or code).lower()
+    if error in {"true", "1", "yes"}:
         return "Error"
-    if message and message.lower() not in {"ok", "unset"}:
+    if code_text in {"error", "2"}:
+        return "Error"
+    try:
+        if code and int(code) not in {0, 1}:
+            return "Error"
+    except ValueError:
+        pass
+    try:
+        if http_status and int(http_status) >= 400:
+            return "Error"
+    except ValueError:
+        pass
+    if re.search(r"\b(error|fail|exception|timeout|unavailable|denied|refused)\b", message.lower()):
         return "Error"
     return "Ok"
 
@@ -340,9 +441,9 @@ def transform_trace(df: pl.DataFrame) -> pl.DataFrame:
         .alias("time"),
         pl.col("traceID").cast(pl.String).alias("trace_id"),
         pl.col("spanID").cast(pl.String).alias("span_id"),
-        pl.col("references").list.first().struct.field("spanID").cast(pl.String).alias("parent_span_id"),
+        child_of_span_expr(),
         pl.col("operationName").cast(pl.String).alias("span_name"),
-        pl.col("process").struct.field("serviceName").cast(pl.String).alias("service_name"),
+        pl.col("process").struct.field("serviceName").cast(pl.String).alias("raw.service_name"),
         (
             pl.when(pl.col("duration") > 0)
             .then(pl.col("duration"))
@@ -350,15 +451,62 @@ def transform_trace(df: pl.DataFrame) -> pl.DataFrame:
             .cast(pl.UInt64)
             * pl.lit(1000, dtype=pl.UInt64)
         ).alias("duration"),
-        pl.lit("").cast(pl.String).alias("attr.span_kind"),
-        pl.lit("Ok").cast(pl.String).alias("attr.status_code"),
+        tag_value_expr("span.kind", "attr.span_kind"),
+        tag_value_expr("status.code", "status.code"),
+        tag_value_expr("status.message", "status.message"),
+        tag_value_expr("http.status_code", "http.status_code"),
+        tag_value_expr("otel.status_code", "otel.status_code"),
+        tag_value_expr("error", "error"),
         pl.lit("").cast(pl.String).alias("attr.k8s.pod.name"),
         pl.lit("").cast(pl.String).alias("attr.k8s.namespace.name"),
         pl.lit("").cast(pl.String).alias("attr.k8s.node.name"),
+        pl.col("flags").cast(pl.Float64).alias("raw.flags"),
+        pl.col("startTime").cast(pl.Int64).alias("raw.start_time"),
+        pl.col("startTimeMillis").cast(pl.Int64).alias("raw.start_time_millis"),
+        pl.col("duration").cast(pl.Int64).alias("raw.duration"),
+        pl.col("references").alias("raw.references"),
+        pl.col("tags").alias("raw.tags"),
+        pl.col("logs").alias("raw.logs"),
+        pl.col("process").alias("raw.process"),
     ).with_columns(
-        pl.col("service_name").alias("attr.k8s.service.name"),
+        pl.col("raw.service_name")
+        .map_elements(canonical_service_name, return_dtype=pl.String)
+        .alias("service_name"),
+        pl.col("http.status_code").alias("attr.http.response.status_code"),
+        pl.col("error").alias("attr.error"),
         pl.col("parent_span_id").fill_null(""),
     )
+
+    status_code_number = pl.col("status.code").cast(pl.Int64, strict=False)
+    http_status_number = pl.col("http.status_code").cast(pl.Int64, strict=False)
+    status_is_error = (
+        pl.col("error").str.to_lowercase().is_in(["true", "1", "yes"])
+        | pl.col("otel.status_code").str.to_lowercase().is_in(["error", "2"])
+        | ((status_code_number.is_not_null()) & (~status_code_number.is_in([0, 1])))
+        | ((http_status_number.is_not_null()) & (http_status_number >= 400))
+        | pl.col("status.message")
+        .str.to_lowercase()
+        .str.contains(r"\b(error|fail|exception|timeout|unavailable|denied|refused)\b")
+    )
+    out = out.with_columns(
+        pl.when(status_is_error)
+        .then(pl.lit("Error"))
+        .otherwise(pl.lit("Ok"))
+        .alias("status_code")
+    ).with_columns(
+        pl.col("status_code").alias("attr.status_code"),
+        pl.col("service_name").alias("attr.k8s.service.name"),
+    )
+    parent_lookup = out.select(
+        pl.col("span_id").alias("_parent_span_id"),
+        pl.col("service_name").alias("parent_service"),
+    ).unique("_parent_span_id")
+    out = out.join(
+        parent_lookup,
+        left_on="parent_span_id",
+        right_on="_parent_span_id",
+        how="left",
+    ).with_columns(pl.col("parent_service").fill_null(""))
 
     return out.select(list(TRACE_SCHEMA)).sort("time")
 
@@ -392,12 +540,18 @@ def transform_log(df: pl.DataFrame) -> pl.DataFrame:
         .alias("time"),
         pl.lit("").cast(pl.String).alias("trace_id"),
         pl.lit("").cast(pl.String).alias("span_id"),
-        pl.lit("INFO").cast(pl.String).alias("level"),
+        pl.col("message").map_elements(log_level, return_dtype=pl.String).alias("level"),
         service_expr.alias("service_name"),
         pl.col("message").cast(pl.String).alias("message"),
         pod_clean.alias("attr.k8s.pod.name"),
+        pod_clean.alias("attr.k8s.container.name"),
         pl.col("k8_namespace").cast(pl.String).alias("attr.k8s.namespace.name"),
         pl.col("k8_node_name").cast(pl.String).alias("attr.k8s.node.name"),
+        pl.col("@timestamp").cast(pl.String).alias("raw.timestamp"),
+        pl.col("agent_name").cast(pl.String).alias("raw.agent_name"),
+        pod_clean.alias("raw.k8_pod"),
+        pl.col("k8_namespace").cast(pl.String).alias("raw.k8_namespace"),
+        pl.col("k8_node_name").cast(pl.String).alias("raw.k8_node_name"),
     ).with_columns(
         pl.col("service_name").alias("attr.k8s.service.name"),
     )
@@ -500,6 +654,14 @@ def transform_metric_file(
         pl.col("object_id").cast(pl.String).alias("attr.aiops.object_id"),
         pl.col("object_type").cast(pl.String).alias("attr.aiops.object_type"),
         pl.col("instance").cast(pl.String).alias("attr.aiops.instance"),
+        pl.col("pod").cast(pl.String).alias("attr.aiops.pod"),
+        pl.col("device").cast(pl.String).alias("attr.aiops.device"),
+        pl.col("mountpoint").cast(pl.String).alias("attr.aiops.mountpoint"),
+        pl.col("cf").cast(pl.String).alias("attr.aiops.cf"),
+        pl.col("sql_type").cast(pl.String).alias("attr.aiops.sql_type"),
+        pl.col("type").cast(pl.String).alias("attr.aiops.type"),
+        pl.col("kpi_key").cast(pl.String).alias("attr.aiops.kpi_key"),
+        pl.col("kpi_name").cast(pl.String).alias("attr.aiops.kpi_name"),
         pl.col("_metric_group").cast(pl.String).alias("attr.aiops.metric_group"),
         pl.col("_metric_file").cast(pl.String).alias("attr.aiops.metric_file"),
         pl.col("value").cast(pl.Float64),
@@ -630,6 +792,26 @@ def write_parquet(path: Path, df: pl.DataFrame) -> None:
     df.write_parquet(path)
 
 
+def service_set(df: pl.DataFrame) -> set[str]:
+    if df.is_empty() or "service_name" not in df.columns:
+        return set()
+    return {
+        service
+        for service in df.get_column("service_name").drop_nulls().cast(pl.String).unique().to_list()
+        if service
+    }
+
+
+def observable_labels(
+    labels: list[str],
+    *frames: pl.DataFrame,
+) -> tuple[set[str], set[str]]:
+    services: set[str] = set()
+    for frame in frames:
+        services.update(service_set(frame))
+    return set(labels) & services, services
+
+
 def injection_payload(
     row: dict[str, Any],
     labels: list[str],
@@ -697,6 +879,7 @@ def convert_case(
     row: dict[str, Any],
     labels: list[str],
     min_window: timedelta,
+    require_observable_label: bool,
 ) -> dict[str, Any]:
     normal_start, normal_end, abnormal_start, abnormal_end = case_windows(row, min_window)
 
@@ -714,6 +897,29 @@ def convert_case(
             "abnormal_traces": abnormal_traces.height,
             "normal_metrics": normal_metrics.height,
             "abnormal_metrics": abnormal_metrics.height,
+        }
+
+    matched_labels, candidate_services = observable_labels(
+        labels,
+        normal_traces,
+        abnormal_traces,
+        normal_metrics,
+        abnormal_metrics,
+        normal_logs,
+        abnormal_logs,
+    )
+    if require_observable_label and not matched_labels:
+        return {
+            "status": "skipped_unobservable_label",
+            "labels": labels,
+            "candidate_service_count": len(candidate_services),
+            "candidate_services": sorted(candidate_services),
+            "normal_traces": normal_traces.height,
+            "abnormal_traces": abnormal_traces.height,
+            "normal_metrics": normal_metrics.height,
+            "abnormal_metrics": abnormal_metrics.height,
+            "normal_logs": normal_logs.height,
+            "abnormal_logs": abnormal_logs.height,
         }
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -741,6 +947,8 @@ def convert_case(
         "abnormal_metrics": abnormal_metrics.height,
         "normal_logs": normal_logs.height,
         "abnormal_logs": abnormal_logs.height,
+        "matched_labels": sorted(matched_labels),
+        "candidate_service_count": len(candidate_services),
     }
 
 
@@ -803,6 +1011,7 @@ def build_dataset(args: argparse.Namespace) -> None:
         "skipped_node": 0,
         "skipped_no_labels": 0,
         "skipped_empty": 0,
+        "skipped_unobservable_label": 0,
         "skipped_limit": 0,
         "case_results": [],
     }
@@ -823,12 +1032,22 @@ def build_dataset(args: argparse.Namespace) -> None:
             continue
 
         datapack = safe_name(f"aiops2025-{row.get('uuid')}-{row.get('fault_type')}")
-        result = convert_case(src, data_dir / datapack, row, labels, min_window)
+        result = convert_case(
+            src,
+            data_dir / datapack,
+            row,
+            labels,
+            min_window,
+            require_observable_label=not args.keep_unobservable_labels,
+        )
         result.update({"datapack": datapack, "uuid": row.get("uuid"), "labels": labels})
         stats["case_results"].append(result)
 
         if result["status"] != "converted":
-            stats["skipped_empty"] += 1
+            if result["status"] == "skipped_empty":
+                stats["skipped_empty"] += 1
+            elif result["status"] == "skipped_unobservable_label":
+                stats["skipped_unobservable_label"] += 1
             if (data_dir / datapack).exists():
                 shutil.rmtree(data_dir / datapack)
             continue
@@ -846,6 +1065,7 @@ def build_dataset(args: argparse.Namespace) -> None:
         f"dataset={args.dataset} datapacks={stats['converted']} "
         f"skipped_node={stats['skipped_node']} "
         f"skipped_empty={stats['skipped_empty']} "
+        f"skipped_unobservable_label={stats['skipped_unobservable_label']} "
         f"data_root={data_root}"
     )
 
@@ -857,6 +1077,14 @@ def main() -> None:
     parser.add_argument("--dataset", default=DEFAULT_DATASET)
     parser.add_argument("--min-window-minutes", type=float, default=10.0)
     parser.add_argument("--limit", type=int, default=None, help="Convert only the first N service/pod cases")
+    parser.add_argument(
+        "--keep-unobservable-labels",
+        action="store_true",
+        help=(
+            "Keep cases whose service-level labels are absent from all converted "
+            "metric/log/trace service candidates."
+        ),
+    )
     parser.add_argument("--overwrite", action="store_true", help="Replace only the target dataset data/meta dirs")
     args = parser.parse_args()
 

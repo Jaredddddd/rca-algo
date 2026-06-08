@@ -638,6 +638,10 @@ uv run --package rcaeval_run python algorithms/run/main.py \
 单个算法的 `perf-report` 用注册该算法的 entrypoint 生成。例如：
 
 ```bash
+export DATASET=aiopschallenge2025_rcabench_service
+```
+
+```bash
 uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report "$DATASET"
 uv run --package baro python algorithms/baro/main.py eval perf-report "$DATASET"
 uv run --package shapleyiq python algorithms/shapleyiq/main.py eval perf-report "$DATASET"
