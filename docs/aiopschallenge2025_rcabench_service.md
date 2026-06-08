@@ -225,10 +225,13 @@ CREST trace degradation analysis:
 
 ```text
 docs/aiopschallenge2025_crest_trace_analysis.md
+docs/aiopschallenge2025_crest_after_rebuild_analysis.md
 ```
 
-Key finding: raw aiops2025 trace tags contain non-OK status/error evidence, but the pre-fix
-conversion wrote all `attr.status_code` values as `Ok`. Raw Jaeger trace also covers only 8 services,
-about half of the service-level ground-truth label space. This made full CREST fusion over-emphasize
-entry/key-path traffic services on many resource, JVM, pod, and infra faults, while still helping
-network and DNS cases.
+Key finding before the rebuild: raw aiops2025 trace tags contain non-OK status/error evidence, but
+the pre-fix conversion wrote all `attr.status_code` values as `Ok`.
+
+Key finding after the rebuild: status/error preservation and unobservable-label filtering are fixed,
+but aiops2025 trace is still much less root-aligned than RCABench trace. Full CREST remains weaker
+than `crest_metric_log` because trace/topology support often promotes `frontend` or other propagation
+services on resource, JVM, pod, and port-misconfig cases.
