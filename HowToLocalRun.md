@@ -472,6 +472,14 @@ export CPUS=16
 export LOGURU_LEVEL=WARNING
 ```
 
+如果是新component 数据集，改成下面这个
+```bash
+cd /home/ljw/paper/aegis/rca-algo-contrib
+export DATASET=aiopschallenge2025_rcabench_component
+export CPUS=16
+export LOGURU_LEVEL=WARNING
+```
+
 也可以直接使用批量脚本运行除 `art`、`eadro`、`DiagFusion`、`RUN` 之外的算法：
 
 ```bash
