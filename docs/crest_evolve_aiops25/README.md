@@ -41,6 +41,89 @@ If the working tree contains a later accepted CREST variant, use the freshly
 verified current `crest` output as the no-regression baseline instead of these
 reference numbers.
 
+## Current Status
+
+This task is stopped after the user-defined three-round limit for the resumed
+adaptive-modality direction. The target `AC@1 >= 0.70` on
+`aiopschallenge2025_rcabench_service` was not reached without RCABench
+regression.
+
+The accepted default remains `CREST_AIOPS2`. Later ablations are documented but
+not promoted:
+
+| version | registry | AIOps25 AC@1 | RCABench AC@1 | decision |
+| --- | --- | ---: | ---: | --- |
+| `CREST_AIOPS3` | `crest_resource_provenance` | 0.469565 | 0.798172 | rejected: RCABench regression |
+| `CREST_AIOPS4` | `crest_trace_root_eligibility` | 0.465217 | 0.803797 | rejected: no AIOps25 gain |
+| `CREST_AIOPS5` | `crest_adaptive_modality` | 0.465217 | 0.803094 | rejected: no ranking change |
+| `CREST_AIOPS6` | `crest_surface_competition` | 0.530435 | 0.789733 | rejected: RCABench regression |
+
+The strongest rejected AIOps25 ablation is `CREST_AIOPS6`: it confirms the
+telemetry-reliability hypothesis by raising AIOps25 AC@1 from `0.465217` to
+`0.530435`, but it is too broad and damages RCABench trace-root cases.
+
+Key final documents:
+
+- [CREST_AIOPS6_iteration.md](CREST_AIOPS6_iteration.md)
+- [CREST_AIOPS6_surface_competition_compare.md](CREST_AIOPS6_surface_competition_compare.md)
+- [CREST_AIOPS6_SURFACE_AIOPS25_summary.md](../EvidRank_evolve/CREST_AIOPS6_SURFACE_AIOPS25_summary.md)
+- [CREST_AIOPS6_SURFACE_RCABENCH_summary.md](../EvidRank_evolve/CREST_AIOPS6_SURFACE_RCABENCH_summary.md)
+
+The lesson is that CREST needs incident-local modality reliability, but a safe
+online selector must prove trace is not root-aligned before demoting a trace
+surface. Metric/log ownership alone is an insufficient proof because propagated
+symptoms can also create strong non-trace ownership.
+
+## Current Accepted Default
+
+`CREST_AIOPS2` is the current accepted default `crest`. It keeps the
+incident-local trace structural confidence gate and adds a narrow unsupervised
+modality ownership arbitration step. Under weak trace reliability, a metric/log
+candidate can overtake a trace-surface winner only when it has joint metric and
+log local ownership, and trace-mutation-owned winners are protected.
+
+Freshly verified final result:
+
+| dataset | version | total | error | AC@1 | MRR | AC@3 | AC@5 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `aiopschallenge2025_rcabench_service` | `CREST_AIOPS2_FINAL_AIOPS25` | 230 | 0 | 0.465217 | 0.617852 | 0.695652 | 0.786957 |
+| `rcabench` | `CREST_AIOPS2_FINAL_RCABENCH` | 1422 | 0 | 0.803094 | 0.876983 | 0.945148 | 0.972574 |
+
+Against the AIOPS2 fresh baseline, AIOps25 improved by `+0.052174` AC@1 and
+`+0.037359` MRR; RCABench improved by `+0.001406` AC@1 and `+0.000954` MRR.
+Against the later magic-free majority-ownership intermediate, AIOps25 improved
+by `+0.043478` AC@1 and RCABench improved by `+0.000703` AC@1.
+
+Key documents:
+
+- [CREST_AIOPS2_iteration.md](CREST_AIOPS2_iteration.md)
+- [CREST_AIOPS2_modality_selector_design.md](CREST_AIOPS2_modality_selector_design.md)
+- [CREST_AIOPS2_FINAL_AIOPS25_summary.md](../EvidRank_evolve/CREST_AIOPS2_FINAL_AIOPS25_summary.md)
+- [CREST_AIOPS2_FINAL_RCABENCH_summary.md](../EvidRank_evolve/CREST_AIOPS2_FINAL_RCABENCH_summary.md)
+
+The target `AC@1 >= 0.70` is still not reached. Further optimization is not
+continued in this task because three additional adaptive-modality rounds were
+completed without a promotable solution.
+
+## Previous Accepted Intermediate
+
+`CREST_AIOPS1` adds an incident-local trace structural confidence gate to the
+default `crest`. The mechanism is unsupervised and uses only raw telemetry plus
+CREST feature values. It caps trace structural support when abnormal trace rows
+are dominated by a single high-observability service surface, trace root
+alignment is weak, and metric/log evidence points outside trace coverage.
+
+Freshly verified result:
+
+| dataset | version | total | error | AC@1 | MRR | AC@3 | AC@5 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `aiopschallenge2025_rcabench_service` | `CREST_AIOPS1_DOMINANT_AIOPS25` | 230 | 0 | 0.413043 | 0.580494 | 0.678261 | 0.786957 |
+| `rcabench` | `CREST_AIOPS1_DOMINANT_RCABENCH` | 1422 | 0 | 0.801688 | 0.876029 | 0.944444 | 0.971871 |
+
+Against the fresh no-reliability baseline, AIOps25 improved by `+0.078261`
+AC@1 and RCABench did not regress. This is accepted only as an intermediate
+version; AIOps25 remains far below the target `AC@1 >= 0.70`.
+
 ## Hard Rules
 
 - Do not use SuperPower skills unless the user explicitly asks.
