@@ -468,3 +468,15 @@ guard 已通过：无 high-risk 过拟合告警；`algorithm.py` 没有残留实
 验证方式：CREST17 `crest_path_fanin_arbitration` 和 promoted default `crest` full eval 均为 1422 case、error 0。相对 `CREST15_ACCEPTED`，AC@1 `0.812940 -> 0.825598`，MRR `0.882065 -> 0.888980`，AC@3/AC@5 保持 `0.945148/0.971871`；compare 显示 18 个 `improved_to_hit1`、0 个 `regressed_from_hit1`、1 个非 top-1 `rank_regressed`。guard 无 high-risk。运行时成本从约 `9.21s` 上升到约 `11.74s`。
 
 适用范围：CREST-family 中所有 request path、span name、HTTP method/status、server protocol、endpoint ownership、caller-cluster path consistency 或 protocol mutation rescue 实验。未来若继续扩展该方向，应增强结构解释性或缓存 raw trace TV，而不要放宽为 scalar protocol score。
+
+### PV-CREST 动态 evidence selection 有效但接近无监督可辨识性上限
+
+触发信号：AIOps25 service-level 的目标要求 `crest` 接近 `AC@1 >= 0.70`，同时 RCABench full multimodal 不下降；PV_CREST1-PV_CREST3 尝试将 CREST 改造成 DyMo-style inference-time dynamic evidence selection。
+
+根因 / 约束：两个数据集的可观测性语义冲突很强。RCABench 经常奖励 trace-root-aligned protocol / topology 证据；AIOps25 service-level 中 trace 又常常只覆盖入口或传播面，真正 service root 更可能通过 metric/log/resource provenance 出现。单 incident、label-free 的选择器很难区分“trace dominance 是真实 root”还是“trace dominance 是 exposure surface”，也很难区分“metric/log ownership 是 root-local”还是“metric/log ownership 是传播受害者”。oracle union 显示，当前 `crest` 与 `crest_metric_log` 的 AIOps25 hit@1 union 只有 `0.673913`，而引入另一套 metric-log 排序的 oracle 才能略过 `0.70`，这意味着无监督 selector 几乎必须接近 oracle 才能达标。
+
+正确做法：保留 PV_CREST2 的动态 evidence selection 作为当前最稳的 safe gain：只在 incident-local masked-root view 的无标签质量优于 base view 时切换，不做 dataset/service/fault 分支，不全局降低 trace。PV_CREST3 的 service-level representativeness 可作为 provenance atom 的局部校准，帮助 MRR/AC@3/AC@5，但不要声称它解决 top-1。后续若要继续逼近 `0.70`，不要再放宽 broad trace demotion 或 metric+log fallback；需要新增无标签信息源，例如历史 incident 原型、服务角色稳定性、重复事件下的 self-supervised calibration，或更细的 resource/provenance atom。
+
+验证方式：PV_CREST2 full eval：AIOps25 `AC@1=0.526087, MRR=0.662711, AC@3=0.756522, AC@5=0.826087`，RCABench `0.800281/0.875326/0.944444/0.971871` 不变。PV_CREST3 full eval：AIOps25 `AC@1=0.526087, MRR=0.672613, AC@3=0.782609, AC@5=0.865217`，RCABench 仍不变。PV_CREST1 broad partial-view override 虽提升 AIOps25 到 `0.430435`，但 RCABench 降到 `0.492264`，证明 broad role override 不安全。
+
+适用范围：所有 AIOps25 service-level 与 RCABench 同时优化的 CREST / PV-CREST 实验，尤其是动态模态选择、trace exposure suppression、metric/log/provenance root rescue、resource ownership arbitration，以及试图用纯 incident-local 无监督机制同时获得两个数据集高 AC@1 的方案。

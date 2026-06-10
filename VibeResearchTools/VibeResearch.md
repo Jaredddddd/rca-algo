@@ -784,7 +784,7 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-09T03:07:27+08:00_
+_Last refreshed: 2026-06-10T20:59:26+08:00_
 
 ## EvidenceRank Document Index
 
@@ -908,6 +908,14 @@ _Last refreshed: 2026-06-09T03:07:27+08:00_
 | iteration | [docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_iteration.md) | 2026-06-04T02:04:32+08:00 |
 | summary | [docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_summary.md](../docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_summary.md) | 2026-06-04T02:05:18+08:00 |
 | note | [docs/EvidRank_evolve/FW_PRIORITY_VARIANTS_CASE_MOVEMENT.md](../docs/EvidRank_evolve/FW_PRIORITY_VARIANTS_CASE_MOVEMENT.md) | 2026-06-04T13:46:57+08:00 |
+| summary | [docs/EvidRank_evolve/PV_CREST1_BASE_AIOPS25_SERVICE_summary.md](../docs/EvidRank_evolve/PV_CREST1_BASE_AIOPS25_SERVICE_summary.md) | 2026-06-10T16:16:17+08:00 |
+| summary | [docs/EvidRank_evolve/PV_CREST1_BASE_RCABENCH_FRESH_summary.md](../docs/EvidRank_evolve/PV_CREST1_BASE_RCABENCH_FRESH_summary.md) | 2026-06-10T16:16:27+08:00 |
+| summary | [docs/EvidRank_evolve/PV_CREST1_PARTIAL_AIOPS25_SERVICE_summary.md](../docs/EvidRank_evolve/PV_CREST1_PARTIAL_AIOPS25_SERVICE_summary.md) | 2026-06-10T17:14:51+08:00 |
+| summary | [docs/EvidRank_evolve/PV_CREST1_PARTIAL_RCABENCH_summary.md](../docs/EvidRank_evolve/PV_CREST1_PARTIAL_RCABENCH_summary.md) | 2026-06-10T17:15:01+08:00 |
+| summary | [docs/EvidRank_evolve/PV_CREST2_DYNAMIC_AIOPS25_SERVICE_summary.md](../docs/EvidRank_evolve/PV_CREST2_DYNAMIC_AIOPS25_SERVICE_summary.md) | 2026-06-10T20:15:01+08:00 |
+| summary | [docs/EvidRank_evolve/PV_CREST2_DYNAMIC_RCABENCH_summary.md](../docs/EvidRank_evolve/PV_CREST2_DYNAMIC_RCABENCH_summary.md) | 2026-06-10T20:15:10+08:00 |
+| summary | [docs/EvidRank_evolve/PV_CREST3_REPRESENTATIVE_AIOPS25_SERVICE_summary.md](../docs/EvidRank_evolve/PV_CREST3_REPRESENTATIVE_AIOPS25_SERVICE_summary.md) | 2026-06-10T20:45:23+08:00 |
+| summary | [docs/EvidRank_evolve/PV_CREST3_REPRESENTATIVE_RCABENCH_summary.md](../docs/EvidRank_evolve/PV_CREST3_REPRESENTATIVE_RCABENCH_summary.md) | 2026-06-10T20:45:33+08:00 |
 | guide | [docs/EvidRank_evolve/README.md](../docs/EvidRank_evolve/README.md) | 2026-06-01T18:29:32+08:00 |
 | iteration | [docs/EvidRank_evolve/V10_iteration.md](../docs/EvidRank_evolve/V10_iteration.md) | 2026-06-03T13:14:42+08:00 |
 | summary | [docs/EvidRank_evolve/V10_summary.md](../docs/EvidRank_evolve/V10_summary.md) | 2026-06-02T11:24:53+08:00 |
@@ -1020,6 +1028,10 @@ _Last refreshed: 2026-06-09T03:07:27+08:00_
 | compare | [docs/EvidRank_evolve/compare_V7_vs_V8.md](../docs/EvidRank_evolve/compare_V7_vs_V8.md) | 2026-06-02T03:53:57+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V8_vs_V9.md](../docs/EvidRank_evolve/compare_V8_vs_V9.md) | 2026-06-02T10:23:35+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V9_vs_V10.md](../docs/EvidRank_evolve/compare_V9_vs_V10.md) | 2026-06-02T11:24:43+08:00 |
+| note | [docs/EvidRank_evolve/cross_compare_PV_CREST1_BASE_AIOPS25_SERVICE_vs_PV_CREST2_DYNAMIC_AIOPS25_SERVICE.md](../docs/EvidRank_evolve/cross_compare_PV_CREST1_BASE_AIOPS25_SERVICE_vs_PV_CREST2_DYNAMIC_AIOPS25_SERVICE.md) | 2026-06-10T20:15:02+08:00 |
+| note | [docs/EvidRank_evolve/cross_compare_PV_CREST1_BASE_RCABENCH_FRESH_vs_PV_CREST2_DYNAMIC_RCABENCH.md](../docs/EvidRank_evolve/cross_compare_PV_CREST1_BASE_RCABENCH_FRESH_vs_PV_CREST2_DYNAMIC_RCABENCH.md) | 2026-06-10T20:15:21+08:00 |
+| note | [docs/EvidRank_evolve/cross_compare_PV_CREST2_DYNAMIC_AIOPS25_SERVICE_vs_PV_CREST3_REPRESENTATIVE_AIOPS25_SERVICE.md](../docs/EvidRank_evolve/cross_compare_PV_CREST2_DYNAMIC_AIOPS25_SERVICE_vs_PV_CREST3_REPRESENTATIVE_AIOPS25_SERVICE.md) | 2026-06-10T20:45:24+08:00 |
+| note | [docs/EvidRank_evolve/cross_compare_PV_CREST2_DYNAMIC_RCABENCH_vs_PV_CREST3_REPRESENTATIVE_RCABENCH.md](../docs/EvidRank_evolve/cross_compare_PV_CREST2_DYNAMIC_RCABENCH_vs_PV_CREST3_REPRESENTATIVE_RCABENCH.md) | 2026-06-10T20:45:44+08:00 |
 
 ### EvidRank-ARC
 
@@ -1109,6 +1121,30 @@ _Last refreshed: 2026-06-09T03:07:27+08:00_
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_PRIORITY_POWER2_TIER` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_PRIORITY_PRIOR` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_PRIORITY_SYNTH_LADDER` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_BASE_AIOPS25` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_BASE_AIOPS25_SERVICE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_BASE_FINAL_AIOPS25` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_BASE_FINAL_RCABENCH` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_BASE_RCABENCH` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_BASE_RCABENCH_FRESH` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_PARTIAL_AIOPS25_SERVICE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_PARTIAL_RCABENCH` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_PRE_AIOPS25_SERVICE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_PRE_RCABENCH` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_RESOURCE_AIOPS25` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_RESOURCE_RCABENCH` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_RESTORE_AIOPS25` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_RESTORE_RCABENCH` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_SURFACE_AIOPS25` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_SURFACE_RCABENCH` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST2_DYNAMIC_AIOPS25_SERVICE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST2_DYNAMIC_RCABENCH` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST2_ROLE_BROAD_AIOPS25_SERVICE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST2_ROLE_BROAD_RCABENCH` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST3_REPRESENTATIVE_AIOPS25_SERVICE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST3_REPRESENTATIVE_RCABENCH` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST_BASE_AIOPS25` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST_BASE_RCABENCH` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V1` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V10` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/V11` |
@@ -1219,6 +1255,14 @@ _Last refreshed: 2026-06-09T03:07:27+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/FW_PRIORITY_POWER2_TIER` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_PRIORITY_PRIOR` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_PRIORITY_SYNTH_LADDER` |
+| report | `output/rcabench-platform-v2/evolve_reports/PV_CREST1_BASE_AIOPS25_SERVICE` |
+| report | `output/rcabench-platform-v2/evolve_reports/PV_CREST1_BASE_RCABENCH_FRESH` |
+| report | `output/rcabench-platform-v2/evolve_reports/PV_CREST1_PARTIAL_AIOPS25_SERVICE` |
+| report | `output/rcabench-platform-v2/evolve_reports/PV_CREST1_PARTIAL_RCABENCH` |
+| report | `output/rcabench-platform-v2/evolve_reports/PV_CREST2_DYNAMIC_AIOPS25_SERVICE` |
+| report | `output/rcabench-platform-v2/evolve_reports/PV_CREST2_DYNAMIC_RCABENCH` |
+| report | `output/rcabench-platform-v2/evolve_reports/PV_CREST3_REPRESENTATIVE_AIOPS25_SERVICE` |
+| report | `output/rcabench-platform-v2/evolve_reports/PV_CREST3_REPRESENTATIVE_RCABENCH` |
 | report | `output/rcabench-platform-v2/evolve_reports/V1` |
 | report | `output/rcabench-platform-v2/evolve_reports/V10` |
 | report | `output/rcabench-platform-v2/evolve_reports/V11` |
@@ -1336,6 +1380,12 @@ _Last refreshed: 2026-06-09T03:07:27+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V7_vs_V8` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V8_vs_V9` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V9_vs_V10` |
+| report | `output/rcabench-platform-v2/evolve_reports/cross_compare_PV_CREST1_BASE_AIOPS25_SERVICE_vs_PV_CREST1_PARTIAL_AIOPS25_SERVICE` |
+| report | `output/rcabench-platform-v2/evolve_reports/cross_compare_PV_CREST1_BASE_AIOPS25_SERVICE_vs_PV_CREST2_DYNAMIC_AIOPS25_SERVICE` |
+| report | `output/rcabench-platform-v2/evolve_reports/cross_compare_PV_CREST1_BASE_RCABENCH_FRESH_vs_PV_CREST1_PARTIAL_RCABENCH` |
+| report | `output/rcabench-platform-v2/evolve_reports/cross_compare_PV_CREST1_BASE_RCABENCH_FRESH_vs_PV_CREST2_DYNAMIC_RCABENCH` |
+| report | `output/rcabench-platform-v2/evolve_reports/cross_compare_PV_CREST2_DYNAMIC_AIOPS25_SERVICE_vs_PV_CREST3_REPRESENTATIVE_AIOPS25_SERVICE` |
+| report | `output/rcabench-platform-v2/evolve_reports/cross_compare_PV_CREST2_DYNAMIC_RCABENCH_vs_PV_CREST3_REPRESENTATIVE_RCABENCH` |
 
 <!-- VIBE-INDEX:END -->
 

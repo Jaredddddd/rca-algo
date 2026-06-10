@@ -41,15 +41,54 @@ If the working tree contains a later accepted CREST variant, use the freshly
 verified current `crest` output as the no-regression baseline instead of these
 reference numbers.
 
-## Current Status
+## Current Working-Tree Status
+
+The resumed PV-CREST direction is now retained as historical analysis only.
+Per the user request after the cleanup review, all runtime CREST code changes
+from the AIOps25 optimization attempt were reverted to the pre-AIOps25
+optimization source state. The `AC@1 >= 0.70` target was not reached.
+
+Last verified PV-CREST experimental outputs before rollback:
+
+| dataset | version | total | error | AC@1 | MRR | AC@3 | AC@5 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `aiopschallenge2025_rcabench_service` | `PV_CREST3_REPRESENTATIVE_AIOPS25_SERVICE` | 230 | 0 | 0.526087 | 0.672613 | 0.782609 | 0.865217 |
+| `rcabench` | `PV_CREST3_REPRESENTATIVE_RCABENCH` | 1422 | 0 | 0.800281 | 0.875326 | 0.944444 | 0.971871 |
+
+PV_CREST2 introduced DyMo-style dynamic evidence selection and was the main
+safe gain in this resumed direction: AIOps25 AC@1 improved from `0.334783` to
+`0.526087` while RCABench stayed unchanged. PV_CREST3 added incident-local
+service representativeness for provenance atoms; it kept AIOps25 AC@1 unchanged
+but improved MRR, AC@3, and AC@5. These mechanisms were not retained in the
+default runtime code because they added too many hand-designed traces without
+reaching the AIOps25 target.
+
+Key PV-CREST documents:
+
+- [../pv-crest/PV_CREST1_iteration.md](../pv-crest/PV_CREST1_iteration.md)
+- [../pv-crest/PV_CREST2_iteration.md](../pv-crest/PV_CREST2_iteration.md)
+- [../pv-crest/PV_CREST3_analysis.md](../pv-crest/PV_CREST3_analysis.md)
+- [PV_CREST3_REPRESENTATIVE_AIOPS25_SERVICE_summary.md](../EvidRank_evolve/PV_CREST3_REPRESENTATIVE_AIOPS25_SERVICE_summary.md)
+- [PV_CREST3_REPRESENTATIVE_RCABENCH_summary.md](../EvidRank_evolve/PV_CREST3_REPRESENTATIVE_RCABENCH_summary.md)
+
+Historical code cleanup note before rollback:
+
+- A cleanup split had separated default CREST code from experimental variants,
+  but that code change was also reverted with the rest of the AIOps25 runtime
+  modifications.
+- The retained lesson is that default CREST should not import CERA/EvidenceRank
+  ordinal evidence energy, feature ladders, calibrated priors, or similar
+  hand-designed scorer traces.
+
+## Historical AIOPS Status
 
 This task is stopped after the user-defined three-round limit for the resumed
 adaptive-modality direction. The target `AC@1 >= 0.70` on
 `aiopschallenge2025_rcabench_service` was not reached without RCABench
 regression.
 
-The accepted default remains `CREST_AIOPS2`. Later ablations are documented but
-not promoted:
+Before the PV-CREST resumed direction, the accepted default was `CREST_AIOPS2`.
+Later AIOPS ablations are documented but not promoted:
 
 | version | registry | AIOps25 AC@1 | RCABench AC@1 | decision |
 | --- | --- | ---: | ---: | --- |
@@ -74,9 +113,9 @@ online selector must prove trace is not root-aligned before demoting a trace
 surface. Metric/log ownership alone is an insufficient proof because propagated
 symptoms can also create strong non-trace ownership.
 
-## Current Accepted Default
+## Historical Accepted Default
 
-`CREST_AIOPS2` is the current accepted default `crest`. It keeps the
+`CREST_AIOPS2` was the accepted default `crest` for the older AIOPS series. It keeps the
 incident-local trace structural confidence gate and adds a narrow unsupervised
 modality ownership arbitration step. Under weak trace reliability, a metric/log
 candidate can overtake a trace-surface winner only when it has joint metric and
