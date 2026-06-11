@@ -31,13 +31,14 @@ from src.evidencerank.crest import (
     CRESTLog,
     CRESTLogTrace,
     CRESTLocal,
+    CRESTMEO,
     CRESTMetric,
     CRESTMetricLog,
     CRESTMetricTrace,
     CRESTNoCF,
-    CRESTResidual,
     CRESTTrace,
 )
+from src.evidencerank.crest_residual import CRESTResidual
 
 if __name__ == "__main__":
     registry = global_algorithm_registry()
@@ -66,5 +67,6 @@ if __name__ == "__main__":
     registry["crest_local"] = CRESTLocal
     registry["crest_nocf"] = CRESTNoCF
     registry["crest_residual"] = CRESTResidual
+    registry["crest_meo"] = CRESTMEO
 
     main(enable_builtin_algorithms=False)

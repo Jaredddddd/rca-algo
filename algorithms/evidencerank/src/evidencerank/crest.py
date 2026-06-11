@@ -31,6 +31,9 @@ from .cera import (
     _load_input_frames,
     _series_service,
 )
+from .meo.dsl.schema import EvidenceOperatorSpec
+from .meo.runtime.instantiate import ROLE_ORDER, instantiate_meol_features
+from .meo.runtime.load_meol import DEFAULT_MEOL_PATH, load_operator_specs
 
 
 CREST_ROLE_FAMILIES: dict[str, tuple[str, ...]] = {
@@ -96,6 +99,10 @@ CREST_COUNTERFACTUAL_ITERATION_FAMILIES = tuple(
 
 CREST_CASE_SCALE_CLIP = 3.0
 CREST_DENOISED_CHANNEL_EXCLUDES = frozenset({"trace_duration_z"})
+ROLE_MUTATION = ROLE_ORDER.index("mutation")
+ROLE_PROPAGATION = ROLE_ORDER.index("propagation")
+ROLE_OBSERVABILITY_BIAS = ROLE_ORDER.index("observability_bias")
+ROLE_TOPOLOGY_CONTEXT = ROLE_ORDER.index("topology_context")
 
 
 def _finite_nonnegative_array(values: np.ndarray) -> np.ndarray:
@@ -228,6 +235,59 @@ def _trace_density_context_weight(
     return 1.0 / (1.0 + average_edge_degree)
 
 
+def _meo_role_vectors(
+    feature_matrix: np.ndarray,
+    role_weight_matrix: np.ndarray,
+) -> dict[str, np.ndarray]:
+    """Project MEOL feature columns into CREST role vectors."""
+
+    row_count = int(feature_matrix.shape[0]) if feature_matrix.ndim == 2 else 0
+    zeros = np.zeros(row_count, dtype=np.float64)
+    if (
+        feature_matrix.ndim != 2
+        or role_weight_matrix.ndim != 2
+        or feature_matrix.shape[1] == 0
+        or role_weight_matrix.shape[0] != feature_matrix.shape[1]
+        or role_weight_matrix.shape[1] < len(ROLE_ORDER)
+    ):
+        return {
+            "mutation": zeros.copy(),
+            "propagation": zeros.copy(),
+            "observability_bias": zeros.copy(),
+            "topology_context": zeros.copy(),
+        }
+
+    clean_features = _finite_nonnegative_array(feature_matrix)
+    clean_weights = np.nan_to_num(
+        role_weight_matrix.astype(np.float64, copy=False),
+        nan=0.0,
+        posinf=0.0,
+        neginf=0.0,
+    )
+    clean_weights = np.maximum(clean_weights, 0.0)
+    return {
+        "mutation": _finite_nonnegative_array(clean_features @ clean_weights[:, ROLE_MUTATION]),
+        "propagation": _finite_nonnegative_array(clean_features @ clean_weights[:, ROLE_PROPAGATION]),
+        "observability_bias": _finite_nonnegative_array(
+            clean_features @ clean_weights[:, ROLE_OBSERVABILITY_BIAS]
+        ),
+        "topology_context": _finite_nonnegative_array(
+            clean_features @ clean_weights[:, ROLE_TOPOLOGY_CONTEXT]
+        ),
+    }
+
+
+def _filter_meo_specs_for_modalities(
+    specs: list[EvidenceOperatorSpec],
+    enabled_modalities: frozenset[str],
+) -> list[EvidenceOperatorSpec]:
+    return [
+        spec
+        for spec in specs
+        if spec.source in enabled_modalities or spec.source == "topology"
+    ]
+
+
 def _apply_counterfactual_explain_away_once(
     services: list[str],
     structural_energy: np.ndarray,
@@ -315,6 +375,94 @@ def _apply_counterfactual_explain_away(
             adjusted,
             role_matrix,
             enabled_features,
+            trace_edges,
+        )
+        if np.linalg.norm(updated - adjusted) <= 1e-12 * (
+            np.linalg.norm(adjusted) + 1e-12
+        ):
+            return updated
+        adjusted = updated
+    return adjusted
+
+
+def _apply_counterfactual_explain_away_once_soft(
+    services: list[str],
+    structural_energy: np.ndarray,
+    mutation: np.ndarray,
+    propagation: np.ndarray,
+    trace_edges: list[tuple[str, str]],
+) -> np.ndarray:
+    if not trace_edges or structural_energy.size == 0:
+        return structural_energy
+
+    service_to_idx = {service: idx for idx, service in enumerate(services)}
+    adjusted = structural_energy.astype(np.float64, copy=True)
+    clean_mutation = _finite_nonnegative_array(mutation)
+    clean_propagation = _finite_nonnegative_array(propagation)
+    best_by_victim: dict[int, tuple[int, int, float]] = {}
+
+    def add_pair(root_idx: int, victim_idx: int) -> None:
+        if root_idx == victim_idx or adjusted[victim_idx] <= adjusted[root_idx]:
+            return
+
+        mutation_excess = max(
+            0.0,
+            float(clean_mutation[root_idx] - clean_mutation[victim_idx]),
+        )
+        propagation_excess = max(
+            0.0,
+            float(clean_propagation[victim_idx] - clean_propagation[root_idx]),
+        )
+        if mutation_excess <= 0.0 or propagation_excess <= 0.0:
+            return
+
+        mutation_share = mutation_excess / (
+            float(clean_mutation[root_idx] + clean_mutation[victim_idx]) + 1e-12
+        )
+        propagation_share = propagation_excess / (
+            float(clean_propagation[victim_idx] + clean_propagation[root_idx]) + 1e-12
+        )
+        transfer = (
+            float(adjusted[victim_idx] - adjusted[root_idx])
+            * mutation_share
+            * propagation_share
+        )
+        if not math.isfinite(transfer) or transfer <= 0.0:
+            return
+
+        current = best_by_victim.get(victim_idx)
+        if current is None or transfer > current[2]:
+            best_by_victim[victim_idx] = (root_idx, victim_idx, transfer)
+
+    for parent, child in trace_edges:
+        parent_idx = service_to_idx.get(parent)
+        child_idx = service_to_idx.get(child)
+        if parent_idx is None or child_idx is None:
+            continue
+        add_pair(parent_idx, child_idx)
+        add_pair(child_idx, parent_idx)
+
+    for root_idx, victim_idx, transfer in best_by_victim.values():
+        adjusted[root_idx] += transfer
+        adjusted[victim_idx] -= transfer
+    return np.maximum(adjusted, 0.0)
+
+
+def _apply_counterfactual_explain_away_soft(
+    services: list[str],
+    structural_energy: np.ndarray,
+    mutation: np.ndarray,
+    propagation: np.ndarray,
+    trace_edges: list[tuple[str, str]],
+    max_iter: int = len(CREST_COUNTERFACTUAL_ITERATION_FAMILIES),
+) -> np.ndarray:
+    adjusted = structural_energy.astype(np.float64, copy=True)
+    for _step in range(max_iter):
+        updated = _apply_counterfactual_explain_away_once_soft(
+            services,
+            adjusted,
+            mutation,
+            propagation,
             trace_edges,
         )
         if np.linalg.norm(updated - adjusted) <= 1e-12 * (
@@ -482,35 +630,74 @@ def score_crest_services(
     input_folder: Path,
     enabled_modalities: frozenset[str] = ALL_MODALITIES,
     graph_mode: str = "counterfactual",
+    use_meo: bool = False,
+    meol_path: Path | None = None,
 ) -> pd.DataFrame:
     frames = _load_input_frames(input_folder)
     services = _collect_services_from_frames(frames)
     if not services:
         return pd.DataFrame(columns=["service", "A", "F", "S", "score"])
 
-    enabled_feature_set = frozenset().union(
-        *(MODALITY_FEATURES[modality] for modality in enabled_modalities)
-    )
-    enabled_features = tuple(
-        feature
-        for feature in BASE_FEATURE_NAMES
-        if feature in enabled_feature_set
-    )
-    matrix, trace_edges = _build_feature_matrix(
-        frames,
-        services,
-        enabled_features,
-        enabled_modalities,
-        normalize=True,
-    )
-    case_matrix = _robust_case_feature_matrix(matrix)
-    role_matrix = _apply_arc_trace_endpoint_support_gate(enabled_features, case_matrix)
-    local_energy = _local_family_energy(
-        role_matrix,
-        enabled_features,
-        include_topology=True,
-    )
-    local_abnormality = _saturating_incident_scale(local_energy)
+    mutation = np.zeros(len(services), dtype=np.float64)
+    propagation = np.zeros(len(services), dtype=np.float64)
+    if use_meo:
+        try:
+            specs = _filter_meo_specs_for_modalities(
+                load_operator_specs(meol_path or DEFAULT_MEOL_PATH),
+                enabled_modalities,
+            )
+            meo_matrix, _meo_features, role_weight_matrix = instantiate_meol_features(
+                frames,
+                services,
+                specs,
+            )
+            _empty_matrix, trace_edges = _build_feature_matrix(
+                frames,
+                services,
+                (),
+                enabled_modalities,
+                normalize=False,
+            )
+            case_matrix = _robust_case_feature_matrix(meo_matrix)
+            role_vectors = _meo_role_vectors(case_matrix, role_weight_matrix)
+            mutation = role_vectors["mutation"]
+            propagation = role_vectors["propagation"]
+            observability_bias = role_vectors["observability_bias"]
+            topology_context = role_vectors["topology_context"]
+            local_energy = np.maximum(
+                mutation + propagation + observability_bias + topology_context,
+                0.0,
+            )
+            local_abnormality = _saturating_incident_scale(local_energy)
+            if not np.any(local_abnormality > 0.0):
+                use_meo = False
+        except Exception:
+            use_meo = False
+
+    if not use_meo:
+        enabled_feature_set = frozenset().union(
+            *(MODALITY_FEATURES[modality] for modality in enabled_modalities)
+        )
+        enabled_features = tuple(
+            feature
+            for feature in BASE_FEATURE_NAMES
+            if feature in enabled_feature_set
+        )
+        matrix, trace_edges = _build_feature_matrix(
+            frames,
+            services,
+            enabled_features,
+            enabled_modalities,
+            normalize=True,
+        )
+        case_matrix = _robust_case_feature_matrix(matrix)
+        role_matrix = _apply_arc_trace_endpoint_support_gate(enabled_features, case_matrix)
+        local_energy = _local_family_energy(
+            role_matrix,
+            enabled_features,
+            include_topology=True,
+        )
+        local_abnormality = _saturating_incident_scale(local_energy)
 
     graph = _weighted_trace_graph(frames, services) if "trace" in enabled_modalities else {}
     denoised_support = np.zeros_like(local_abnormality, dtype=np.float64)
@@ -519,11 +706,14 @@ def score_crest_services(
     elif graph_mode == "pagerank":
         explanatory_power = _pagerank_explanatory_power(local_abnormality, graph)
     else:
-        structural_seed = _local_family_energy(
-            role_matrix,
-            enabled_features,
-            include_topology=True,
-        )
+        if use_meo:
+            structural_seed = local_energy.copy()
+        else:
+            structural_seed = _local_family_energy(
+                role_matrix,
+                enabled_features,
+                include_topology=True,
+            )
         context_weight = _trace_density_context_weight(services, trace_edges)
         structural_energy = _apply_parent_context(
             services,
@@ -531,30 +721,43 @@ def score_crest_services(
             trace_edges,
             context_weight,
         )
-        structural_energy = _apply_counterfactual_explain_away(
-            services,
-            np.maximum(structural_energy, 0.0),
-            role_matrix,
-            enabled_features,
-            trace_edges,
-        )
-        explanatory_power = _saturating_incident_scale(structural_energy)
+        if use_meo:
+            structural_energy = _apply_counterfactual_explain_away_soft(
+                services,
+                np.maximum(structural_energy, 0.0),
+                mutation,
+                propagation,
+                trace_edges,
+            )
+            explanatory_power = _saturating_incident_scale(structural_energy)
+            denoised_support = _saturating_incident_scale(
+                np.maximum(mutation + propagation, 0.0)
+            )
+        else:
+            structural_energy = _apply_counterfactual_explain_away(
+                services,
+                np.maximum(structural_energy, 0.0),
+                role_matrix,
+                enabled_features,
+                trace_edges,
+            )
+            explanatory_power = _saturating_incident_scale(structural_energy)
 
-        denoised_energy = _denoised_channel_energy(role_matrix, enabled_features)
-        denoised_structural = _apply_parent_context(
-            services,
-            denoised_energy,
-            trace_edges,
-            context_weight,
-        )
-        denoised_structural = _apply_counterfactual_explain_away(
-            services,
-            np.maximum(denoised_structural, 0.0),
-            role_matrix,
-            enabled_features,
-            trace_edges,
-        )
-        denoised_support = _saturating_incident_scale(denoised_structural)
+            denoised_energy = _denoised_channel_energy(role_matrix, enabled_features)
+            denoised_structural = _apply_parent_context(
+                services,
+                denoised_energy,
+                trace_edges,
+                context_weight,
+            )
+            denoised_structural = _apply_counterfactual_explain_away(
+                services,
+                np.maximum(denoised_structural, 0.0),
+                role_matrix,
+                enabled_features,
+                trace_edges,
+            )
+            denoised_support = _saturating_incident_scale(denoised_structural)
 
     score = local_abnormality * explanatory_power
     if graph_mode == "counterfactual":
@@ -583,6 +786,8 @@ class CREST(Algorithm):
 
     _modalities: frozenset[str] = ALL_MODALITIES
     _graph_mode = "counterfactual"
+    _use_meo = False
+    _meol_path: Path | None = None
 
     def needs_cpu_count(self) -> int | None:
         return 1
@@ -593,11 +798,20 @@ class CREST(Algorithm):
             args.input_folder,
             enabled_modalities=self._modalities,
             graph_mode=self._graph_mode,
+            use_meo=self._use_meo,
+            meol_path=self._meol_path,
         )
         return [
             AlgorithmAnswer(level="service", name=str(row.service), rank=rank)
             for rank, row in enumerate(ranking.itertuples(index=False), start=1)
         ]
+
+
+class CRESTMEO(CREST):
+    """CREST-MEO ranking with a JSON Meta Evidence Operator Library."""
+
+    _use_meo = True
+    _meol_path: Path | None = None
 
 
 class CRESTLocal(CREST):

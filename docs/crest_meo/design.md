@@ -1773,6 +1773,81 @@ if __name__ == "__main__":
 
 ---
 
+## 11.1 Config-driven LLM Synthesis 当前实现
+
+当前实现已经把 LLM synthesis 从简单 `--mock` 脚本升级为 config-driven offline
+pipeline。配置文件位置：
+
+```text
+algorithms/evidencerank/src/evidencerank/meo/llm/config.yaml
+```
+
+默认配置：
+
+```yaml
+synthesis:
+  mode: mock
+  allow_real_llm: false
+llm:
+  provider: mock
+```
+
+因此默认运行不会调用任何真实 LLM。mock 内容统一放在：
+
+```text
+algorithms/evidencerank/src/evidencerank/meo/llm/mock_outputs.py
+```
+
+包括：
+
+- `mock_meol()`
+- mock artifact summary
+- mock telemetry schema
+- mock mechanism catalog
+
+CLI：
+
+```bash
+uv run --package evidencerank python -m meo.llm.synthesize \
+  --config algorithms/evidencerank/src/evidencerank/meo/llm/config.yaml \
+  --mock \
+  --output /tmp/default_meol.json
+```
+
+这个 CLI 会执行完整离线流程：
+
+```text
+config.yaml
+  -> artifact / telemetry / mechanism prompt context
+  -> DSL-constrained prompt
+  -> mock or real LLM client
+  -> MEOL JSON
+  -> static verifier
+  -> leakage verifier
+  -> frozen output JSON
+```
+
+真实 LLM 路径已经预留，但需要双重显式开启：
+
+1. config 中设置 `synthesis.mode=real`、`synthesis.allow_real_llm=true`、
+   `llm.provider=openai`、`llm.model=<your model>`；
+2. CLI 传入 `--allow-real-llm`。
+
+这样可以防止测试、benchmark eval 或在线 CREST-MEO 路径误触发外部调用。
+
+如果需要把某个 incident 的 telemetry schema 喂给 prompt，可使用：
+
+```bash
+uv run --package evidencerank python -m meo.llm.synthesize \
+  --mock \
+  --input-folder data/rcabench-platform-v2/data/rcabench/<datapack> \
+  --output /tmp/default_meol.json
+```
+
+`--input-folder` 只做 schema summary，不把 row-level telemetry 或 GT 写入 prompt。
+
+---
+
 ## 12. Artifact Mining 第一版
 
 第一版可以只实现 telemetry schema mining，不做完整 source code parser。
@@ -2112,3 +2187,253 @@ frames = {
 8. 第一版不要追求覆盖所有字段，先跑通核心 operators。
 9. 所有输出必须 finite、non-negative。
 10. 保留原始 hard-coded CREST 作为 baseline 和 ablation。
+
+---
+
+## 20. Oracle Evidence Operators / Raw-Telemetry Upper Bound
+
+Oracle evidence operators 是专门用于离线研究和论文上限分析的泄漏型
+artifact。它们可以读取 RCABench 的 service-level GT label，但读取只发生在
+`VibeResearchTools/` 的离线 synthesis 阶段，不允许进入 `default_meol.json`、
+`CRESTMEO` 在线路径、benchmark 正式提交路径或任何无标签/可部署算法路径。
+
+当前主 Oracle 的语义是：
+
+```text
+从 raw telemetry 自动生成一批全 benchmark 通用 evidence operators，
+再用 GT 离线选择最能提升 AC@1 的全局 operator + role + counterfactual 配置。
+```
+
+它模拟的是“离线 MEO/LLM 如果能从 telemetry schema 和机制语义中生成最好的通用
+operator library，会得到什么上限”，而不是“每个 incident 直接查 GT”。
+
+### 20.1 目的
+
+Raw-telemetry Oracle artifact 用于回答：
+
+```text
+如果允许用整个 benchmark 的 GT label 离线选择通用 evidence operators 和角色，
+但每个 operator 的取值仍只能来自 raw normal/abnormal telemetry，
+CREST-MEO role-vector + counterfactual ranking 可以达到什么上限？
+```
+
+它用于：
+
+1. 给 CREST、默认 CREST-MEO 和 future LLM-MEO 做 upper-bound 对照；
+2. 检查当前 telemetry schema 能否表达更强的 RCA evidence；
+3. 验证 MEOL/feature-matrix/role-vector/counterfactual pipeline 是否能消费全局 operator library；
+4. 为论文叙事区分“在线无标签算法”与“离线 Oracle 角色合成上限”。
+
+### 20.2 严格隔离规则
+
+Oracle artifact 必须满足：
+
+1. 只由 `VibeResearchTools/crest_meo_universal_oracle.py` 生成；
+2. 可以读取 `labels.csv`，但只能用于离线 operator/role selection objective；
+3. feature values 只由 raw telemetry 计算，不能由 GT、fault type 或历史排名计算；
+4. 不读取 `conclusion.parquet`；
+5. 不读取历史 `output.parquet` / `perf.parquet` 作为候选 evidence；
+6. 不写入 `algorithms/evidencerank/src/evidencerank/meo/library/default_meol.json`；
+7. 不被 `score_crest_services(..., use_meo=True)` 默认加载；
+8. JSON metadata 中必须显式标注 `uses_gt_labels=true`、
+   `not_for_online_ranking=true` 和 `intentionally_leaky=true`；
+9. 任何基于 Oracle 的分数不能作为正式算法结果汇报，只能作为 upper bound。
+
+明确禁止：
+
+```text
+per-incident GT signal
+service-name weight
+GT telemetry feature bank
+historical run result feature
+datapack / fault / service name rule
+```
+
+### 20.3 Candidate Operator Pool
+
+候选 operator pool 是全局的，由 schema / dtype / alias / coverage 规则自动枚举：
+
+1. `crest_feature`
+   当前 CREST 的 21 个基础 telemetry features。
+
+2. `meol_operator`
+   default MEOL 中的 10 个机制化 operators。当前离线工具为了速度复用与 CREST
+   feature 同名的列；无法映射的 operator 返回零列，不会 crash。
+
+3. `raw_metric_value`
+   从 raw metrics 中扫描覆盖足够多 incident 的 metric name，并枚举
+   `z_shift`、`robust_z_shift`、`mean_delta`。
+
+4. `raw_metric_row_count` / `raw_trace_row_count` / `raw_log_row_count`
+   对 metric、trace、log 的 service-level row count 枚举
+   `count_delta`、`count_rise`、`count_drop`。
+
+5. `raw_trace_categorical`
+   对 status/code/endpoint/route/span/method 等 trace categorical 字段计算
+   distribution shift。
+
+6. `raw_trace_error_rate`
+   对 status-like trace 字段计算 error-rate delta。
+
+7. `raw_trace_numeric`
+   对 duration/latency/elapsed 等 trace numeric 字段计算
+   `z_shift`、`robust_z_shift`、`mean_delta`。
+
+8. `raw_log_categorical`
+   对 template/level/severity/message-template 等 log 字段计算 distribution shift。
+
+9. `raw_topology_edge_count` / `raw_topology_distribution`
+   从 raw trace edges 计算 edge count rise/drop/delta 和 caller/callee distribution shift。
+
+字段选择只依赖 schema、dtype、alias 和最小覆盖率，不使用服务名、datapack 名、
+fault 名或任何 per-incident GT 规则。
+
+### 20.4 Offline Optimization
+
+离线合成流程：
+
+1. 对所有 incident 一次性提取候选 feature matrices；
+2. 每个 incident 内使用 CREST 的 `_robust_case_feature_matrix` 做 case scaling；
+3. seed 配置来自当前 CREST role families 和 default MEOL role priors；
+4. 用单 feature rank proxy 筛选候选；
+5. 用 deterministic greedy 加入能提升目标的 operator/role；
+6. 用 coordinate search 优化 selected operators 的 role assignment；
+7. prune 删除不伤 objective 的 operator。
+
+目标函数严格按下面顺序比较：
+
+```text
+AC@1 -> MRR -> AC@3 -> AC@5 -> fewer selected operators
+```
+
+评分路径使用 CREST-MEO role-vector 语义：
+
+```text
+mutation = feature_matrix @ role_weight_matrix[:, mutation]
+propagation = feature_matrix @ role_weight_matrix[:, propagation]
+observability_bias = feature_matrix @ role_weight_matrix[:, observability_bias]
+topology_context = feature_matrix @ role_weight_matrix[:, topology_context]
+local_abnormality = saturating(mutation + propagation + observability_bias + topology_context)
+score = local_abnormality * explanatory_power + denoised_support
+```
+
+其中 `explanatory_power` 使用当前 CREST parent-context 和 MEO soft counterfactual
+explain-away 逻辑。GT 只用于比较不同全局配置的 hit@k，不参与任何 incident 的
+feature value 计算。
+
+### 20.5 主 Artifact 语义
+
+默认输出：
+
+```text
+output/rcabench-platform-v2/crest_meo_oracle/oracle_evidence_operators.json
+```
+
+文件类型：
+
+```text
+artifact_type = oracle_raw_telemetry_operator_synthesis
+oracle_scope = global_raw_telemetry_operator_and_role_synthesis
+```
+
+主 artifact 包含：
+
+- 全局 operator specs；
+- 每个 operator 的 `selected` 标记；
+- learned `role_prior`；
+- `role_families`；
+- `counterfactual_mutation_features`；
+- `counterfactual_propagation_features`；
+- candidate-space metadata；
+- synthesis metrics 和 search history；
+- policy flags，标明 GT 只用于离线 synthesis。
+
+主 artifact 不包含：
+
+- `cases`；
+- per-incident GT vector；
+- service-name weight；
+- telemetry feature bank keyed by GT；
+- historical output/rank references；
+- datapack-specific lookup table。
+
+### 20.6 生成命令与当前结果
+
+当前全量生成命令：
+
+```bash
+uv run --package evidencerank python VibeResearchTools/crest_meo_universal_oracle.py \
+  --dataset rcabench \
+  --workers 32 \
+  --max-candidates 40 \
+  --coordinate-passes 1
+```
+
+实际运行耗时：
+
+```text
+elapsed=55:30.40
+```
+
+当前结果：
+
+```text
+total=1422
+error=0
+operator_count=208
+selected_operator_count=24
+AC@1=0.890999
+MRR=0.931160
+AC@3=0.969058
+AC@5=0.988748
+```
+
+Selected operator 分布：
+
+```text
+operator_family:
+  crest_feature=11
+  meol_operator=4
+  raw_metric_value=6
+  raw_trace_numeric=2
+  raw_log_categorical=1
+
+source:
+  metric=8
+  trace=11
+  log=5
+
+role:
+  mutation=8
+  propagation=6
+  observability_bias=8
+  topology_context=2
+```
+
+Reference 输出：
+
+```text
+output/rcabench-platform-v2/data/rcabench/<datapack>/crest_meo_oracle_role_synthesis/output.parquet
+output/rcabench-platform-v2/data/rcabench/<datapack>/crest_meo_oracle_role_synthesis/perf.parquet
+output/rcabench-platform-v2/crest_meo_oracle/role_synthesis_reference_result_summary.json
+```
+
+### 20.7 Deprecated Oracle Variants
+
+之前的 case-indicator artifact 只保留为 pipeline sanity check，不是论文主 Oracle。
+它直接把 service-level GT signal 写入 per-incident artifact，因此不能代表
+MEO 能生成的 operator library。
+
+之前的 service-name calibration / GT telemetry prototype-bank 版本也作废。它们虽然
+可以被描述为 benchmark-level shared features，但仍然把 GT 服务身份或 GT telemetry
+样本库编码进 feature space，不符合当前 Oracle 定义。后续论文和实验默认只使用
+`artifact_type=oracle_raw_telemetry_operator_synthesis` 的 raw-telemetry synthesis
+artifact。
+
+旧脚本和输出路径只用于 sanity check：
+
+```text
+VibeResearchTools/crest_meo_oracle.py
+VibeResearchTools/crest_meo_oracle_reference.py
+output/rcabench-platform-v2/crest_meo_oracle/case_indicator_oracle.json
+```

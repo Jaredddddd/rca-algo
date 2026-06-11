@@ -1,0 +1,317 @@
+{
+  "library_name": "crest-meol-default-v1",
+  "dsl_version": "1.0",
+  "generator": {
+    "type": "mock_llm",
+    "prompt_version": "meo_operator_synthesis_v1",
+    "telemetry_only": true,
+    "deterministic_runtime": true
+  },
+  "roles": [
+    "mutation",
+    "propagation",
+    "observability_bias",
+    "topology_context"
+  ],
+  "operators": [
+    {
+      "name": "metric_max_z",
+      "source": "metric",
+      "entity": "service",
+      "signal": {
+        "field": "*",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "max"
+      },
+      "role_prior": {
+        "mutation": 0.45,
+        "propagation": 0.3,
+        "observability_bias": 0.15,
+        "topology_context": 0.1
+      },
+      "mechanism": "resource or performance magnitude shift",
+      "required_fields": [
+        "time",
+        "service_name",
+        "value"
+      ],
+      "rationale": "Large metric z shifts indicate service-local state deviation, while retaining propagation and volume uncertainty."
+    },
+    {
+      "name": "metric_count_drop_shift",
+      "source": "metric",
+      "entity": "service",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_drop",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 0.75,
+        "propagation": 0.1,
+        "observability_bias": 0.15,
+        "topology_context": 0.0
+      },
+      "mechanism": "service hang or telemetry disappearance",
+      "required_fields": [
+        "time",
+        "service_name"
+      ],
+      "rationale": "A sharp drop in service metric observations can indicate stopped processing or reporting."
+    },
+    {
+      "name": "trace_status_code_shift",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "status_code",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "role_prior": {
+        "mutation": 0.85,
+        "propagation": 0.1,
+        "observability_bias": 0.05,
+        "topology_context": 0.0
+      },
+      "mechanism": "interface failure",
+      "required_fields": [
+        "service_name",
+        "status_code"
+      ],
+      "rationale": "A status-code distribution shift reflects interface behavior changes at service granularity."
+    },
+    {
+      "name": "trace_error_rate",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "status_code",
+        "type": "rate"
+      },
+      "contrast": {
+        "operator": "error_rate_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 0.8,
+        "propagation": 0.15,
+        "observability_bias": 0.05,
+        "topology_context": 0.0
+      },
+      "mechanism": "interface failure",
+      "required_fields": [
+        "service_name",
+        "status_code"
+      ],
+      "rationale": "A change in error status rate is a compact interface failure signal."
+    },
+    {
+      "name": "trace_endpoint_shift",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "endpoint",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "role_prior": {
+        "mutation": 0.75,
+        "propagation": 0.2,
+        "observability_bias": 0.05,
+        "topology_context": 0.0
+      },
+      "mechanism": "endpoint behavior change",
+      "required_fields": [
+        "service_name",
+        "endpoint"
+      ],
+      "rationale": "A changed endpoint mix suggests altered service interface behavior."
+    },
+    {
+      "name": "trace_duration_delta",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "duration",
+        "type": "duration"
+      },
+      "contrast": {
+        "operator": "robust_z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "max"
+      },
+      "role_prior": {
+        "mutation": 0.2,
+        "propagation": 0.75,
+        "observability_bias": 0.05,
+        "topology_context": 0.0
+      },
+      "mechanism": "latency propagation",
+      "required_fields": [
+        "service_name",
+        "duration"
+      ],
+      "rationale": "Latency shifts are often amplified along dependencies and are treated primarily as propagated symptoms."
+    },
+    {
+      "name": "trace_count_rise_shift",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_rise",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 0.2,
+        "propagation": 0.7,
+        "observability_bias": 0.1,
+        "topology_context": 0.0
+      },
+      "mechanism": "retry or traffic amplification",
+      "required_fields": [
+        "service_name"
+      ],
+      "rationale": "A trace count rise can reflect retries, fan-out, or propagated pressure."
+    },
+    {
+      "name": "trace_count_drop_shift",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_drop",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 0.75,
+        "propagation": 0.15,
+        "observability_bias": 0.1,
+        "topology_context": 0.0
+      },
+      "mechanism": "service hang or request handling failure",
+      "required_fields": [
+        "service_name"
+      ],
+      "rationale": "A sharp trace activity drop can indicate stopped request handling."
+    },
+    {
+      "name": "log_count_delta",
+      "source": "log",
+      "entity": "service",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 0.35,
+        "propagation": 0.55,
+        "observability_bias": 0.1,
+        "topology_context": 0.0
+      },
+      "mechanism": "software event volume shift",
+      "required_fields": [
+        "service_name"
+      ],
+      "rationale": "Log volume changes can indicate local software events or propagated error handling."
+    },
+    {
+      "name": "log_template_delta",
+      "source": "log",
+      "entity": "service",
+      "signal": {
+        "field": "template",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "role_prior": {
+        "mutation": 0.45,
+        "propagation": 0.45,
+        "observability_bias": 0.1,
+        "topology_context": 0.0
+      },
+      "mechanism": "software event distribution shift",
+      "required_fields": [
+        "service_name",
+        "template"
+      ],
+      "rationale": "A log-template distribution shift indicates changed software behavior that can be local or propagated."
+    }
+  ]
+}
+
