@@ -214,14 +214,110 @@ max_metric_names=60
 min_case_coverage=3
 ```
 
-`operators`
-: 最核心的列表，长度为 `operator_count=208`。它保存所有候选 operator，不只是最终
-  选中的 24 个。每个元素都是一个 operator spec + synthesis result。
+这段 `candidate_space` 可以理解为：这次离线 Oracle synthesis 在多大的“证据算子候选池”里搜索，以及这个候选池怎么被扫描出来。
 
-`selected_operator_count`
-: 最终启用的 operator 数量。本次为 `24`。判断某个 operator 是否进入最终 Oracle
-  library，应看 operator 内部的 `selected` 字段，而不是只看它是否出现在
-  `operators` 列表中。
+对应文件是 [oracle_evidence_operators.json](/home/ljw/paper/aegis/rca-algo-contrib/output/rcabench-platform-v2/crest_meo_oracle/oracle_evidence_operators.json:26)，生成逻辑在 [crest_meo_universal_oracle.py](/home/ljw/paper/aegis/rca-algo-contrib/VibeResearchTools/crest_meo_universal_oracle.py:1636)。
+
+```json
+"candidate_space": {
+  "crest_feature_count": 21,
+  "meol_operator_count": 10,
+  "total_operator_count": 208,
+  "raw_operator_count": 177,
+  "max_scan_incidents": 120,
+  "max_metric_names": 60,
+  "min_case_coverage": 3
+}
+```
+
+含义如下：
+
+`crest_feature_count=21`
+
+表示把现有 CREST/CERA 内置的 21 个派生 feature 纳入候选池，例如 `metric_mean_z`、`trace_status_code_shift`、`log_error_rate`、`topology_in_degree` 等。它们在 JSON 里命名为：
+
+```text
+crest::<feature_name>
+```
+
+`meol_operator_count=10`
+
+表示从 [default_meol.json](/home/ljw/paper/aegis/rca-algo-contrib/algorithms/evidencerank/src/evidencerank/meo/library/default_meol.json) 读入了 10 个已有 MEOL operator，作为候选 evidence operator。它们命名为：
+
+```text
+meol::<operator_name>
+```
+
+`raw_operator_count=177`
+
+表示脚本还从 raw telemetry schema 中自动合成了 177 个 raw operator。这些不是现成 CREST feature，而是从原始 metric / trace / log / topology 字段构造出来的候选信号，比如：
+
+```text
+raw_metric::<metric_name>::z_shift
+raw_metric::<metric_name>::robust_z_shift
+raw_metric::<metric_name>::mean_delta
+raw_trace::<column>::distribution_shift
+raw_log::<column>::distribution_shift
+raw_trace::duration::mean_delta
+```
+
+我用当前 JSON 数了一下，177 个 raw operator 大致分解为：
+
+```text
+raw_metric_value              144
+raw_metric_row_count            3
+raw_trace_row_count             3
+raw_log_row_count               3
+raw_trace_categorical           5
+raw_trace_error_rate            2
+raw_trace_numeric               9
+raw_log_categorical             3
+raw_topology_edge_count         3
+raw_topology_distribution       2
+```
+
+`total_operator_count=208`
+
+就是总候选数：
+
+```text
+21 CREST features
++ 10 MEOL operators
++ 177 raw telemetry operators
+= 208 total operators
+```
+
+注意：这不是最终启用的 operator 数。当前 JSON 里最终 `selected_operator_count` 是 24。也就是说，Oracle 在 208 个候选里搜索，最后选中了 24 个，并给它们分配 `mutation`、`propagation`、`observability_bias`、`topology_context` 等角色。
+
+`max_scan_incidents=120`
+
+表示 raw operator 的 schema discovery 最多只扫描前 120 个 incident/datapack。这个参数用于控制候选池生成成本，不代表最终评估只用了 120 个 case。
+
+`max_metric_names=60`
+
+表示扫描 raw metric 时，最多保留 60 个 metric name 进入候选生成。每个 metric name 通常会派生多个 contrast operator，例如：
+
+```text
+z_shift
+robust_z_shift
+mean_delta
+```
+
+这次实际生成了 144 个 `raw_metric_value` operator，所以等价于实际保留了 48 个 metric names：
+
+```text
+48 metric names × 3 contrasts = 144 raw metric value operators
+```
+
+`min_case_coverage=3`
+
+表示一个 raw 字段或 metric name 至少要出现在 3 个 incident 中，才有资格进入候选池。这个门槛用来过滤只在极少数 case 出现的偶然字段，避免候选池过度数据集碎片化。
+
+一句话概括：这段不是算法结果，而是 Oracle 离线搜索的“候选证据空间说明”。它说的是：本次 Oracle 从 21 个现有 CREST feature、10 个 MEOL operator、177 个 raw telemetry 合成 operator，共 208 个候选中，利用 GT 做离线 upper-bound synthesis，最终挑出一组全局 operator/role 组合。
+
+
+
+
 
 `role_families`
 : 按最终 role 分组后的 selected operator names。它是从 `operators` 中
@@ -235,6 +331,15 @@ min_case_coverage=3
 `counterfactual_propagation_features`
 : 最终用于 MEO soft counterfactual explain-away 的 propagation feature names。
   当前等价于 `role_families["propagation"]`。
+
+`operators`
+: 最核心的列表，长度为 `operator_count=208`。它保存所有候选 operator，不只是最终
+  选中的 24 个。每个元素都是一个 operator spec + synthesis result。
+
+`selected_operator_count`
+: 最终启用的 operator 数量。本次为 `24`。判断某个 operator 是否进入最终 Oracle
+  library，应看 operator 内部的 `selected` 字段，而不是只看它是否出现在
+  `operators` 列表中。
 
 `metrics`
 : 使用最终 selected operators 和 CREST-MEO scoring path 对全量 benchmark 生成
@@ -852,6 +957,152 @@ output/rcabench-platform-v2/data/rcabench/<datapack>/crest_meo_oracle_role_synth
 output/rcabench-platform-v2/data/rcabench/<datapack>/crest_meo_oracle_role_synthesis/perf.parquet
 output/rcabench-platform-v2/crest_meo_oracle/role_synthesis_reference_result_summary.json
 ```
+
+## Generic-Template Oracle Ablation
+
+有一个更保守的可迁移性问题需要单独回答：
+
+```text
+如果认为 raw_metric::<具体 metric name>::* 属于当前 benchmark schema binding，
+不把它们计入通用 operator library，那么只保留通用 operator templates 时，
+Oracle 上限有多高？
+```
+
+这里不是删除所有 raw operators。保留的仍包括：
+
+- `raw_metric::row_count::*`
+- `raw_trace::*`
+- `raw_log::*`
+- `raw_topology::*`
+- CREST base features
+- default MEOL operators
+
+删除的只是 `raw_metric_value` family，也就是具体 metric-name 实例：
+
+```text
+raw_metric::k8s.pod.cpu.usage::mean_delta
+raw_metric::k8s.pod.filesystem.usage::z_shift
+raw_metric::container.cpu.usage::mean_delta
+...
+```
+
+这一区分很重要：
+
+```text
+raw_metric::row_count::count_delta
+```
+
+是通用观测量变化模板；而：
+
+```text
+raw_metric::k8s.pod.filesystem.usage::z_shift
+```
+
+依赖当前数据集的 metric name，更像 schema binding。它不是 case/service/fault
+hardcode，但跨数据集迁移时需要额外的 metric semantic binding 层。
+
+生成命令：
+
+```bash
+uv run --package evidencerank python VibeResearchTools/crest_meo_universal_oracle.py \
+  --dataset rcabench \
+  --workers 32 \
+  --max-candidates 40 \
+  --coordinate-passes 1 \
+  --exclude-raw-metric-values \
+  --no-reference \
+  --algorithm crest_meo_oracle_generic_template_synthesis \
+  --artifact output/rcabench-platform-v2/crest_meo_oracle/generic_template_evidence_operators.json \
+  --summary output/rcabench-platform-v2/crest_meo_oracle/generic_template_reference_result_summary.json
+```
+
+实际运行耗时：
+
+```text
+elapsed=42:43.67
+```
+
+Artifact:
+
+```text
+output/rcabench-platform-v2/crest_meo_oracle/generic_template_evidence_operators.json
+```
+
+Candidate space:
+
+```text
+operator_count=64
+raw_operator_count=33
+excluded_operator_families=["raw_metric_value"]
+selected_operator_count=25
+```
+
+结果：
+
+```text
+total=1422
+error=0
+AC@1=0.845288
+MRR=0.903372
+AC@3=0.955696
+AC@5=0.975387
+```
+
+Selected operator 分布：
+
+```text
+operator_family:
+  crest_feature=14
+  meol_operator=6
+  raw_log_row_count=1
+  raw_trace_categorical=1
+  raw_trace_numeric=1
+  raw_log_categorical=1
+  raw_topology_distribution=1
+
+source:
+  metric=6
+  trace=11
+  log=7
+  topology=1
+
+role:
+  mutation=9
+  propagation=8
+  observability_bias=8
+```
+
+和完整 raw-telemetry Oracle 对比：
+
+```text
+Full raw-telemetry Oracle:
+  operator_count=208
+  selected_operator_count=24
+  AC@1=0.890999
+  MRR=0.931160
+  AC@3=0.969058
+  AC@5=0.988748
+
+Generic-template Oracle:
+  operator_count=64
+  selected_operator_count=25
+  AC@1=0.845288
+  MRR=0.903372
+  AC@3=0.955696
+  AC@5=0.975387
+```
+
+这个 ablation 的解释是：
+
+1. 即使去掉具体 metric-name binding，通用 operator templates 仍能达到
+   `AC@1=0.845288`，明显高于 seed 配置的 `AC@1=0.739100`。
+2. 完整 Oracle 到 `AC@1=0.890999` 的额外提升主要来自 raw metric schema 中的具体
+   resource metric names，例如 filesystem/cpu/page-fault 类信号。
+3. 论文中应把完整 Oracle 作为 raw telemetry discovery upper bound；把
+   generic-template Oracle 作为更保守、更接近可迁移 MEOL 的 upper bound。
+4. 后续若要把具体 metric-name evidence 变成可迁移方法，需要新增 schema binding
+   层，例如把 `k8s.pod.filesystem.usage` 归入
+   `resource_filesystem_pressure_shift`，而不是直接把原始 metric name 写入在线默认库。
 
 ## Deprecated Variants
 

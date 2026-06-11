@@ -1494,6 +1494,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-case-coverage", type=int, default=3)
     parser.add_argument("--max-candidates", type=int, default=80)
     parser.add_argument("--coordinate-passes", type=int, default=3)
+    parser.add_argument(
+        "--exclude-raw-metric",
+        action="store_true",
+        help=(
+            "Exclude all raw_metric::* candidates. This is a conservative "
+            "generic-operator ablation for reviewers who treat metric-name "
+            "operators as schema- or benchmark-specific."
+        ),
+    )
+    parser.add_argument(
+        "--exclude-raw-metric-values",
+        action="store_true",
+        help=(
+            "Exclude only raw_metric::<metric-name>::* candidates while keeping "
+            "generic raw_metric::row_count::* operators."
+        ),
+    )
     parser.add_argument("--no-reference", action="store_true")
     parser.add_argument("--indent", type=int, default=2)
     return parser
@@ -1522,6 +1539,14 @@ def main(argv: list[str] | None = None) -> None:
         max_metric_names=int(args.max_metric_names),
         min_case_coverage=int(args.min_case_coverage),
     )
+    excluded_prefixes: list[str] = []
+    excluded_families: list[str] = []
+    if args.exclude_raw_metric_values:
+        excluded_families.append("raw_metric_value")
+        specs = [spec for spec in specs if spec.family != "raw_metric_value"]
+    if args.exclude_raw_metric:
+        excluded_prefixes.append("raw_metric::")
+        specs = [spec for spec in specs if not spec.name.startswith("raw_metric::")]
 
     worker_args = [
         (data_root, args.dataset, datapack, gt_by_datapack[datapack], specs, meo_specs)
@@ -1628,6 +1653,8 @@ def main(argv: list[str] | None = None) -> None:
             "max_scan_incidents": int(args.max_scan_cases),
             "max_metric_names": int(args.max_metric_names),
             "min_case_coverage": int(args.min_case_coverage),
+            "excluded_operator_prefixes": excluded_prefixes,
+            "excluded_operator_families": excluded_families,
         },
         "role_families": role_families,
         "counterfactual_mutation_features": mutation_features,
