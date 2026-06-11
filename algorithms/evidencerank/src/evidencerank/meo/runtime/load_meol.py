@@ -10,6 +10,9 @@ from ..dsl.schema import EvidenceOperatorSpec, parse_operator_spec
 
 
 DEFAULT_MEOL_PATH = Path(__file__).resolve().parents[1] / "library" / "default_meol.json"
+CREST_BUILTIN_MEOL_PATH = (
+    Path(__file__).resolve().parents[1] / "library" / "crest_builtin_meol.json"
+)
 
 
 def load_meol(path: str | Path) -> dict[str, Any]:
@@ -30,4 +33,3 @@ def load_operator_specs(path: str | Path) -> list[EvidenceOperatorSpec]:
     if not isinstance(operators, list):
         raise ValueError("MEOL operators must be a list")
     return [parse_operator_spec(item) for item in operators]
-

@@ -1,0 +1,799 @@
+{
+  "library_name": "crest-builtins-meol-v1",
+  "dsl_version": "1.0",
+  "generator": {
+    "type": "mechanical_crest_export",
+    "source_modules": [
+      "evidencerank.crest",
+      "evidencerank.cera"
+    ],
+    "deterministic_runtime": true
+  },
+  "roles": [
+    "mutation",
+    "propagation",
+    "neutral"
+  ],
+  "compatibility": {
+    "feature_binding": "crest_builtin_feature_name",
+    "runtime_path": "score_crest_services(use_meo=True, meol_path=...)",
+    "uses_crest_feature_fast_path": true,
+    "score_equivalent_to_hardcoded_crest": true,
+    "note": "The MEOL selects the same CREST built-in feature columns and counterfactual mutation/propagation memberships. The online CREST-MEO scorer intentionally reuses the hard-coded CREST scoring logic for equivalence."
+  },
+  "denoised_channel_excludes": [
+    "trace_duration_z"
+  ],
+  "counterfactual_mutation_features": [
+    "metric_count_drop_shift",
+    "trace_count_drop_shift",
+    "trace_endpoint_shift",
+    "trace_error_rate",
+    "trace_status_code_shift"
+  ],
+  "counterfactual_propagation_features": [
+    "abnormal_trace_rows",
+    "log_count_delta",
+    "log_template_delta",
+    "trace_count_delta",
+    "trace_count_rise_shift",
+    "trace_duration_delta",
+    "trace_duration_z",
+    "trace_self_duration_relative_shift"
+  ],
+  "operators": [
+    {
+      "name": "metric_max_z",
+      "source": "metric",
+      "entity": "service",
+      "signal": {
+        "field": "*",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "max"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "metric magnitude shift",
+      "required_fields": [
+        "time",
+        "service_name",
+        "value"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature metric_max_z; original family is metric_shift, source modality is metric, and MEO role is neutral.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "metric_shift",
+        "crest_modality": "metric",
+        "crest_counterfactual_role": "neutral"
+      }
+    },
+    {
+      "name": "metric_mean_z",
+      "source": "metric",
+      "entity": "service",
+      "signal": {
+        "field": "*",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "mean"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "metric average shift",
+      "required_fields": [
+        "time",
+        "service_name",
+        "value"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature metric_mean_z; original family is metric_shift, source modality is metric, and MEO role is neutral.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "metric_shift",
+        "crest_modality": "metric",
+        "crest_counterfactual_role": "neutral"
+      }
+    },
+    {
+      "name": "metric_anomaly_count",
+      "source": "metric",
+      "entity": "service",
+      "signal": {
+        "field": "*",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "sum"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "metric anomaly volume change",
+      "required_fields": [
+        "time",
+        "service_name",
+        "value"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature metric_anomaly_count; original family is metric_shift, source modality is metric, and MEO role is neutral.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "metric_shift",
+        "crest_modality": "metric",
+        "crest_counterfactual_role": "neutral"
+      }
+    },
+    {
+      "name": "metric_value_delta",
+      "source": "metric",
+      "entity": "service",
+      "signal": {
+        "field": "*",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "mean_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "mean"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "metric value level change",
+      "required_fields": [
+        "time",
+        "service_name",
+        "value"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature metric_value_delta; original family is metric_shift, source modality is metric, and MEO role is neutral.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "metric_shift",
+        "crest_modality": "metric",
+        "crest_counterfactual_role": "neutral"
+      }
+    },
+    {
+      "name": "metric_count_drop_shift",
+      "source": "metric",
+      "entity": "service",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_drop",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "metric observation disappearance",
+      "required_fields": [
+        "service_name"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature metric_count_drop_shift; original family is metric_shift, source modality is metric, and MEO role is mutation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "metric_shift",
+        "crest_modality": "metric",
+        "crest_counterfactual_role": "mutation"
+      }
+    },
+    {
+      "name": "trace_duration_z",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "duration",
+        "type": "duration"
+      },
+      "contrast": {
+        "operator": "z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "max"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace latency z shift",
+      "required_fields": [
+        "service_name",
+        "duration"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature trace_duration_z; original family is trace_propagation, source modality is trace, and MEO role is propagation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "trace_propagation",
+        "crest_modality": "trace",
+        "crest_counterfactual_role": "propagation"
+      }
+    },
+    {
+      "name": "trace_duration_delta",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "duration",
+        "type": "duration"
+      },
+      "contrast": {
+        "operator": "robust_z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "max"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace latency propagation",
+      "required_fields": [
+        "service_name",
+        "duration"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature trace_duration_delta; original family is trace_propagation, source modality is trace, and MEO role is propagation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "trace_propagation",
+        "crest_modality": "trace",
+        "crest_counterfactual_role": "propagation"
+      }
+    },
+    {
+      "name": "trace_count_delta",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace traffic volume change",
+      "required_fields": [
+        "service_name"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature trace_count_delta; original family is trace_propagation, source modality is trace, and MEO role is propagation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "trace_propagation",
+        "crest_modality": "trace",
+        "crest_counterfactual_role": "propagation"
+      }
+    },
+    {
+      "name": "trace_count_rise_shift",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_rise",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "retry or fan-out traffic amplification",
+      "required_fields": [
+        "service_name"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature trace_count_rise_shift; original family is trace_propagation, source modality is trace, and MEO role is propagation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "trace_propagation",
+        "crest_modality": "trace",
+        "crest_counterfactual_role": "propagation"
+      }
+    },
+    {
+      "name": "trace_count_drop_shift",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_drop",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "request handling disappearance",
+      "required_fields": [
+        "service_name"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature trace_count_drop_shift; original family is trace_propagation, source modality is trace, and MEO role is mutation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "trace_propagation",
+        "crest_modality": "trace",
+        "crest_counterfactual_role": "mutation"
+      }
+    },
+    {
+      "name": "trace_endpoint_shift",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "endpoint",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "endpoint behavior distribution shift",
+      "required_fields": [
+        "service_name",
+        "endpoint"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature trace_endpoint_shift; original family is trace_mutation, source modality is trace, and MEO role is mutation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "trace_mutation",
+        "crest_modality": "trace",
+        "crest_counterfactual_role": "mutation"
+      }
+    },
+    {
+      "name": "trace_error_rate",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "status_code",
+        "type": "rate"
+      },
+      "contrast": {
+        "operator": "error_rate_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace error-rate change",
+      "required_fields": [
+        "service_name",
+        "status_code"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature trace_error_rate; original family is trace_mutation, source modality is trace, and MEO role is mutation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "trace_mutation",
+        "crest_modality": "trace",
+        "crest_counterfactual_role": "mutation"
+      }
+    },
+    {
+      "name": "trace_status_code_shift",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "status_code",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "status-code distribution shift",
+      "required_fields": [
+        "service_name",
+        "status_code"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature trace_status_code_shift; original family is trace_mutation, source modality is trace, and MEO role is mutation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "trace_mutation",
+        "crest_modality": "trace",
+        "crest_counterfactual_role": "mutation"
+      }
+    },
+    {
+      "name": "trace_self_duration_relative_shift",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "duration",
+        "type": "duration"
+      },
+      "contrast": {
+        "operator": "robust_z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "service-local span duration share shift",
+      "required_fields": [
+        "service_name",
+        "duration"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature trace_self_duration_relative_shift; original family is trace_propagation, source modality is trace, and MEO role is propagation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "trace_propagation",
+        "crest_modality": "trace",
+        "crest_counterfactual_role": "propagation"
+      }
+    },
+    {
+      "name": "log_count_delta",
+      "source": "log",
+      "entity": "service",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "log volume change",
+      "required_fields": [
+        "service_name"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature log_count_delta; original family is log_shift, source modality is log, and MEO role is propagation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "log_shift",
+        "crest_modality": "log",
+        "crest_counterfactual_role": "propagation"
+      }
+    },
+    {
+      "name": "log_error_rate",
+      "source": "log",
+      "entity": "service",
+      "signal": {
+        "field": "message",
+        "type": "rate"
+      },
+      "contrast": {
+        "operator": "rate_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "log error keyword rate change",
+      "required_fields": [
+        "service_name",
+        "message"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature log_error_rate; original family is log_shift, source modality is log, and MEO role is neutral.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "log_shift",
+        "crest_modality": "log",
+        "crest_counterfactual_role": "neutral"
+      }
+    },
+    {
+      "name": "log_template_delta",
+      "source": "log",
+      "entity": "service",
+      "signal": {
+        "field": "template",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "log template distribution shift",
+      "required_fields": [
+        "service_name",
+        "template"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature log_template_delta; original family is log_shift, source modality is log, and MEO role is propagation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "log_shift",
+        "crest_modality": "log",
+        "crest_counterfactual_role": "propagation"
+      }
+    },
+    {
+      "name": "topology_in_degree",
+      "source": "topology",
+      "entity": "service",
+      "signal": {
+        "field": "incoming_edges",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "sum"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "incoming dependency context",
+      "required_fields": [
+        "parent_service",
+        "service_name"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature topology_in_degree; original family is topology_context, source modality is trace, and MEO role is neutral.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "topology_context",
+        "crest_modality": "trace",
+        "crest_counterfactual_role": "neutral"
+      }
+    },
+    {
+      "name": "topology_out_degree",
+      "source": "topology",
+      "entity": "service",
+      "signal": {
+        "field": "outgoing_edges",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "sum"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "outgoing dependency context",
+      "required_fields": [
+        "parent_service",
+        "service_name"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature topology_out_degree; original family is topology_context, source modality is trace, and MEO role is neutral.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "topology_context",
+        "crest_modality": "trace",
+        "crest_counterfactual_role": "neutral"
+      }
+    },
+    {
+      "name": "abnormal_metric_rows",
+      "source": "metric",
+      "entity": "service",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "sum"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "metric observability volume",
+      "required_fields": [
+        "service_name"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature abnormal_metric_rows; original family is observability_volume, source modality is metric, and MEO role is neutral.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "observability_volume",
+        "crest_modality": "metric",
+        "crest_counterfactual_role": "neutral"
+      }
+    },
+    {
+      "name": "abnormal_trace_rows",
+      "source": "trace",
+      "entity": "service",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "sum"
+      },
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace observability volume",
+      "required_fields": [
+        "service_name"
+      ],
+      "rationale": "Mechanical MEOL export of CREST built-in feature abnormal_trace_rows; original family is observability_volume, source modality is trace, and MEO role is propagation.",
+      "metadata": {
+        "crest_builtin_feature": true,
+        "crest_role_family": "observability_volume",
+        "crest_modality": "trace",
+        "crest_counterfactual_role": "propagation"
+      }
+    }
+  ]
+}

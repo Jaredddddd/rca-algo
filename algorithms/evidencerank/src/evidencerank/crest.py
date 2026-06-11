@@ -308,12 +308,53 @@ def _meo_role_weight_matrix(specs: list[EvidenceOperatorSpec]) -> np.ndarray:
     return np.asarray(weights, dtype=np.float64)
 
 
+def _meo_counterfactual_feature_sets(
+    specs: list[EvidenceOperatorSpec],
+) -> tuple[frozenset[str], frozenset[str]]:
+    """Read CREST counterfactual role membership from MEOL specs."""
+
+    mutation_features = frozenset(
+        spec.name
+        for spec in specs
+        if float(spec.role_prior.get("mutation", 0.0)) > 0.0
+    )
+    propagation_features = frozenset(
+        spec.name
+        for spec in specs
+        if float(spec.role_prior.get("propagation", 0.0)) > 0.0
+    )
+    return mutation_features, propagation_features
+
+
+def _local_meo_energy(
+    matrix: np.ndarray,
+    enabled_features: tuple[str, ...],
+) -> np.ndarray:
+    """Compute CREST local energy for MEOL features.
+
+    Built-in CREST feature names use the exact CREST role-family aggregation.
+    Custom MEOL operators that are not part of CREST_ROLE_FAMILIES are included
+    as local evidence so they can still affect ranking.
+    """
+
+    energy = _local_family_energy(matrix, enabled_features, include_topology=True)
+    known_features = frozenset().union(*CREST_ROLE_FAMILIES.values())
+    extra_indices = [
+        idx
+        for idx, feature_name in enumerate(enabled_features)
+        if feature_name not in known_features
+    ]
+    if extra_indices:
+        energy += matrix[:, extra_indices].sum(axis=1).astype(np.float64)
+    return np.maximum(energy, 0.0)
+
+
 def _instantiate_meol_from_crest_features(
     frames: dict[str, pd.DataFrame],
     services: list[str],
     specs: list[EvidenceOperatorSpec],
     enabled_modalities: frozenset[str],
-) -> tuple[np.ndarray, tuple[str, ...], np.ndarray, list[tuple[str, str]]] | None:
+) -> tuple[np.ndarray, tuple[str, ...], list[tuple[str, str]]] | None:
     """Fast path for MEOL operators that are aliases of built-in CREST features."""
 
     if not specs:
@@ -332,9 +373,9 @@ def _instantiate_meol_from_crest_features(
         services,
         feature_names,
         enabled_modalities,
-        normalize=False,
+        normalize=True,
     )
-    return matrix, feature_names, _meo_role_weight_matrix(specs), trace_edges
+    return matrix, feature_names, trace_edges
 
 
 def _apply_counterfactual_explain_away_once(
@@ -343,6 +384,8 @@ def _apply_counterfactual_explain_away_once(
     role_matrix: np.ndarray,
     enabled_features: tuple[str, ...],
     trace_edges: list[tuple[str, str]],
+    mutation_features: frozenset[str] = CREST_COUNTERFACTUAL_MUTATION_FEATURES,
+    propagation_features: frozenset[str] = CREST_COUNTERFACTUAL_PROPAGATION_FEATURES,
 ) -> np.ndarray:
     if not trace_edges or structural_energy.size == 0:
         return structural_energy
@@ -352,12 +395,12 @@ def _apply_counterfactual_explain_away_once(
     mutation_indices = [
         idx
         for idx, feature_name in enumerate(enabled_features)
-        if feature_name in CREST_COUNTERFACTUAL_MUTATION_FEATURES
+        if feature_name in mutation_features
     ]
     propagation_indices = [
         idx
         for idx, feature_name in enumerate(enabled_features)
-        if feature_name in CREST_COUNTERFACTUAL_PROPAGATION_FEATURES
+        if feature_name in propagation_features
     ]
     if not mutation_indices or not propagation_indices:
         return structural_energy
@@ -416,6 +459,8 @@ def _apply_counterfactual_explain_away(
     role_matrix: np.ndarray,
     enabled_features: tuple[str, ...],
     trace_edges: list[tuple[str, str]],
+    mutation_features: frozenset[str] = CREST_COUNTERFACTUAL_MUTATION_FEATURES,
+    propagation_features: frozenset[str] = CREST_COUNTERFACTUAL_PROPAGATION_FEATURES,
 ) -> np.ndarray:
     adjusted = structural_energy.astype(np.float64, copy=True)
     for _family in CREST_COUNTERFACTUAL_ITERATION_FAMILIES:
@@ -425,6 +470,8 @@ def _apply_counterfactual_explain_away(
             role_matrix,
             enabled_features,
             trace_edges,
+            mutation_features,
+            propagation_features,
         )
         if np.linalg.norm(updated - adjusted) <= 1e-12 * (
             np.linalg.norm(adjusted) + 1e-12
@@ -525,11 +572,12 @@ def _apply_counterfactual_explain_away_soft(
 def _denoised_channel_energy(
     role_matrix: np.ndarray,
     enabled_features: tuple[str, ...],
+    excluded_features: frozenset[str] = CREST_DENOISED_CHANNEL_EXCLUDES,
 ) -> np.ndarray:
     indices = [
         idx
         for idx, feature_name in enumerate(enabled_features)
-        if feature_name not in CREST_DENOISED_CHANNEL_EXCLUDES
+        if feature_name not in excluded_features
     ]
     if not indices:
         return np.zeros(role_matrix.shape[0], dtype=np.float64)
@@ -687,8 +735,11 @@ def score_crest_services(
     if not services:
         return pd.DataFrame(columns=["service", "A", "F", "S", "score"])
 
-    mutation = np.zeros(len(services), dtype=np.float64)
-    propagation = np.zeros(len(services), dtype=np.float64)
+    enabled_features: tuple[str, ...] = ()
+    trace_edges: list[tuple[str, str]] = []
+    role_matrix = np.zeros((len(services), 0), dtype=np.float64)
+    mutation_features = CREST_COUNTERFACTUAL_MUTATION_FEATURES
+    propagation_features = CREST_COUNTERFACTUAL_PROPAGATION_FEATURES
     if use_meo:
         try:
             selected_meol_path = meol_path or DEFAULT_MEOL_PATH
@@ -696,6 +747,7 @@ def score_crest_services(
                 list(_cached_meo_specs(str(selected_meol_path))),
                 enabled_modalities,
             )
+            mutation_features, propagation_features = _meo_counterfactual_feature_sets(specs)
             fast_meo = _instantiate_meol_from_crest_features(
                 frames,
                 services,
@@ -703,30 +755,27 @@ def score_crest_services(
                 enabled_modalities,
             )
             if fast_meo is None:
-                meo_matrix, _meo_features, role_weight_matrix = instantiate_meol_features(
+                meo_matrix, enabled_features, _role_weight_matrix = instantiate_meol_features(
                     frames,
                     services,
                     specs,
                 )
+                meo_matrix = np.log1p(_finite_nonnegative_array(meo_matrix))
                 _empty_matrix, trace_edges = _build_feature_matrix(
                     frames,
                     services,
                     (),
                     enabled_modalities,
-                    normalize=False,
+                    normalize=True,
                 )
             else:
-                meo_matrix, _meo_features, role_weight_matrix, trace_edges = fast_meo
+                meo_matrix, enabled_features, trace_edges = fast_meo
             case_matrix = _robust_case_feature_matrix(meo_matrix)
-            role_vectors = _meo_role_vectors(case_matrix, role_weight_matrix)
-            mutation = role_vectors["mutation"]
-            propagation = role_vectors["propagation"]
-            observability_bias = role_vectors["observability_bias"]
-            topology_context = role_vectors["topology_context"]
-            local_energy = np.maximum(
-                mutation + propagation + observability_bias + topology_context,
-                0.0,
+            role_matrix = _apply_arc_trace_endpoint_support_gate(
+                enabled_features,
+                case_matrix,
             )
+            local_energy = _local_meo_energy(role_matrix, enabled_features)
             local_abnormality = _saturating_incident_scale(local_energy)
             if not np.any(local_abnormality > 0.0):
                 use_meo = False
@@ -734,6 +783,8 @@ def score_crest_services(
             use_meo = False
 
     if not use_meo:
+        mutation_features = CREST_COUNTERFACTUAL_MUTATION_FEATURES
+        propagation_features = CREST_COUNTERFACTUAL_PROPAGATION_FEATURES
         enabled_feature_set = frozenset().union(
             *(MODALITY_FEATURES[modality] for modality in enabled_modalities)
         )
@@ -765,14 +816,15 @@ def score_crest_services(
     elif graph_mode == "pagerank":
         explanatory_power = _pagerank_explanatory_power(local_abnormality, graph)
     else:
-        if use_meo:
-            structural_seed = local_energy.copy()
-        else:
-            structural_seed = _local_family_energy(
+        structural_seed = (
+            _local_meo_energy(role_matrix, enabled_features)
+            if use_meo
+            else _local_family_energy(
                 role_matrix,
                 enabled_features,
                 include_topology=True,
             )
+        )
         context_weight = _trace_density_context_weight(services, trace_edges)
         structural_energy = _apply_parent_context(
             services,
@@ -780,43 +832,34 @@ def score_crest_services(
             trace_edges,
             context_weight,
         )
-        if use_meo:
-            structural_energy = _apply_counterfactual_explain_away_soft(
-                services,
-                np.maximum(structural_energy, 0.0),
-                mutation,
-                propagation,
-                trace_edges,
-            )
-            explanatory_power = _saturating_incident_scale(structural_energy)
-            denoised_support = _saturating_incident_scale(
-                np.maximum(mutation + propagation, 0.0)
-            )
-        else:
-            structural_energy = _apply_counterfactual_explain_away(
-                services,
-                np.maximum(structural_energy, 0.0),
-                role_matrix,
-                enabled_features,
-                trace_edges,
-            )
-            explanatory_power = _saturating_incident_scale(structural_energy)
+        structural_energy = _apply_counterfactual_explain_away(
+            services,
+            np.maximum(structural_energy, 0.0),
+            role_matrix,
+            enabled_features,
+            trace_edges,
+            mutation_features,
+            propagation_features,
+        )
+        explanatory_power = _saturating_incident_scale(structural_energy)
 
-            denoised_energy = _denoised_channel_energy(role_matrix, enabled_features)
-            denoised_structural = _apply_parent_context(
-                services,
-                denoised_energy,
-                trace_edges,
-                context_weight,
-            )
-            denoised_structural = _apply_counterfactual_explain_away(
-                services,
-                np.maximum(denoised_structural, 0.0),
-                role_matrix,
-                enabled_features,
-                trace_edges,
-            )
-            denoised_support = _saturating_incident_scale(denoised_structural)
+        denoised_energy = _denoised_channel_energy(role_matrix, enabled_features)
+        denoised_structural = _apply_parent_context(
+            services,
+            denoised_energy,
+            trace_edges,
+            context_weight,
+        )
+        denoised_structural = _apply_counterfactual_explain_away(
+            services,
+            np.maximum(denoised_structural, 0.0),
+            role_matrix,
+            enabled_features,
+            trace_edges,
+            mutation_features,
+            propagation_features,
+        )
+        denoised_support = _saturating_incident_scale(denoised_structural)
 
     score = local_abnormality * explanatory_power
     if graph_mode == "counterfactual":
@@ -866,13 +909,6 @@ class CREST(Algorithm):
         ]
 
 
-class CRESTMEO(CREST):
-    """CREST-MEO ranking with a JSON Meta Evidence Operator Library."""
-
-    _use_meo = True
-    _meol_path: Path | None = None
-
-
 class CRESTLocal(CREST):
     """CREST-Local ablation: Module 1 only."""
 
@@ -919,3 +955,17 @@ class CRESTLogTrace(CREST):
     """CREST ablation using log and trace evidence."""
 
     _modalities = frozenset({"log", "trace"})
+
+
+def __getattr__(name: str) -> object:
+    """Keep historic CREST-MEO import paths while defining them separately."""
+
+    if name == "CRESTMEO":
+        from .crest_meo import CRESTMEO
+
+        return CRESTMEO
+    if name == "CRESTMEOBuiltIn":
+        from .crest_meo import CRESTMEOBuiltIn
+
+        return CRESTMEOBuiltIn
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

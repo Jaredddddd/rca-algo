@@ -153,8 +153,7 @@ def _finalize_meol(meol: dict[str, Any], config: MEOLLMConfig, config_path: Path
     meol["roles"] = [
         "mutation",
         "propagation",
-        "observability_bias",
-        "topology_context",
+        "neutral",
     ]
     meol.setdefault("operators", [])
     meol["generator"] = {

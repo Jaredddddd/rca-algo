@@ -18,8 +18,11 @@ Rules:
 1. Use only allowed DSL atoms.
 2. Do not depend on a specific service name, incident id, datapack id,
    evaluation outcome metadata, injected-fault metadata, or prior method output.
-3. Assign role_prior over mutation, propagation, observability_bias, and
-   topology_context. The values must sum to 1.
+3. Assign counterfactual role membership through role_prior: mutation,
+   propagation, or neutral. Use mutation=1 only for root-local mechanism-change
+   evidence, propagation=1 only for propagated symptom evidence, and all-zero
+   mutation/propagation for neutral local evidence. Do not set mutation and
+   propagation at the same time.
 4. Include mechanism, rationale, and required_fields for every operator.
 5. The online RCA path must remain deterministic over the frozen JSON library.
 """.strip()
@@ -83,11 +86,12 @@ DEFAULT_MECHANISM_CATALOG = [
         "typical_roles": ["propagation"],
     },
     {
-        "mechanism": "observability skew",
+        "mechanism": "neutral local evidence",
         "observable_consequences": [
-            "services with more telemetry rows can receive larger raw evidence",
+            "metric magnitude shifts or volume signals can support local energy",
+            "the signal is not specific enough for counterfactual explain-away",
         ],
-        "typical_roles": ["observability_bias"],
+        "typical_roles": ["neutral"],
     },
 ]
 
@@ -114,8 +118,7 @@ def build_operator_synthesis_prompt(
             "roles": [
                 "mutation",
                 "propagation",
-                "observability_bias",
-                "topology_context",
+                "neutral",
             ],
             "operators": [
                 {

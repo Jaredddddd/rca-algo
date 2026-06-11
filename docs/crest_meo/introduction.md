@@ -33,9 +33,9 @@ MEOL 里面每一项是一个 feature spec，比如：
   "abnormal_window": "post_anomaly",
   "aggregation": "service_level",
   "role_prior": {
-    "mutation": 0.85,
-    "propagation": 0.10,
-    "observability_bias": 0.05,
+    "mutation": 1.0,
+    "propagation": 0.0,
+    "observability_bias": 0.0,
     "topology_context": 0.00
   },
   "mechanism": "interface failure",
@@ -54,27 +54,14 @@ CREST_COUNTERFACTUAL_PROPAGATION_FEATURES = {...}
 而是从 MEOL 读出：
 
 ```python
-mutation_weight[f]
-propagation_weight[f]
-bias_weight[f]
-topology_weight[f]
+is_mutation_feature[f]
+is_propagation_feature[f]
 ```
 
-然后算：
-
-[
-
-M(s)=\sum_f w_f^{mut} E_f(s)
-
-]
-
-[
-
-P(s)=\sum_f w_f^{prop} E_f(s)
-
-]
-
-再喂给你现在的 counterfactual explain-away 和 residual 模块。
+然后把这些 membership 传给当前 CREST 的 counterfactual explain-away。默认
+CREST-MEO 不使用连续 4 维 role weight 重新投影分数；MEOL 只替代 feature/operator
+配置来源，local abnormality、parent context、denoised support、final score 都复刻
+CREST。
 
 ---
 
@@ -331,9 +318,10 @@ LLM 输出：
     "count_rise"
   ],
   "role_prior": {
-    "mutation": 0.8,
-    "propagation": 0.15,
-    "observability_bias": 0.05
+    "mutation": 1.0,
+    "propagation": 0.0,
+    "observability_bias": 0.0,
+    "topology_context": 0.0
   }
 }
 ```
@@ -355,9 +343,10 @@ LLM 输出：
     "delta"
   ],
   "role_prior": {
-    "mutation": 0.2,
-    "propagation": 0.75,
-    "observability_bias": 0.05
+    "mutation": 0.0,
+    "propagation": 1.0,
+    "observability_bias": 0.0,
+    "topology_context": 0.0
   }
 }
 ```
@@ -376,8 +365,8 @@ LLM 输出：
 | retry/backpressure | trace count rise, log burst | propagation |
 | traffic surge | request count rise, upstream fan-out | propagation/local |
 | software event shift | log template distribution change | mutation/propagation |
-| observability skew | abnormal rows/count volume high | bias |
-| topology exposure | high in/out degree | context |
+| observability skew | abnormal rows/count volume high | neutral/local |
+| topology exposure | high in/out degree | neutral/local |
 
 ---
 
@@ -684,7 +673,7 @@ Rules:
 2. Each operator must be service-level or edge-level aggregatable.
 3. Do not create operators that depend on a specific service name.
 4. Do not use ground-truth root cause labels or fault types.
-5. Assign role_prior over mutation, propagation, observability_bias, topology_context.
+5. Assign role_prior as counterfactual membership: mutation, propagation, or neutral.
 6. Output valid JSON only.
 
 Output:
@@ -729,9 +718,9 @@ Output:
         "method": "jsd"
       },
       "role_prior": {
-        "mutation": 0.80,
-        "propagation": 0.15,
-        "observability_bias": 0.05,
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
         "topology_context": 0.0
       },
       "mechanism": "endpoint behavior change",
@@ -756,7 +745,7 @@ Verifier 是防止 LLM 胡编和数据泄露的关键。
 JSON schema 是否合法
 operator 是否在 DSL allowlist
 required_fields 是否存在
-role_prior 是否归一化
+role_prior 是否是 mutation / propagation / neutral 的互斥 membership
 是否包含 forbidden fields
 是否包含 service-specific literal
 是否依赖 root cause label / fault type / case id
@@ -809,10 +798,12 @@ def static_verify(spec: dict, telemetry_columns: set[str]) -> tuple[bool, list[s
             errors.append(f"forbidden_token:{forbidden}")
 
     role = spec.get("role_prior", {})
-    total = sum(float(v) for v in role.values())
-    if abs(total - 1.0) > 1e-3:
-        errors.append("role_prior_not_normalized")
-
+    mutation = float(role.get("mutation", 0.0))
+    propagation = float(role.get("propagation", 0.0))
+    if mutation not in {0.0, 1.0} or propagation not in {0.0, 1.0}:
+        errors.append("role_prior_not_binary")
+    if mutation > 0.0 and propagation > 0.0:
+        errors.append("role_prior_ambiguous")
     if any(float(v) < 0 or float(v) > 1 for v in role.values()):
         errors.append("role_prior_out_of_range")
 
@@ -1108,22 +1099,28 @@ for op in compiled_ops:
     E.append(op(frames, services))
 
 feature_matrix = np.stack(E, axis=1)
-role_weights = build_role_weight_matrix(meol)
+mutation_features, propagation_features = read_counterfactual_membership(meol)
 ```
 
 其中：
 
 ```python
-role_weights.shape = [num_features, num_roles]
+mutation_features = {op.name for op in meol.operators if op.role_prior["mutation"] > 0}
+propagation_features = {op.name for op in meol.operators if op.role_prior["propagation"] > 0}
 ```
 
 然后：
 
 ```python
-mutation = feature_matrix @ role_weights[:, ROLE_MUTATION]
-propagation = feature_matrix @ role_weights[:, ROLE_PROPAGATION]
-bias = feature_matrix @ role_weights[:, ROLE_BIAS]
-topology = feature_matrix @ role_weights[:, ROLE_TOPOLOGY]
+local_energy = crest_local_family_energy(feature_matrix, feature_names)
+structural_energy = apply_parent_context(local_energy, trace_edges)
+structural_energy = apply_counterfactual_explain_away(
+    structural_energy,
+    feature_matrix,
+    feature_names,
+    mutation_features=mutation_features,
+    propagation_features=propagation_features,
+)
 ```
 
 你的 `_apply_counterfactual_explain_away_once` 里现在是通过 feature name 找 mutation / propagation indices。
@@ -1257,7 +1254,7 @@ def build_meol(
         accepted.append(spec)
 
     accepted = deduplicate_specs(accepted)
-    accepted = normalize_role_priors(accepted)
+    accepted = validate_role_membership(accepted)
 
     meol = freeze_library(
         specs=accepted,
@@ -1279,33 +1276,43 @@ def compute_meo_feature_matrix(frames, services, meol):
 
     values = []
     names = []
-    role_weights = []
+    mutation_features = set()
+    propagation_features = set()
 
     for spec, fn in zip(meol["operators"], compiled):
         v = fn(frames, services)
         values.append(v)
         names.append(spec["name"])
-        role_weights.append([
-            spec["role_prior"]["mutation"],
-            spec["role_prior"]["propagation"],
-            spec["role_prior"]["observability_bias"],
-            spec["role_prior"]["topology_context"],
-        ])
+        if spec["role_prior"].get("mutation", 0.0) > 0:
+            mutation_features.add(spec["name"])
+        if spec["role_prior"].get("propagation", 0.0) > 0:
+            propagation_features.add(spec["name"])
 
     feature_matrix = np.stack(values, axis=1)
-    role_weight_matrix = np.asarray(role_weights, dtype=float)
 
-    return feature_matrix, names, role_weight_matrix
+    return feature_matrix, names, mutation_features, propagation_features
 ```
 
 然后接 CREST：
 
 ```python
-feature_matrix, feature_names, W = compute_meo_feature_matrix(frames, services, meol)
+feature_matrix, feature_names, mutation_features, propagation_features = compute_meo_feature_matrix(
+    frames,
+    services,
+    meol,
+)
 
 feature_matrix = robust_case_scale(feature_matrix)
+local_abnormality = crest_local_family_energy(feature_matrix, feature_names)
 
-mutation = feature_matrix @ W[:, 0]
+structural_energy = crest_parent_context(local_abnormality, trace_edges)
+structural_energy = crest_counterfactual_explain_away(
+    structural_energy,
+    feature_matrix,
+    feature_names,
+    mutation_features=mutation_features,
+    propagation_features=propagation_features,
+)
 propagation = feature_matrix @ W[:, 1]
 bias = feature_matrix @ W[:, 2]
 topology = feature_matrix @ W[:, 3]
@@ -1471,6 +1478,33 @@ log_template_shift
 ```
 
 这 10 个已经基本覆盖你现在 CREST 的手工 features。然后让 MEO 生成这些 operator specs，并通过 compiler 计算出同样或更丰富的 feature matrix。你现在 CREST 里已经有 metric、trace、log、topology、mutation、propagation、observability volume 这些 role families；MEO 的第一步就是把这些从 hard-coded constants 升级为 MEOL。
+
+当前实现里需要区分两个 MEOL 文件：
+
+```text
+algorithms/evidencerank/src/evidencerank/meo/library/default_meol.json
+algorithms/evidencerank/src/evidencerank/meo/library/crest_builtin_meol.json
+```
+
+`default_meol.json` 是 mock LLM 生成路径的默认输出，内容来自
+`meo/llm/mock_outputs.py`，用于模拟未来真实 LLM 会生成的一组机制化 operator
+spec。它不是从 CREST 常量自动转换出来的。
+
+`crest_builtin_meol.json` 则是从当前 CREST/CERA 源码机械导出的对照库：
+
+```bash
+uv run --package evidencerank python VibeResearchTools/export_crest_builtin_meol.py
+```
+
+这个文件包含完整 21 个 `BASE_FEATURE_NAMES`，并把
+`CREST_COUNTERFACTUAL_MUTATION_FEATURES`、`CREST_COUNTERFACTUAL_PROPAGATION_FEATURES`
+分别转换为 one-hot `mutation` / `propagation` role prior；其余 feature 转成
+neutral，也就是 mutation/propagation 都为 0。neutral feature 仍参与 CREST local
+energy 和 denoised support，只是不参与 counterfactual mutation/propagation 对比。
+因此它适合用来检查“当前 hard-coded CREST roles 被 JSON MEOL 表达出来以后是否覆盖
+同一批 feature 和 counterfactual sets”。当前 CREST-MEO 在线路径已经复刻原 CREST
+scoring，所以 `crest_meo_builtin` 应与 `crest` 在 ranking、`A/F/S/score` 和 benchmark
+指标上等价。
 
 等第一版跑通后，再加：
 

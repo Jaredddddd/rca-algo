@@ -3,8 +3,8 @@
 ## Goal
 
 Phase 1 adds a deterministic CREST-MEO path that turns a frozen JSON Meta
-Evidence Operator Library (MEOL) into service-level evidence features and role
-vectors for CREST ranking.
+Evidence Operator Library (MEOL) into service-level evidence features and
+counterfactual role membership for CREST ranking.
 
 Implemented scope:
 
@@ -32,22 +32,97 @@ Implemented scope:
 - `algorithms/evidencerank/src/evidencerank/meo/llm/config.yaml`
 - `algorithms/evidencerank/src/evidencerank/meo/artifacts/telemetry_schema.py`
 - `algorithms/evidencerank/src/evidencerank/meo/library/default_meol.json`
+- `algorithms/evidencerank/src/evidencerank/meo/library/crest_builtin_meol.json`
 - `algorithms/evidencerank/src/evidencerank/crest.py`
+- `algorithms/evidencerank/src/evidencerank/crest_meo.py`
+- `VibeResearchTools/export_crest_builtin_meol.py`
+
+## MEOL Library Provenance
+
+当前有两个用途不同的 MEOL 文件：
+
+`default_meol.json` 是 Phase-1 的 mock LLM 输出。它由
+`algorithms/evidencerank/src/evidencerank/meo/llm/mock_outputs.py` 中的
+`mock_meol()` 提供，包含 10 个机制化 seed operators，例如
+`metric_max_z`、`trace_status_code_shift`、`trace_error_rate`、
+`trace_duration_delta` 和 `log_template_delta`。它的作用是跑通
+“prompt/context -> mock LLM response -> verifier -> compiler -> CREST-MEO
+ranking” 这条链路，不是从当前 CREST 的 hard-coded constants 自动生成的。
+
+`crest_builtin_meol.json` 是一个对照/消融库，由
+`VibeResearchTools/export_crest_builtin_meol.py` 从当前 CREST/CERA 源码机械导出：
+
+- operator 顺序严格等于 `BASE_FEATURE_NAMES`，共 21 个；
+- operator 名字严格等于原 CREST feature 名字，因此 CREST-MEO 可以走
+  `_build_feature_matrix` fast path；
+- `CREST_COUNTERFACTUAL_MUTATION_FEATURES` 中的 feature 被转换为
+  `role_prior.mutation = 1.0`；
+- `CREST_COUNTERFACTUAL_PROPAGATION_FEATURES` 中的 feature 被转换为
+  `role_prior.propagation = 1.0`；
+- 其余 CREST feature 被转换为 neutral，也就是
+  `role_prior.mutation = 0.0` 且 `role_prior.propagation = 0.0`；这些 feature
+  仍参与 CREST local evidence energy 和 denoised support，但不参与
+  counterfactual mutation/propagation 对比。
+
+这个转换的目标是让你能直接查看“当前 CREST hard-coded feature/role set 的
+JSON MEOL 表达”。当前 `crest_meo_builtin` 的在线 scoring 已经刻意复刻原
+hard-coded CREST：同一批 feature columns、同一个 endpoint support gate、同一个
+parent context、同一个 hard counterfactual explain-away、同一个 denoised support。
+因此它应理解为“CREST scorer 的 MEOL 配置化入口”。
+
+重新生成命令：
+
+```bash
+uv run --package evidencerank python VibeResearchTools/export_crest_builtin_meol.py
+```
+
+直接用该库跑 CREST-MEO：
+
+```python
+from pathlib import Path
+from evidencerank.crest import score_crest_services
+
+ranking = score_crest_services(
+    input_folder,
+    use_meo=True,
+    meol_path=Path(
+        "algorithms/evidencerank/src/evidencerank/meo/library/crest_builtin_meol.json"
+    ),
+)
+```
+
+Benchmark CLI 中也注册了一个显式算法名：
+
+```bash
+uv run --package evidencerank python algorithms/evidencerank/main.py eval batch \
+  -a crest_meo_builtin \
+  -d rcabench \
+  --clear \
+  --use-cpus 48
+```
+
+对应关系是：
+
+- `-a crest_meo`：使用 `default_meol.json`，也就是 mock LLM seed library；
+- `-a crest_meo_builtin`：使用 `crest_builtin_meol.json`，也就是当前 CREST 21 个
+  built-in feature 的机械 MEOL 导出库。
 
 ## Runtime Behavior
 
 `use_meo=False` keeps the existing CREST path. `use_meo=True` loads
-`default_meol.json` unless an explicit `meol_path` is provided, compiles each
-operator, executes operators against the current incident frames, scales the
-result with `_robust_case_feature_matrix`, and computes:
+`default_meol.json` unless an explicit `meol_path` is provided. MEOL controls
+which operators become feature columns and which columns enter the
+counterfactual mutation / propagation sets. The online scoring logic then
+reuses CREST exactly:
 
-- `mutation`
-- `propagation`
-- `observability_bias`
-- `topology_context`
-
-The counterfactual mode then uses parent context plus the new soft explain-away
-routine over MEO `mutation` and `propagation` role vectors.
+- `_build_feature_matrix(..., normalize=True)` for built-in feature aliases;
+- `_robust_case_feature_matrix`;
+- `_apply_arc_trace_endpoint_support_gate`;
+- CREST local family energy;
+- parent context;
+- hard counterfactual explain-away;
+- CREST denoised structural support;
+- final `score = A * F + S`.
 
 If an individual operator fails, its feature column is zeroed. If the whole
 MEOL path produces no positive local abnormality, the function falls back to
@@ -114,12 +189,15 @@ uv run --package evidencerank python VibeResearchTools/evidrank_lab.py guard
 
 Results:
 
-- `pytest`: 6 passed.
+- `pytest`: 12 passed.
 - `compileall`: passed.
 - config-driven mock synthesis CLI: passed and wrote non-empty JSON.
 - prompt construction: passed.
 - `ruff check`: passed.
 - default MEOL static/leakage verifier check: 10 operators, no errors.
+- CREST built-in MEOL equivalence check: 21 operators, mutation/propagation sets
+  match the current hard-coded CREST constants, and a smoke input has identical
+  `A/F/S/score` to `crest`.
 - guard: no high-risk overfitting warnings; only pre-existing medium
   `rcabench_platform` import/name warnings were reported.
 
@@ -139,10 +217,10 @@ for every operator.
 
 The default MEOL also has a compatibility fast path: when every enabled
 operator name maps directly to an existing CREST/CERA feature name, CREST-MEO
-uses the existing batched `_build_feature_matrix` implementation and then
-projects the resulting columns through the MEOL `role_prior` matrix. Custom
-operators that do not map to built-in CREST features still fall back to the
-general grouped compiler path, preserving DSL compatibility.
+uses the existing batched `_build_feature_matrix(..., normalize=True)`
+implementation. Custom operators that do not map to built-in CREST features
+still fall back to the general grouped compiler path, preserving DSL
+compatibility.
 
 Validation on one RCABench case after the optimization:
 
@@ -160,3 +238,26 @@ uv run --package evidencerank python -m compileall -q algorithms/evidencerank/sr
 uv run --package evidencerank ruff check algorithms/evidencerank/src/evidencerank/meo/dsl/compiler.py algorithms/evidencerank/src/evidencerank/crest.py algorithms/evidencerank/tests/test_meo_phase1.py
 uv run --package evidencerank python VibeResearchTools/evidrank_lab.py guard
 ```
+
+## CREST Built-In MEOL Equivalence
+
+`crest_builtin_meol.json` 现在是原 CREST scorer 的配置化入口，而不是 soft role-vector
+ablation。它通过 MEOL 提供：
+
+- 21 个 `BASE_FEATURE_NAMES`；
+- counterfactual mutation membership；
+- counterfactual propagation membership；
+- `denoised_channel_excludes = ["trace_duration_z"]`。
+
+在线路径不再使用 `mutation + propagation` 的 soft denoised support，而是复用原 CREST
+的 hard explain-away 和 denoised structural support。当前真实 case smoke 已确认：
+
+```text
+ts0-ts-basic-service-response-replace-code-lmnjw7 equal
+ts0-ts-auth-service-stress-nlpsfx equal
+ts0-ts-food-service-container-kill-fc4sjw equal
+ts7-mysql-partition-wk622l equal
+```
+
+最终验收要求是 full benchmark 中 `crest_meo_builtin` 的 `AC@1/MRR/AC@3/AC@5`
+与 `crest` 完全一致。

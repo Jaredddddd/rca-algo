@@ -62,7 +62,7 @@ MEOL 是一个 JSON 文件，里面每个 operator 都描述：
 2. 使用哪个字段。
 3. 使用哪个 normal-vs-abnormal contrast atom。
 4. 如何按 service 聚合。
-5. 它更像 mutation、propagation、observability bias，还是 topology context。
+5. 它是否属于 counterfactual mutation set、propagation set，或者只是 neutral/local-only evidence。
 6. 其运维机制和 rationale 是什么。
 7. 需要哪些字段。
 8. 是否通过 verifier。
@@ -80,12 +80,18 @@ run on existing normal/abnormal telemetry
   ↓
 feature_matrix: services × operators
   ↓
-role_weight_matrix: operators × roles
+derive mutation_features / propagation_features from role_prior membership
   ↓
-mutation / propagation / bias / topology vectors
+CREST-equivalent local family energy, parent context, denoised support
   ↓
-CREST counterfactual ranking
+CREST counterfactual ranking with dynamic mutation/propagation sets
 ```
+
+默认 CREST-MEO 不重新设计 scoring。MEOL 只替代 hard-coded feature/operator
+配置来源；当 `crest_builtin_meol.json` 覆盖当前 21 个 CREST feature 时，在线
+ranking、`A`、`F`、`S`、`score` 必须与原 `crest` 数值等价。旧的
+role-vector projection 和 soft explain-away 只保留为显式 ablation / Oracle
+研究路径。
 
 ---
 
@@ -156,9 +162,9 @@ LLM 只能输出类似下面的 JSON spec：
     "method": "jsd"
   },
   "role_prior": {
-    "mutation": 0.85,
-    "propagation": 0.10,
-    "observability_bias": 0.05,
+    "mutation": 1.0,
+    "propagation": 0.0,
+    "observability_bias": 0.0,
     "topology_context": 0.00
   },
   "mechanism": "interface failure",
@@ -266,6 +272,7 @@ meo/dsl/compiler.py
 meo/runtime/load_meol.py
 meo/runtime/instantiate.py
 meo/library/default_meol.json
+meo/library/crest_builtin_meol.json
 ```
 
 LLM 生成先 mock。
@@ -281,6 +288,44 @@ meo/library/default_meol.json
 ```
 
 第一版可以直接写入 mock LLM 生成的 operators。
+
+同时保留一个用于对照和消融的机械导出库：
+
+```text
+meo/library/crest_builtin_meol.json
+```
+
+这不是 LLM 输出，而是从当前 CREST/CERA 源码导出：
+
+```bash
+uv run --package evidencerank python VibeResearchTools/export_crest_builtin_meol.py
+```
+
+导出规则是：
+
+1. `operators[*].name` 严格等于 `BASE_FEATURE_NAMES` 中的 21 个 CREST built-in
+   feature 名字；
+2. `CREST_COUNTERFACTUAL_MUTATION_FEATURES` 转成 one-hot
+   `role_prior.mutation = 1.0`；
+3. `CREST_COUNTERFACTUAL_PROPAGATION_FEATURES` 转成 one-hot
+   `role_prior.propagation = 1.0`；
+4. 其余 feature 转成 neutral，即 `role_prior.mutation = 0.0` 且
+   `role_prior.propagation = 0.0`；neutral feature 仍参与 CREST local energy 和
+   denoised support，但不参与 counterfactual mutation/propagation 对比。
+
+因此 `default_meol.json` 和 `crest_builtin_meol.json` 的定位不同：
+
+- `default_meol.json`：Phase-1 mock LLM seed，只有 10 个机制化 operators，用于验证
+  LLM synthesis -> verifier -> compiler -> CREST-MEO runtime 流程；
+- `crest_builtin_meol.json`：CREST hard-coded feature/role set 的 JSON 化对照库，
+  用于检查“把 CREST 常量转成 MEOL 后是否覆盖同一批 feature 和 counterfactual
+  role sets”。
+
+`crest_builtin_meol.json` 通过 operator 名字绑定 CREST built-in feature，因此
+`score_crest_services(use_meo=True, meol_path=...)` 会走 `_build_feature_matrix`
+fast path。当前默认 CREST-MEO 语义是“MEOL 配置化 + CREST scoring 等价”：在线路径
+复刻原 CREST 的 `normalize=True`、endpoint support gate、parent context、hard
+counterfactual explain-away 和 denoised support。
 
 示例：
 
@@ -1428,6 +1473,24 @@ local_energy = _local_family_energy(...)
 ...
 ```
 
+### 10.0 当前实现修订：默认使用 CREST-equivalent MEO path
+
+当前主线不再把 `role_prior` 当作四维连续 soft weight。CREST-MEO 默认语义是：
+
+```text
+MEOL operator specs -> feature_names + feature_matrix
+MEOL role_prior     -> mutation_features / propagation_features membership
+CREST scorer        -> 原 CREST 的 local energy、parent context、hard explain-away、S
+```
+
+也就是说，MEOL 只替代“feature/operator 配置来源”和“counterfactual feature set
+来源”；在线 scoring 必须复刻 CREST。`crest_builtin_meol.json` 对齐 21 个
+`BASE_FEATURE_NAMES` 时，`score_crest_services(use_meo=True, meol_path=...)` 应与
+`use_meo=False` 在 service ranking、`A`、`F`、`S`、`score` 上一致。
+
+旧的 role-vector projection / soft explain-away 设计只保留为后续 ablation 思路，不是
+默认 CREST-MEO 路径。
+
 现在建议增加一个可选参数：
 
 ```python
@@ -1443,9 +1506,11 @@ class CRESTMEO(CREST):
     _meol_path = Path("meo/library/default_meol.json")
 ```
 
-### 10.1 新增 role vector 计算函数
+### 10.1 历史 / ablation：role vector 计算函数
 
-在 CREST 文件中新增：
+下面这一路径来自 Phase-1 原型：把 `role_prior` 解释为连续 4 维权重，然后投影为
+mutation / propagation / observability / topology vectors。它不再是默认
+CREST-MEO scoring，仅用于后续 soft-role ablation 或 Oracle 上限实验。
 
 ```python
 ROLE_MUTATION = 0
@@ -1475,11 +1540,14 @@ def _meo_role_vectors(
     }
 ```
 
-### 10.2 新增 soft explain-away
+### 10.2 历史 / ablation：soft explain-away
 
-当前 `_apply_counterfactual_explain_away_once` 通过 feature index 从 role_matrix 中重新计算 mutation / propagation。MEO 模式下直接传入 `mutation` 和 `propagation` vectors。
+当前默认 CREST-equivalent MEO path 仍调用硬 CREST explain-away，只是把
+mutation / propagation feature set 从 MEOL membership 中动态读出。下面的 soft
+版本只用于显式 ablation：它不通过 feature index 重新计算 mutation /
+propagation，而是直接使用投影后的 vectors。
 
-新增：
+历史原型函数：
 
 ```python
 def _apply_counterfactual_explain_away_once_soft(
@@ -1596,61 +1664,58 @@ if use_meo:
     from meo.runtime.instantiate import instantiate_meol_features
 
     specs = load_operator_specs(meol_path or Path("meo/library/default_meol.json"))
+    mutation_features, propagation_features = _meo_counterfactual_feature_sets(specs)
 
-    meo_matrix, meo_features, role_weight_matrix = instantiate_meol_features(
-        frames=frames,
-        services=services,
-        specs=specs,
-    )
+    if all(spec.name in CREST_BUILTIN_FEATURES for spec in specs):
+        meo_matrix, meo_features, trace_edges = _build_feature_matrix(
+            frames, services, tuple(spec.name for spec in specs),
+            enabled_modalities, normalize=True,
+        )
+    else:
+        meo_matrix, meo_features, _ = instantiate_meol_features(
+            frames=frames,
+            services=services,
+            specs=specs,
+        )
+        meo_matrix = np.log1p(nonnegative(meo_matrix))
 
     case_matrix = _robust_case_feature_matrix(meo_matrix)
-    role_vectors = _meo_role_vectors(case_matrix, role_weight_matrix)
-
-    mutation = role_vectors["mutation"]
-    propagation = role_vectors["propagation"]
-    observability_bias = role_vectors["observability_bias"]
-    topology_context = role_vectors["topology_context"]
-
-    local_energy = np.maximum(
-        mutation + propagation + observability_bias + topology_context,
-        0.0,
-    )
+    role_matrix = _apply_arc_trace_endpoint_support_gate(meo_features, case_matrix)
+    local_energy = _local_meo_energy(role_matrix, meo_features)
     local_abnormality = _saturating_incident_scale(local_energy)
 
-    matrix = meo_matrix
     enabled_features = meo_features
-    role_matrix = case_matrix
 
 else:
     existing original path
 ```
 
-之后 graph 逻辑复用现有代码。但在 `graph_mode == "counterfactual"` 分支中，如果 `use_meo=True`，用 soft explain-away：
+之后 graph 逻辑复用 CREST 原路径。`use_meo=True` 只把 hard-coded
+`CREST_COUNTERFACTUAL_MUTATION_FEATURES` / `CREST_COUNTERFACTUAL_PROPAGATION_FEATURES`
+替换成从 MEOL 解析出的 `mutation_features` / `propagation_features`：
 
 ```python
-if use_meo:
-    structural_seed = local_energy.copy()
-    context_weight = _trace_density_context_weight(services, trace_edges)
-    structural_energy = _apply_parent_context(
-        services,
-        structural_seed,
-        trace_edges,
-        context_weight,
-    )
-    structural_energy = _apply_counterfactual_explain_away_soft(
-        services=services,
-        structural_energy=np.maximum(structural_energy, 0.0),
-        mutation=mutation,
-        propagation=propagation,
-        trace_edges=trace_edges,
-    )
-    explanatory_power = _saturating_incident_scale(structural_energy)
-
-    denoised_support = _saturating_incident_scale(
-        np.maximum(mutation + propagation, 0.0)
-    )
-else:
-    existing original counterfactual branch
+structural_energy = _apply_parent_context(...)
+structural_energy = _apply_counterfactual_explain_away(
+    services,
+    structural_energy,
+    role_matrix,
+    enabled_features,
+    trace_edges,
+    mutation_features,
+    propagation_features,
+)
+denoised_energy = _denoised_channel_energy(role_matrix, enabled_features)
+denoised_structural = _apply_parent_context(...)
+denoised_structural = _apply_counterfactual_explain_away(
+    services,
+    denoised_structural,
+    role_matrix,
+    enabled_features,
+    trace_edges,
+    mutation_features,
+    propagation_features,
+)
 ```
 
 最终：
@@ -1905,11 +1970,10 @@ Important constraints:
 4. You must only use the allowed DSL atoms.
 5. Each operator must be computable from normal and abnormal telemetry windows.
 6. Each operator must be service-level or edge-level aggregatable.
-7. Each operator must include a role_prior over:
+7. Each operator must assign exactly one counterfactual role membership:
    - mutation
    - propagation
-   - observability_bias
-   - topology_context
+   - neutral, represented by mutation=0 and propagation=0
 8. Output valid JSON only.
 
 Telemetry schema:
@@ -1942,7 +2006,7 @@ Return JSON in this format:
         "method": "max|mean|sum|p95|ratio|jsd"
       }},
       "role_prior": {{
-        "mutation": 0.0,
+        "mutation": 1.0,
         "propagation": 0.0,
         "observability_bias": 0.0,
         "topology_context": 0.0
@@ -2027,7 +2091,8 @@ DEFAULT_MECHANISM_CATALOG = [
 4. `use_meo=True` 时走新路径。
 5. 如果 MEOL 加载失败或 operators 全部不可用，应 fallback 到原始 CREST 或 local abnormality，不能崩溃。
 6. 所有 feature 输出必须非负、finite。
-7. 所有 role_prior 必须归一化。
+7. `role_prior` 不再是连续软权重；只允许 mutation、propagation 或 neutral，且
+   mutation 与 propagation 不可同时为正。
 8. MEOL 不允许使用 GT、fault label、baseline output。
 
 ---
@@ -2168,7 +2233,7 @@ frames = {
 3. `default_meol.json` 可以被加载并编译。
 4. 每个 operator 都能输出每个 service 的非负分数。
 5. CRESTMEO 输出 service-level ranking。
-6. feature names 和 role weights 可导出用于诊断。
+6. feature names、counterfactual role membership 和兼容诊断矩阵可导出用于诊断。
 7. mock LLM 版本可以复现固定 MEOL。
 8. 没有任何 GT label、fault type、baseline output 进入 MEOL。
 9. 支持后续替换为真实 LLM 生成。
@@ -2183,7 +2248,8 @@ frames = {
 4. compiler 必须只使用已有 telemetry frames。
 5. verifier 必须防止 GT leakage。
 6. MEO 模式失败时要 graceful fallback。
-7. role_prior 先用 soft weight，不要硬编码 mutation / propagation set。
+7. `role_prior` 表达 counterfactual role membership，默认只区分 mutation、
+   propagation 和 neutral；soft role-vector 只作为后续 ablation。
 8. 第一版不要追求覆盖所有字段，先跑通核心 operators。
 9. 所有输出必须 finite、non-negative。
 10. 保留原始 hard-coded CREST 作为 baseline 和 ablation。
@@ -2214,14 +2280,14 @@ Raw-telemetry Oracle artifact 用于回答：
 ```text
 如果允许用整个 benchmark 的 GT label 离线选择通用 evidence operators 和角色，
 但每个 operator 的取值仍只能来自 raw normal/abnormal telemetry，
-CREST-MEO role-vector + counterfactual ranking 可以达到什么上限？
+一个更自由的 Oracle role synthesis / counterfactual ranking 可以达到什么上限？
 ```
 
 它用于：
 
 1. 给 CREST、默认 CREST-MEO 和 future LLM-MEO 做 upper-bound 对照；
 2. 检查当前 telemetry schema 能否表达更强的 RCA evidence；
-3. 验证 MEOL/feature-matrix/role-vector/counterfactual pipeline 是否能消费全局 operator library；
+3. 验证 MEOL/feature-matrix/counterfactual pipeline 是否能消费全局 operator library；
 4. 为论文叙事区分“在线无标签算法”与“离线 Oracle 角色合成上限”。
 
 ### 20.2 严格隔离规则
@@ -2306,7 +2372,9 @@ fault 名或任何 per-incident GT 规则。
 AC@1 -> MRR -> AC@3 -> AC@5 -> fewer selected operators
 ```
 
-评分路径使用 CREST-MEO role-vector 语义：
+Oracle 工具内部可以使用更自由的 role-vector scoring 语义，以估计“如果离线
+operator/role synthesis 也被 GT 选择，理论上限能到哪里”。这一路径与默认
+在线 `CRESTMEO` 隔离，不代表 deployable scoring：
 
 ```text
 mutation = feature_matrix @ role_weight_matrix[:, mutation]

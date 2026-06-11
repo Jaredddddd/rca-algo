@@ -10,8 +10,7 @@
   "roles": [
     "mutation",
     "propagation",
-    "observability_bias",
-    "topology_context"
+    "neutral"
   ],
   "operators": [
     {
@@ -32,10 +31,10 @@
         "method": "max"
       },
       "role_prior": {
-        "mutation": 0.45,
-        "propagation": 0.3,
-        "observability_bias": 0.15,
-        "topology_context": 0.1
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
       },
       "mechanism": "resource or performance magnitude shift",
       "required_fields": [
@@ -43,7 +42,7 @@
         "service_name",
         "value"
       ],
-      "rationale": "Large metric z shifts indicate service-local state deviation, while retaining propagation and volume uncertainty."
+      "rationale": "Large metric z shifts provide local evidence but are neutral for counterfactual mutation/propagation explain-away."
     },
     {
       "name": "metric_count_drop_shift",
@@ -63,9 +62,9 @@
         "method": "ratio"
       },
       "role_prior": {
-        "mutation": 0.75,
-        "propagation": 0.1,
-        "observability_bias": 0.15,
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
         "topology_context": 0.0
       },
       "mechanism": "service hang or telemetry disappearance",
@@ -93,9 +92,9 @@
         "method": "jsd"
       },
       "role_prior": {
-        "mutation": 0.85,
-        "propagation": 0.1,
-        "observability_bias": 0.05,
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
         "topology_context": 0.0
       },
       "mechanism": "interface failure",
@@ -123,9 +122,9 @@
         "method": "ratio"
       },
       "role_prior": {
-        "mutation": 0.8,
-        "propagation": 0.15,
-        "observability_bias": 0.05,
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
         "topology_context": 0.0
       },
       "mechanism": "interface failure",
@@ -153,9 +152,9 @@
         "method": "jsd"
       },
       "role_prior": {
-        "mutation": 0.75,
-        "propagation": 0.2,
-        "observability_bias": 0.05,
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
         "topology_context": 0.0
       },
       "mechanism": "endpoint behavior change",
@@ -183,9 +182,9 @@
         "method": "max"
       },
       "role_prior": {
-        "mutation": 0.2,
-        "propagation": 0.75,
-        "observability_bias": 0.05,
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
         "topology_context": 0.0
       },
       "mechanism": "latency propagation",
@@ -213,9 +212,9 @@
         "method": "ratio"
       },
       "role_prior": {
-        "mutation": 0.2,
-        "propagation": 0.7,
-        "observability_bias": 0.1,
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
         "topology_context": 0.0
       },
       "mechanism": "retry or traffic amplification",
@@ -242,9 +241,9 @@
         "method": "ratio"
       },
       "role_prior": {
-        "mutation": 0.75,
-        "propagation": 0.15,
-        "observability_bias": 0.1,
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
         "topology_context": 0.0
       },
       "mechanism": "service hang or request handling failure",
@@ -271,9 +270,9 @@
         "method": "ratio"
       },
       "role_prior": {
-        "mutation": 0.35,
-        "propagation": 0.55,
-        "observability_bias": 0.1,
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
         "topology_context": 0.0
       },
       "mechanism": "software event volume shift",
@@ -300,9 +299,9 @@
         "method": "jsd"
       },
       "role_prior": {
-        "mutation": 0.45,
-        "propagation": 0.45,
-        "observability_bias": 0.1,
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
         "topology_context": 0.0
       },
       "mechanism": "software event distribution shift",
@@ -314,4 +313,3 @@
     }
   ]
 }
-
