@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -103,6 +104,11 @@ ROLE_MUTATION = ROLE_ORDER.index("mutation")
 ROLE_PROPAGATION = ROLE_ORDER.index("propagation")
 ROLE_OBSERVABILITY_BIAS = ROLE_ORDER.index("observability_bias")
 ROLE_TOPOLOGY_CONTEXT = ROLE_ORDER.index("topology_context")
+
+
+@lru_cache(maxsize=8)
+def _cached_meo_specs(meol_path: str) -> tuple[EvidenceOperatorSpec, ...]:
+    return tuple(load_operator_specs(Path(meol_path)))
 
 
 def _finite_nonnegative_array(values: np.ndarray) -> np.ndarray:
@@ -286,6 +292,49 @@ def _filter_meo_specs_for_modalities(
         for spec in specs
         if spec.source in enabled_modalities or spec.source == "topology"
     ]
+
+
+def _meo_role_weight_matrix(specs: list[EvidenceOperatorSpec]) -> np.ndarray:
+    weights: list[list[float]] = []
+    for spec in specs:
+        raw = [float(spec.role_prior.get(role, 0.0)) for role in ROLE_ORDER]
+        clean = [value if math.isfinite(value) and value > 0.0 else 0.0 for value in raw]
+        total = sum(clean)
+        weights.append(
+            [value / total for value in clean]
+            if total > 1e-12
+            else [0.0 for _role in ROLE_ORDER]
+        )
+    return np.asarray(weights, dtype=np.float64)
+
+
+def _instantiate_meol_from_crest_features(
+    frames: dict[str, pd.DataFrame],
+    services: list[str],
+    specs: list[EvidenceOperatorSpec],
+    enabled_modalities: frozenset[str],
+) -> tuple[np.ndarray, tuple[str, ...], np.ndarray, list[tuple[str, str]]] | None:
+    """Fast path for MEOL operators that are aliases of built-in CREST features."""
+
+    if not specs:
+        return None
+    enabled_feature_set = frozenset().union(
+        *(MODALITY_FEATURES[modality] for modality in enabled_modalities)
+    )
+    feature_names = tuple(spec.name for spec in specs)
+    if any(name not in enabled_feature_set for name in feature_names):
+        return None
+    if len(set(feature_names)) != len(feature_names):
+        return None
+
+    matrix, trace_edges = _build_feature_matrix(
+        frames,
+        services,
+        feature_names,
+        enabled_modalities,
+        normalize=False,
+    )
+    return matrix, feature_names, _meo_role_weight_matrix(specs), trace_edges
 
 
 def _apply_counterfactual_explain_away_once(
@@ -642,22 +691,32 @@ def score_crest_services(
     propagation = np.zeros(len(services), dtype=np.float64)
     if use_meo:
         try:
+            selected_meol_path = meol_path or DEFAULT_MEOL_PATH
             specs = _filter_meo_specs_for_modalities(
-                load_operator_specs(meol_path or DEFAULT_MEOL_PATH),
+                list(_cached_meo_specs(str(selected_meol_path))),
                 enabled_modalities,
             )
-            meo_matrix, _meo_features, role_weight_matrix = instantiate_meol_features(
+            fast_meo = _instantiate_meol_from_crest_features(
                 frames,
                 services,
                 specs,
-            )
-            _empty_matrix, trace_edges = _build_feature_matrix(
-                frames,
-                services,
-                (),
                 enabled_modalities,
-                normalize=False,
             )
+            if fast_meo is None:
+                meo_matrix, _meo_features, role_weight_matrix = instantiate_meol_features(
+                    frames,
+                    services,
+                    specs,
+                )
+                _empty_matrix, trace_edges = _build_feature_matrix(
+                    frames,
+                    services,
+                    (),
+                    enabled_modalities,
+                    normalize=False,
+                )
+            else:
+                meo_matrix, _meo_features, role_weight_matrix, trace_edges = fast_meo
             case_matrix = _robust_case_feature_matrix(meo_matrix)
             role_vectors = _meo_role_vectors(case_matrix, role_weight_matrix)
             mutation = role_vectors["mutation"]

@@ -4,7 +4,9 @@ import math
 
 import numpy as np
 import pandas as pd
+import pytest
 
+import evidencerank.crest as crest_module
 from evidencerank.crest import score_crest_services
 from evidencerank.meo.dsl.atoms import (
     count_drop,
@@ -113,6 +115,24 @@ def test_score_crest_services_with_meo_smoke(tmp_path) -> None:
     assert list(ranking.columns) == ["service", "A", "F", "S", "score"]
     assert ranking.iloc[0]["service"] == "a"
     assert math.isfinite(float(ranking.iloc[0]["score"]))
+    assert float(ranking.iloc[0]["score"]) > 0.0
+
+
+def test_score_crest_services_default_meol_uses_crest_feature_fast_path(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frames = _trace_frames()
+    for name, frame in frames.items():
+        frame.to_parquet(tmp_path / f"{name}.parquet")
+
+    def fail_interpreter(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("default MEOL should use the CREST feature fast path")
+
+    monkeypatch.setattr(crest_module, "instantiate_meol_features", fail_interpreter)
+    ranking = score_crest_services(tmp_path, use_meo=True)
+
+    assert ranking.iloc[0]["service"] == "a"
     assert float(ranking.iloc[0]["score"]) > 0.0
 
 

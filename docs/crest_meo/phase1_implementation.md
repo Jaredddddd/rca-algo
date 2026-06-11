@@ -126,3 +126,37 @@ Results:
 Full benchmark evaluation is not part of Phase 1 acceptance; this phase is
 about getting JSON MEOL -> compiler -> feature matrix -> CRESTMEO ranking
 running without introducing online LLM calls or answer-metadata leakage.
+
+## Runtime Optimization
+
+CREST-MEO now has a general grouped execution path rather than a purely
+operator-by-operator interpreter. For each incident, the MEOL is loaded once,
+operators are filtered by enabled modality, and the `EvidenceCompiler` caches
+normal/abnormal telemetry slices grouped by source and service. Metric, trace,
+and log operators that share the same source therefore reuse the same
+service-level frame groups instead of repeatedly filtering the full DataFrame
+for every operator.
+
+The default MEOL also has a compatibility fast path: when every enabled
+operator name maps directly to an existing CREST/CERA feature name, CREST-MEO
+uses the existing batched `_build_feature_matrix` implementation and then
+projects the resulting columns through the MEOL `role_prior` matrix. Custom
+operators that do not map to built-in CREST features still fall back to the
+general grouped compiler path, preserving DSL compatibility.
+
+Validation on one RCABench case after the optimization:
+
+```text
+case=ts7-mysql-partition-wk622l
+crest avg     3.6187s over 5 runs
+crest_meo avg 3.5271s over 5 runs
+```
+
+Verification commands:
+
+```bash
+uv run --package evidencerank pytest algorithms/evidencerank/tests/test_meo_phase1.py -q
+uv run --package evidencerank python -m compileall -q algorithms/evidencerank/src/evidencerank/meo algorithms/evidencerank/src/evidencerank/crest.py
+uv run --package evidencerank ruff check algorithms/evidencerank/src/evidencerank/meo/dsl/compiler.py algorithms/evidencerank/src/evidencerank/crest.py algorithms/evidencerank/tests/test_meo_phase1.py
+uv run --package evidencerank python VibeResearchTools/evidrank_lab.py guard
+```

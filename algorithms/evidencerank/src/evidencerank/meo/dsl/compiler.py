@@ -100,6 +100,12 @@ def _finite_nonnegative_array(values: Iterable[Any], length: int) -> np.ndarray:
 class EvidenceCompiler:
     """Compile verified EvidenceOperatorSpec objects into feature functions."""
 
+    def __init__(self) -> None:
+        self._service_group_cache: dict[
+            tuple[int, int, tuple[str, ...], str],
+            tuple[dict[str, pd.DataFrame], dict[str, pd.DataFrame]] | None,
+        ] = {}
+
     def compile(self, spec: EvidenceOperatorSpec) -> FeatureFn:
         if spec.source == "metric":
             return self._compile_metric(spec)
@@ -118,8 +124,26 @@ class EvidenceCompiler:
         def feature(frames: dict[str, pd.DataFrame], services: list[str]) -> np.ndarray:
             normal = frames.get("normal_metrics", pd.DataFrame())
             abnormal = frames.get("abnormal_metrics", pd.DataFrame())
+            grouped = self._service_frame_groups(normal, abnormal, services, source="metric")
             out: list[float] = []
             for service in services:
+                if grouped is not None:
+                    normal_groups, abnormal_groups = grouped
+                    n_service = normal_groups.get(service, pd.DataFrame(columns=normal.columns))
+                    a_service = abnormal_groups.get(service, pd.DataFrame(columns=abnormal.columns))
+                    if field in ROW_COUNT_FIELDS:
+                        out.append(self._apply_count_op(op, float(len(n_service)), float(len(a_service))))
+                        continue
+                    out.append(
+                        self._metric_numeric_score_from_service_frames(
+                            n_service,
+                            a_service,
+                            field,
+                            op,
+                            spec,
+                        )
+                    )
+                    continue
                 if field in ROW_COUNT_FIELDS:
                     out.append(
                         self._apply_count_op(
@@ -133,6 +157,45 @@ class EvidenceCompiler:
             return _finite_nonnegative_array(out, len(services))
 
         return feature
+
+    def _metric_numeric_score_from_service_frames(
+        self,
+        normal_service: pd.DataFrame,
+        abnormal_service: pd.DataFrame,
+        field: str,
+        op: str,
+        spec: EvidenceOperatorSpec,
+    ) -> float:
+        value_col_n = self._find_col(normal_service, ("value", "metric_value", "val"))
+        value_col_a = self._find_col(abnormal_service, ("value", "metric_value", "val"))
+        if value_col_n is None or value_col_a is None:
+            return 0.0
+
+        metric_col_n = self._find_col(normal_service, ("metric", "metric_name", "name"))
+        metric_col_a = self._find_col(abnormal_service, ("metric", "metric_name", "name"))
+        if field == "*" or metric_col_n is None or metric_col_a is None:
+            return self._apply_field_op(op, normal_service[value_col_n], abnormal_service[value_col_a])
+
+        n_names = normal_service[metric_col_n].map(_clean_text)
+        a_names = abnormal_service[metric_col_a].map(_clean_text)
+        names = sorted((set(n_names.dropna()) | set(a_names.dropna())) & {field})
+        if not names:
+            names = sorted(
+                name
+                for name in (set(n_names.dropna()) | set(a_names.dropna()))
+                if field in str(name)
+            )
+        return self._aggregate_scores(
+            [
+                self._apply_field_op(
+                    op,
+                    normal_service.loc[n_names == name, value_col_n],
+                    abnormal_service.loc[a_names == name, value_col_a],
+                )
+                for name in names
+            ],
+            spec.aggregation.method,
+        )
 
     def _metric_numeric_score(
         self,
@@ -241,15 +304,15 @@ class EvidenceCompiler:
         def feature(frames: dict[str, pd.DataFrame], services: list[str]) -> np.ndarray:
             normal = frames.get("normal_traces", pd.DataFrame())
             abnormal = frames.get("abnormal_traces", pd.DataFrame())
-            service_col_n = self._find_col(normal, SERVICE_ALIASES)
-            service_col_a = self._find_col(abnormal, SERVICE_ALIASES)
-            if service_col_n is None or service_col_a is None:
+            grouped = self._service_frame_groups(normal, abnormal, services, source="trace")
+            if grouped is None:
                 return np.zeros(len(services), dtype=np.float64)
+            normal_groups, abnormal_groups = grouped
 
             out: list[float] = []
             for service in services:
-                n_service = self._filter_service(normal, service_col_n, service)
-                a_service = self._filter_service(abnormal, service_col_a, service)
+                n_service = normal_groups.get(service, pd.DataFrame(columns=normal.columns))
+                a_service = abnormal_groups.get(service, pd.DataFrame(columns=abnormal.columns))
                 if field in ROW_COUNT_FIELDS:
                     out.append(self._apply_count_op(op, float(len(n_service)), float(len(a_service))))
                     continue
@@ -275,15 +338,15 @@ class EvidenceCompiler:
         def feature(frames: dict[str, pd.DataFrame], services: list[str]) -> np.ndarray:
             normal = frames.get("normal_logs", pd.DataFrame())
             abnormal = frames.get("abnormal_logs", pd.DataFrame())
-            service_col_n = self._find_col(normal, SERVICE_ALIASES)
-            service_col_a = self._find_col(abnormal, SERVICE_ALIASES)
-            if service_col_n is None or service_col_a is None:
+            grouped = self._service_frame_groups(normal, abnormal, services, source="log")
+            if grouped is None:
                 return np.zeros(len(services), dtype=np.float64)
+            normal_groups, abnormal_groups = grouped
 
             out: list[float] = []
             for service in services:
-                n_service = self._filter_service(normal, service_col_n, service)
-                a_service = self._filter_service(abnormal, service_col_a, service)
+                n_service = normal_groups.get(service, pd.DataFrame(columns=normal.columns))
+                a_service = abnormal_groups.get(service, pd.DataFrame(columns=abnormal.columns))
                 if field in ROW_COUNT_FIELDS:
                     out.append(self._apply_count_op(op, float(len(n_service)), float(len(a_service))))
                     continue
@@ -319,6 +382,43 @@ class EvidenceCompiler:
             return pd.DataFrame(columns=[] if frame is None else frame.columns)
         normalized = frame[service_col].map(_clean_text)
         return frame.loc[normalized == str(service)]
+
+    def _service_frame_groups(
+        self,
+        normal: pd.DataFrame,
+        abnormal: pd.DataFrame,
+        services: list[str],
+        *,
+        source: str,
+    ) -> tuple[dict[str, pd.DataFrame], dict[str, pd.DataFrame]] | None:
+        service_col_n = self._find_col(normal, SERVICE_ALIASES)
+        service_col_a = self._find_col(abnormal, SERVICE_ALIASES)
+        if service_col_n is None or service_col_a is None:
+            return None
+
+        key = (id(normal), id(abnormal), tuple(services), source)
+        cached = self._service_group_cache.get(key)
+        if cached is not None:
+            return cached
+
+        service_set = set(services)
+
+        def build(frame: pd.DataFrame, service_col: str) -> dict[str, pd.DataFrame]:
+            if frame is None or frame.empty or service_col not in frame.columns:
+                return {}
+            working = frame.copy()
+            working["_meo_service_name"] = working[service_col].map(_clean_text)
+            working = working.loc[working["_meo_service_name"].isin(service_set)]
+            if working.empty:
+                return {}
+            return {
+                str(service): group.drop(columns=["_meo_service_name"])
+                for service, group in working.groupby("_meo_service_name", sort=False)
+            }
+
+        grouped = (build(normal, service_col_n), build(abnormal, service_col_a))
+        self._service_group_cache[key] = grouped
+        return grouped
 
     def _resolve_trace_field(self, frame: pd.DataFrame, field: str) -> str | None:
         aliases = {
@@ -384,4 +484,3 @@ class EvidenceCompiler:
         if method == "p95":
             return float(np.percentile(clean, 95))
         return float(np.max(clean))
-

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -47,26 +48,36 @@ def instantiate_meol_features(
     """Compile and execute MEOL operators against one incident's telemetry."""
 
     compiler = compiler or EvidenceCompiler()
-    feature_values: list[np.ndarray] = []
-    feature_names: list[str] = []
-    role_weights: list[list[float]] = []
+    feature_values: list[np.ndarray | None] = [None for _spec in specs]
+    role_weights: list[list[float] | None] = [None for _spec in specs]
+    grouped_indices: dict[str, list[int]] = defaultdict(list)
+    for idx, spec in enumerate(specs):
+        grouped_indices[spec.source].append(idx)
 
-    for spec in specs:
-        try:
-            feature_fn = compiler.compile(spec)
-            values = feature_fn(frames, services)
-        except Exception:
-            values = np.zeros(len(services), dtype=np.float64)
-        feature_values.append(_clean_feature_values(values, len(services)))
-        feature_names.append(spec.name)
-        role_weights.append(_role_weights(spec))
+    for source in ("metric", "trace", "log", "topology"):
+        for idx in grouped_indices.get(source, []):
+            spec = specs[idx]
+            try:
+                feature_fn = compiler.compile(spec)
+                values = feature_fn(frames, services)
+            except Exception:
+                values = np.zeros(len(services), dtype=np.float64)
+            feature_values[idx] = _clean_feature_values(values, len(services))
+            role_weights[idx] = _role_weights(spec)
 
     if feature_values:
-        feature_matrix = np.stack(feature_values, axis=1).astype(np.float64, copy=False)
-        role_weight_matrix = np.asarray(role_weights, dtype=np.float64)
+        clean_features = [
+            values if values is not None else np.zeros(len(services), dtype=np.float64)
+            for values in feature_values
+        ]
+        clean_role_weights = [
+            weights if weights is not None else [0.0 for _role in ROLE_ORDER]
+            for weights in role_weights
+        ]
+        feature_matrix = np.stack(clean_features, axis=1).astype(np.float64, copy=False)
+        role_weight_matrix = np.asarray(clean_role_weights, dtype=np.float64)
     else:
         feature_matrix = np.zeros((len(services), 0), dtype=np.float64)
         role_weight_matrix = np.zeros((0, len(ROLE_ORDER)), dtype=np.float64)
 
-    return feature_matrix, tuple(feature_names), role_weight_matrix
-
+    return feature_matrix, tuple(spec.name for spec in specs), role_weight_matrix
