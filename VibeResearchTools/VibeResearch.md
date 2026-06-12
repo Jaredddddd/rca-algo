@@ -1,6 +1,6 @@
 # Vibe Research
 
-This is the main page for EvidenceRank vibe research. Keep long-lived research context, launch prompts, decisions, and links here. Detailed iteration notes can stay in `docs/EvidRank_evolve/`; EvidRank-ARC notes live in `docs/EvidRank-ARC-Evolve/`. New CREST evolution notes live in `docs/crest_evolve/`.
+This is the main page for EvidenceRank vibe research. Keep long-lived research context, launch prompts, decisions, and links here. Detailed iteration notes can stay in `docs/EvidRank_evolve/`; EvidRank-ARC notes live in `docs/EvidRank-ARC-Evolve/`. New CREST development should use the standalone `algorithms/crest/` module; retained CREST docs live in `algorithms/crest/docs/crest_meo/` and `algorithms/crest/docs/root_notes/`.
 
 ## Research Entry
 
@@ -8,7 +8,7 @@ This is the main page for EvidenceRank vibe research. Keep long-lived research c
 - Default dataset for current evolution: `rcabench`
 - Iteration docs: `docs/EvidRank_evolve/`
 - EvidRank-ARC docs: `docs/EvidRank-ARC-Evolve/`
-- CREST evolution docs: `docs/crest_evolve/`
+- CREST docs: `algorithms/crest/docs/crest_meo/`, `algorithms/crest/docs/root_notes/`
 - Feature-priority weight study: `docs/feature_weight.md`
 - Tool CLI: `VibeResearchTools/evidrank_lab.py`
 - Labels for offline analysis only: `data/rcabench-platform-v2/meta/rcabench-csv/labels.csv`

@@ -22,12 +22,9 @@ matches the algorithm area being changed.
   - `algorithms/crest/src/crest/meo/`
 - Planned upstream repository: `git@github.com:Jaredddddd/Crest.git`
 - Current research docs:
-  - `algorithms/crest/docs/crest_evolve/`
-  - `algorithms/crest/docs/crest_evolve_aiops25/`
   - `algorithms/crest/docs/crest_meo/`
-  - `algorithms/crest/docs/crest_residual/`
-  - `algorithms/crest/docs/pv-crest/`
   - `algorithms/crest/docs/root_notes/`
 
-Read `algorithms/crest/docs/crest_evolve/CREST_extraction_plan.md` before making structural
-changes around CREST extraction.
+CREST has already been extracted from EvidenceRank. For new structural changes,
+use `algorithms/crest/` as the source of truth and keep compatibility adapters
+under `algorithms/evidencerank/` thin.

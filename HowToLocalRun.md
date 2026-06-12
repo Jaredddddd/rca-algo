@@ -1009,7 +1009,7 @@ LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidenceran
 
 CREST 当前默认入口不再包含 calibration；保留的核心模块是 local abnormality、
 trace parent context、counterfactual explain-away 和 denoised support。消融入口分为
-结构模块消融、模态消融和实验性 MEO / residual 入口。
+结构模块消融、模态消融和实验性 MEO 入口。
 
 结构模块消融：
 
@@ -1022,9 +1022,8 @@ trace parent context、counterfactual explain-away 和 denoised support。消融
 
 | 变体名 | 说明 |
 |--------|------|
-| `crest_residual` | residual explainability 消融；不是默认排序通道 |
-| `crest_meo` | MEO runtime 入口 |
-| `crest_meo_builtin` | 内置 CREST MEO library 入口 |
+| `crest_meo` | MEO runtime 入口，默认使用内置 CREST-equivalent MEOL |
+| `crest_meo_builtin` | `crest_meo` 的兼容别名 |
 
 模态消融：
 
@@ -1054,12 +1053,11 @@ LOGURU_LEVEL=WARNING uv run --package crest python algorithms/crest/main.py \
   -d rcabench --clear --use-cpus 32
 ```
 
-如果要一起跑实验性 MEO / residual 入口：
+如果要一起跑实验性 MEO 入口：
 
 ```bash
 LOGURU_LEVEL=WARNING uv run --package crest python algorithms/crest/main.py \
   eval batch \
-  -a crest_residual \
   -a crest_meo \
   -a crest_meo_builtin \
   -d rcabench --clear --use-cpus 32

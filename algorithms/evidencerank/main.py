@@ -38,7 +38,6 @@ from crest.algorithm import (
     CRESTTrace,
 )
 from crest.meo_algorithm import CRESTMEO, CRESTMEOBuiltIn
-from crest.residual import CRESTResidual
 
 if __name__ == "__main__":
     registry = global_algorithm_registry()
@@ -66,7 +65,6 @@ if __name__ == "__main__":
     registry["crest_log_trace"] = CRESTLogTrace
     registry["crest_local"] = CRESTLocal
     registry["crest_nocf"] = CRESTNoCF
-    registry["crest_residual"] = CRESTResidual
     registry["crest_meo"] = CRESTMEO
     registry["crest_meo_builtin"] = CRESTMEOBuiltIn
 

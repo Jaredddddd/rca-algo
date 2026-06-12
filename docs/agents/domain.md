@@ -22,13 +22,15 @@ Primary current development area:
 - EvidenceRank compatibility adapter: `algorithms/evidencerank/src/evidencerank/crest.py`
 - Planned CREST upstream: `git@github.com:Jaredddddd/Crest.git`
 - `docs/EvidRank_evolve/`
-- `algorithms/crest/docs/crest_evolve/`
+- `algorithms/crest/docs/crest_meo/`
 - `algorithms/crest/docs/root_notes/`
 - `VibeResearchTools/VibeResearch.md`
 
 The user intends to continue CREST-related development in the standalone CREST module under `algorithms/crest/`.
 
-Before structural CREST extraction work, read `CONTEXT-MAP.md` and `algorithms/crest/docs/crest_evolve/CREST_extraction_plan.md`.
+CREST has already been extracted from EvidenceRank. For new structural work, read
+`CONTEXT-MAP.md`, use `algorithms/crest/` as the source of truth, and keep
+EvidenceRank adapters thin.
 
 ## Use the glossary's vocabulary
 
