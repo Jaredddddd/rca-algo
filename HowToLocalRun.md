@@ -132,6 +132,10 @@ Initialize algorithm submodules:
 git submodule update --init --recursive
 ```
 
+`algorithms/crest` is a standalone CREST submodule. New CREST development and
+evaluation should use the `crest` package entrypoint shown below instead of the
+old `evidencerank` compatibility path.
+
 Install `uv` if needed:
 
 ```bash
@@ -148,7 +152,7 @@ uv python install 3.13 3.12 3.10.16
 The lightweight v2 eval algorithms mostly use Python 3.13. The trainable or heavier algorithms use separate environments:
 
 ```text
-baro, rcd, run, causalrca, microdig, shapleyiq, simplerca, evidencerank, herosas: workspace packages
+baro, rcd, run, causalrca, microdig, shapleyiq, simplerca, evidencerank, crest, herosas: workspace packages
 diagfusion: separate uv project, Python 3.10.16
 art:        separate uv project, Python >=3.12
 eadro:      separate uv project, Python >=3.12, CUDA torch/dgl configured
@@ -347,6 +351,7 @@ uv sync --frozen --package rcaeval_causalrca
 uv sync --frozen --package rcaeval_run
 uv sync --frozen --package SimpleRCA
 uv sync --frozen --package evidencerank
+uv sync --frozen --package crest
 uv sync --frozen --package herosas
 
 uv sync --frozen --directory algorithms/art
@@ -516,10 +521,10 @@ output/rcabench-platform-v2/data/aiopschallenge2025_rcabench_service/<datapack>/
 CREST 已经在该数据集上跑通过，适合作为新数据集的首个连通性检查：
 
 ```bash
-uv run --package evidencerank python algorithms/evidencerank/main.py \
+uv run --package crest python algorithms/crest/main.py \
   eval batch -a crest -d "$DATASET" --clear --use-cpus "$CPUS"
 
-uv run --package evidencerank python algorithms/evidencerank/main.py \
+uv run --package crest python algorithms/crest/main.py \
   eval perf-report "$DATASET"
 ```
 
@@ -593,7 +598,9 @@ uv run --package shapleyiq python algorithms/shapleyiq/main.py \
   --use-cpus "$CPUS"
 ```
 
-EvidenceRank / CERA / CREST 可以一起跑：
+EvidenceRank / CERA / CREST 可以一起跑。这里的 `crest` 会经过
+`evidencerank` compatibility adapter；如果只跑 CREST 或开发 CREST，优先使用下一段
+`algorithms/crest/main.py` 的独立入口。
 
 ```bash
 uv run --package evidencerank python algorithms/evidencerank/main.py \
@@ -609,7 +616,7 @@ uv run --package evidencerank python algorithms/evidencerank/main.py \
 如果要跑 CREST 消融：
 
 ```bash
-uv run --package evidencerank python algorithms/evidencerank/main.py \
+uv run --package crest python algorithms/crest/main.py \
   eval batch \
   -a crest \
   -a crest_local \
@@ -651,6 +658,7 @@ export DATASET=aiopschallenge2025_rcabench_service
 
 ```bash
 uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report "$DATASET"
+uv run --package crest python algorithms/crest/main.py eval perf-report "$DATASET"
 uv run --package baro python algorithms/baro/main.py eval perf-report "$DATASET"
 uv run --package shapleyiq python algorithms/shapleyiq/main.py eval perf-report "$DATASET"
 ```
@@ -960,27 +968,48 @@ uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
 
 ### CREST
 
-CREST 也注册在 `evidencerank` package 中。当前默认 `crest` 不调用 CERA
-`_role_scores` 先验，运行时只读取当前 datapack 的 metric / trace / log telemetry。它使用
-local abnormality、trace parent context、counterfactual explain-away 和 denoised support
-完成排序，不包含 calibration 通道。
+CREST 的 canonical implementation 已经抽取到独立子模块 `algorithms/crest`。新开发、
+单独评估和消融实验都优先使用 `crest` package 入口；`evidencerank` 中的 CREST 文件只保留
+compatibility adapter。
+
+当前默认 `crest` 不调用 CERA `_role_scores` 先验，运行时只读取当前 datapack 的
+metric / trace / log telemetry。它使用 local abnormality、trace parent context、
+counterfactual explain-away 和 denoised support 完成排序，不包含 calibration 通道。
 
 ```bash
-LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidencerank/main.py \
+LOGURU_LEVEL=WARNING uv run --package crest python algorithms/crest/main.py \
   eval batch -a crest -d rcabench --clear --use-cpus 32
 ```
 
 Report:
 
 ```bash
-uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
+uv run --package crest python algorithms/crest/main.py eval perf-report rcabench
+```
+
+最近一次抽取后 full eval 验证结果：
+
+```text
+total: 1422
+error: 0
+MRR:   0.875326
+AC@1:  0.800281
+AC@3:  0.944444
+AC@5:  0.971871
+```
+
+旧入口仍可用于兼容已有脚本，但不要作为新的 CREST 开发入口：
+
+```bash
+LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidencerank/main.py \
+  eval batch -a crest -d rcabench --clear --use-cpus 32
 ```
 
 #### CREST Ablation (消融实验)
 
 CREST 当前默认入口不再包含 calibration；保留的核心模块是 local abnormality、
 trace parent context、counterfactual explain-away 和 denoised support。消融入口分为
-结构模块消融和模态消融。
+结构模块消融、模态消融和实验性 MEO / residual 入口。
 
 结构模块消融：
 
@@ -988,6 +1017,14 @@ trace parent context、counterfactual explain-away 和 denoised support。消融
 |--------|------|
 | `crest_local` | 只使用 Module 1 local abnormality |
 | `crest_nocf` | 用 PageRank-style topology 替代 counterfactual propagation |
+
+实验性入口：
+
+| 变体名 | 说明 |
+|--------|------|
+| `crest_residual` | residual explainability 消融；不是默认排序通道 |
+| `crest_meo` | MEO runtime 入口 |
+| `crest_meo_builtin` | 内置 CREST MEO library 入口 |
 
 模态消融：
 
@@ -1003,7 +1040,7 @@ trace parent context、counterfactual explain-away 和 denoised support。消融
 一次运行完整 CREST 和所有结构 / 模态消融变体：
 
 ```bash
-LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidencerank/main.py \
+LOGURU_LEVEL=WARNING uv run --package crest python algorithms/crest/main.py \
   eval batch \
   -a crest \
   -a crest_local \
@@ -1017,17 +1054,28 @@ LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidenceran
   -d rcabench --clear --use-cpus 32
 ```
 
+如果要一起跑实验性 MEO / residual 入口：
+
+```bash
+LOGURU_LEVEL=WARNING uv run --package crest python algorithms/crest/main.py \
+  eval batch \
+  -a crest_residual \
+  -a crest_meo \
+  -a crest_meo_builtin \
+  -d rcabench --clear --use-cpus 32
+```
+
 如果只跑 held-out split，把 `-d rcabench` 换成 `-d rcabench_test`：
 
 ```bash
-LOGURU_LEVEL=WARNING uv run --package evidencerank python algorithms/evidencerank/main.py \
+LOGURU_LEVEL=WARNING uv run --package crest python algorithms/crest/main.py \
   eval batch -a crest -d rcabench_test --clear --use-cpus 32
 ```
 
 Report 和汇总排序：
 
 ```bash
-uv run --package evidencerank python algorithms/evidencerank/main.py eval perf-report rcabench
+uv run --package crest python algorithms/crest/main.py eval perf-report rcabench
 uv run --package baro python scripts/combined_report.py rcabench --sort-by AC@1
 ```
 

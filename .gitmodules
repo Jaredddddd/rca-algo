@@ -1,0 +1,3 @@
+[submodule "algorithms/crest"]
+	path = algorithms/crest
+	url = git@github.com:Jaredddddd/Crest.git

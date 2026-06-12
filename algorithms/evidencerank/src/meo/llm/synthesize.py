@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from evidencerank.meo.llm.synthesize import main
+from crest.meo.llm.synthesize import main
 
 
 if __name__ == "__main__":
     main()
-

@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "baro",
+    "crest",
     "evidencerank",
     "herosas",
     "microdig",
@@ -627,6 +628,23 @@ wheels = [
 ]
 
 [[package]]
+name = "crest"
+version = "0.1.0"
+source = { editable = "algorithms/crest" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "rcabench-platform" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=2.0.0" },
+    { name = "pandas", specifier = ">=2.2.0" },
+    { name = "rcabench-platform", specifier = ">=0.4.1" },
+]
+
+[[package]]
 name = "cryptography"
 version = "46.0.3"
 source = { registry = "https://pypi.org/simple" }
@@ -772,6 +790,7 @@ name = "evidencerank"
 version = "0.1.0"
 source = { editable = "algorithms/evidencerank" }
 dependencies = [
+    { name = "crest" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "rcabench-platform" },
@@ -779,6 +798,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "crest", editable = "algorithms/crest" },
     { name = "numpy", specifier = ">=2.0.0" },
     { name = "pandas", specifier = ">=2.2.0" },
     { name = "rcabench-platform", specifier = ">=0.3.30" },

@@ -30,7 +30,7 @@ This is a multi-context algorithm repository; engineering skills should use the 
 
 - 计划、目标、约束、关键决策、经验教训、步骤或进度变化时，必须同步更新项目内 `docs/`。
 - EvidenceRank 迭代研究默认记录在 `docs/EvidRank_evolve/`。
-- CREST 后续迭代研究默认记录在 `docs/crest_evolve/`；prompt、iteration、summary、compare、ablation 和长期决策都以该目录为准。
+- CREST 后续迭代研究默认记录在 `algorithms/crest/docs/crest_evolve/`；prompt、iteration、summary、compare、ablation 和长期决策都以该目录为准。
 - Vibe Research 主页面为 `VibeResearchTools/VibeResearch.md`。所有 Vibe Research 相关入口信息、启动 prompt、长期决策、索引和导航都可以写入该文件。
 - `docs/EvidRank_evolve/` 中的详细文档必须能在 `VibeResearchTools/VibeResearch.md` 的 index 中被发现。生成或修改研究文档后运行：
 
@@ -45,6 +45,8 @@ uv run --package evidencerank python VibeResearchTools/evidrank_lab.py index
 
 - 目标算法：`algorithms/evidencerank`
 - 主实现：`algorithms/evidencerank/src/evidencerank/algorithm.py`
+- 当前重点开发对象：CREST，canonical implementation 位于 `algorithms/crest/`，`algorithms/evidencerank/src/evidencerank/crest.py` 仅作为兼容 adapter 保留；计划最终可由 `git@github.com:Jaredddddd/Crest.git` 作为 submodule 管理。
+- CREST 结构拆分计划：`algorithms/crest/docs/crest_evolve/CREST_extraction_plan.md`
 - 运行命令：
 
 ```bash

@@ -26,7 +26,7 @@ from src.evidencerank.cera import (
     CERAMetricTrace,
     CERATrace,
 )
-from src.evidencerank.crest import (
+from crest.algorithm import (
     CREST,
     CRESTLog,
     CRESTLogTrace,
@@ -37,8 +37,8 @@ from src.evidencerank.crest import (
     CRESTNoCF,
     CRESTTrace,
 )
-from src.evidencerank.crest_meo import CRESTMEO, CRESTMEOBuiltIn
-from src.evidencerank.crest_residual import CRESTResidual
+from crest.meo_algorithm import CRESTMEO, CRESTMEOBuiltIn
+from crest.residual import CRESTResidual
 
 if __name__ == "__main__":
     registry = global_algorithm_registry()

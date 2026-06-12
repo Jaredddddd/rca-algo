@@ -18,13 +18,17 @@ If any of these files do not exist, proceed silently. Do not suggest creating th
 
 Primary current development area:
 
-- `algorithms/evidencerank/src/evidencerank/crest.py`
-- `algorithms/evidencerank/src/evidencerank/`
+- Canonical CREST path: `algorithms/crest/`
+- EvidenceRank compatibility adapter: `algorithms/evidencerank/src/evidencerank/crest.py`
+- Planned CREST upstream: `git@github.com:Jaredddddd/Crest.git`
 - `docs/EvidRank_evolve/`
-- `docs/crest_evolve/`
+- `algorithms/crest/docs/crest_evolve/`
+- `algorithms/crest/docs/root_notes/`
 - `VibeResearchTools/VibeResearch.md`
 
-The user intends to continue CREST-related development and may later extract this algorithm into a separate directory under `algorithms/`.
+The user intends to continue CREST-related development in the standalone CREST module under `algorithms/crest/`.
+
+Before structural CREST extraction work, read `CONTEXT-MAP.md` and `algorithms/crest/docs/crest_evolve/CREST_extraction_plan.md`.
 
 ## Use the glossary's vocabulary
 
