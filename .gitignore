@@ -1,6 +1,7 @@
 .vscode
 .idea
 __pycache__
+.agents
 
 data
 data_csv

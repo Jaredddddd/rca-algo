@@ -1,0 +1,3272 @@
+{
+  "artifact_name": "crest-meo-oracle-raw-telemetry-role-synthesis-rcabench-v1",
+  "artifact_type": "oracle_raw_telemetry_operator_synthesis",
+  "scoring_mode": "crest_equivalent",
+  "dataset": "rcabench",
+  "created_at": "2026-06-12T03:24:31.893339+00:00",
+  "policy": {
+    "uses_gt_labels": true,
+    "uses_gt_for_feature_values": false,
+    "uses_per_incident_gt_signal": false,
+    "uses_service_identity_weight": false,
+    "uses_gt_feature_bank": false,
+    "uses_fault_labels": false,
+    "uses_prior_run_results": false,
+    "uses_conclusion_parquet": false,
+    "not_for_online_ranking": true,
+    "intentionally_leaky": true,
+    "purpose": "Offline upper-bound synthesis of global raw-telemetry evidence operators, role assignments, and counterfactual role sets."
+  },
+  "inputs": {
+    "labels": "data/rcabench-platform-v2/meta/rcabench-csv/labels.csv",
+    "data_root": "data/rcabench-platform-v2/data",
+    "meol_path": "algorithms/evidencerank/src/evidencerank/meo/library/default_meol.json"
+  },
+  "oracle_scope": "global_raw_telemetry_operator_and_role_synthesis",
+  "objective": "maximize AC@1, then MRR, AC@3, AC@5, and fewer enabled operators",
+  "scoring_semantics": "CREST-equivalent MEOL membership path: selected operators contribute to local/denoised CREST energy; mutation and propagation memberships only choose dynamic counterfactual explain-away sets.",
+  "candidate_space": {
+    "crest_feature_count": 21,
+    "meol_operator_count": 10,
+    "total_operator_count": 64,
+    "raw_operator_count": 33,
+    "max_scan_incidents": 120,
+    "max_metric_names": 60,
+    "min_case_coverage": 3,
+    "excluded_operator_prefixes": [],
+    "excluded_operator_families": [
+      "raw_metric_value"
+    ]
+  },
+  "role_families": {
+    "mutation": [
+      "crest::metric_max_z",
+      "crest::metric_mean_z",
+      "crest::trace_count_delta",
+      "crest::trace_count_rise_shift",
+      "meol::metric_count_drop_shift",
+      "meol::trace_status_code_shift",
+      "meol::trace_duration_delta",
+      "meol::log_count_delta",
+      "meol::log_template_delta",
+      "raw_log::row_count::count_rise",
+      "raw_trace::duration::mean_delta"
+    ],
+    "propagation": [
+      "crest::metric_anomaly_count",
+      "crest::metric_value_delta",
+      "crest::trace_self_duration_relative_shift",
+      "crest::abnormal_trace_rows",
+      "meol::metric_max_z",
+      "raw_trace::attr.http.response.status_code::distribution_shift",
+      "raw_log::level::distribution_shift",
+      "raw_topology::caller_distribution::distribution_shift"
+    ],
+    "observability_bias": [],
+    "topology_context": [],
+    "neutral": [
+      "crest::trace_endpoint_shift",
+      "crest::log_count_delta",
+      "crest::log_error_rate",
+      "crest::log_template_delta",
+      "crest::topology_in_degree",
+      "crest::topology_out_degree"
+    ]
+  },
+  "counterfactual_mutation_features": [
+    "crest::metric_max_z",
+    "crest::metric_mean_z",
+    "crest::trace_count_delta",
+    "crest::trace_count_rise_shift",
+    "meol::metric_count_drop_shift",
+    "meol::trace_status_code_shift",
+    "meol::trace_duration_delta",
+    "meol::log_count_delta",
+    "meol::log_template_delta",
+    "raw_log::row_count::count_rise",
+    "raw_trace::duration::mean_delta"
+  ],
+  "counterfactual_propagation_features": [
+    "crest::metric_anomaly_count",
+    "crest::metric_value_delta",
+    "crest::trace_self_duration_relative_shift",
+    "crest::abnormal_trace_rows",
+    "meol::metric_max_z",
+    "raw_trace::attr.http.response.status_code::distribution_shift",
+    "raw_log::level::distribution_shift",
+    "raw_topology::caller_distribution::distribution_shift"
+  ],
+  "operators": [
+    {
+      "name": "crest::metric_max_z",
+      "source": "metric",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "metric_max_z",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "mutation",
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "metric_max_z"
+      }
+    },
+    {
+      "name": "crest::metric_mean_z",
+      "source": "metric",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "metric_mean_z",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "mutation",
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "metric_mean_z"
+      }
+    },
+    {
+      "name": "crest::metric_anomaly_count",
+      "source": "metric",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "metric_anomaly_count",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "propagation",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "metric_anomaly_count"
+      }
+    },
+    {
+      "name": "crest::metric_value_delta",
+      "source": "metric",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "metric_value_delta",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "propagation",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "metric_value_delta"
+      }
+    },
+    {
+      "name": "crest::metric_count_drop_shift",
+      "source": "metric",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "metric_count_drop_shift",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "metric_count_drop_shift"
+      }
+    },
+    {
+      "name": "crest::trace_duration_z",
+      "source": "trace",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "trace_duration_z",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "trace_duration_z"
+      }
+    },
+    {
+      "name": "crest::trace_duration_delta",
+      "source": "trace",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "trace_duration_delta",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "trace_duration_delta"
+      }
+    },
+    {
+      "name": "crest::trace_count_delta",
+      "source": "trace",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "trace_count_delta",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "mutation",
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "trace_count_delta"
+      }
+    },
+    {
+      "name": "crest::trace_count_rise_shift",
+      "source": "trace",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "trace_count_rise_shift",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "mutation",
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "trace_count_rise_shift"
+      }
+    },
+    {
+      "name": "crest::trace_count_drop_shift",
+      "source": "trace",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "trace_count_drop_shift",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "trace_count_drop_shift"
+      }
+    },
+    {
+      "name": "crest::trace_endpoint_shift",
+      "source": "trace",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "trace_endpoint_shift",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "neutral",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "trace_endpoint_shift"
+      }
+    },
+    {
+      "name": "crest::trace_error_rate",
+      "source": "trace",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "trace_error_rate",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "trace_error_rate"
+      }
+    },
+    {
+      "name": "crest::trace_status_code_shift",
+      "source": "trace",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "trace_status_code_shift",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "trace_status_code_shift"
+      }
+    },
+    {
+      "name": "crest::trace_self_duration_relative_shift",
+      "source": "trace",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "trace_self_duration_relative_shift",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "propagation",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "trace_self_duration_relative_shift"
+      }
+    },
+    {
+      "name": "crest::log_count_delta",
+      "source": "log",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "log_count_delta",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "neutral",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "log_count_delta"
+      }
+    },
+    {
+      "name": "crest::log_error_rate",
+      "source": "log",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "log_error_rate",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "neutral",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "log_error_rate"
+      }
+    },
+    {
+      "name": "crest::log_template_delta",
+      "source": "log",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "log_template_delta",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "neutral",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "log_template_delta"
+      }
+    },
+    {
+      "name": "crest::topology_in_degree",
+      "source": "trace",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "topology_in_degree",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "neutral",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "topology_in_degree"
+      }
+    },
+    {
+      "name": "crest::topology_out_degree",
+      "source": "trace",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "topology_out_degree",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "neutral",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "topology_out_degree"
+      }
+    },
+    {
+      "name": "crest::abnormal_metric_rows",
+      "source": "metric",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "abnormal_metric_rows",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "abnormal_metric_rows"
+      }
+    },
+    {
+      "name": "crest::abnormal_trace_rows",
+      "source": "trace",
+      "operator_family": "crest_feature",
+      "signal": {
+        "field": "abnormal_trace_rows",
+        "type": "derived"
+      },
+      "contrast": {
+        "operator": "crest_builtin",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "crest_builtin"
+      },
+      "selected": true,
+      "synthesized_role": "propagation",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "current CREST telemetry feature",
+      "rationale": "Existing deterministic CREST evidence feature used as a synthesis candidate.",
+      "metadata": {
+        "base_operator": "abnormal_trace_rows"
+      }
+    },
+    {
+      "name": "meol::metric_max_z",
+      "source": "metric",
+      "operator_family": "meol_operator",
+      "signal": {
+        "field": "*",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "max"
+      },
+      "selected": true,
+      "synthesized_role": "propagation",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "resource or performance magnitude shift",
+      "rationale": "Large metric z shifts provide local evidence but are neutral for counterfactual mutation/propagation explain-away.",
+      "metadata": {
+        "base_operator": "metric_max_z",
+        "entity": "service",
+        "required_fields": [
+          "time",
+          "service_name",
+          "value"
+        ],
+        "original_role_prior": {
+          "mutation": 0.0,
+          "propagation": 0.0,
+          "observability_bias": 0.0,
+          "topology_context": 0.0
+        }
+      }
+    },
+    {
+      "name": "meol::metric_count_drop_shift",
+      "source": "metric",
+      "operator_family": "meol_operator",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_drop",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "selected": true,
+      "synthesized_role": "mutation",
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "service hang or telemetry disappearance",
+      "rationale": "A sharp drop in service metric observations can indicate stopped processing or reporting.",
+      "metadata": {
+        "base_operator": "metric_count_drop_shift",
+        "entity": "service",
+        "required_fields": [
+          "time",
+          "service_name"
+        ],
+        "original_role_prior": {
+          "mutation": 1.0,
+          "propagation": 0.0,
+          "observability_bias": 0.0,
+          "topology_context": 0.0
+        }
+      }
+    },
+    {
+      "name": "meol::trace_status_code_shift",
+      "source": "trace",
+      "operator_family": "meol_operator",
+      "signal": {
+        "field": "status_code",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": true,
+      "synthesized_role": "mutation",
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "interface failure",
+      "rationale": "A status-code distribution shift reflects interface behavior changes at service granularity.",
+      "metadata": {
+        "base_operator": "trace_status_code_shift",
+        "entity": "service",
+        "required_fields": [
+          "service_name",
+          "status_code"
+        ],
+        "original_role_prior": {
+          "mutation": 1.0,
+          "propagation": 0.0,
+          "observability_bias": 0.0,
+          "topology_context": 0.0
+        }
+      }
+    },
+    {
+      "name": "meol::trace_error_rate",
+      "source": "trace",
+      "operator_family": "meol_operator",
+      "signal": {
+        "field": "status_code",
+        "type": "rate"
+      },
+      "contrast": {
+        "operator": "error_rate_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "interface failure",
+      "rationale": "A change in error status rate is a compact interface failure signal.",
+      "metadata": {
+        "base_operator": "trace_error_rate",
+        "entity": "service",
+        "required_fields": [
+          "service_name",
+          "status_code"
+        ],
+        "original_role_prior": {
+          "mutation": 1.0,
+          "propagation": 0.0,
+          "observability_bias": 0.0,
+          "topology_context": 0.0
+        }
+      }
+    },
+    {
+      "name": "meol::trace_endpoint_shift",
+      "source": "trace",
+      "operator_family": "meol_operator",
+      "signal": {
+        "field": "endpoint",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "endpoint behavior change",
+      "rationale": "A changed endpoint mix suggests altered service interface behavior.",
+      "metadata": {
+        "base_operator": "trace_endpoint_shift",
+        "entity": "service",
+        "required_fields": [
+          "service_name",
+          "endpoint"
+        ],
+        "original_role_prior": {
+          "mutation": 1.0,
+          "propagation": 0.0,
+          "observability_bias": 0.0,
+          "topology_context": 0.0
+        }
+      }
+    },
+    {
+      "name": "meol::trace_duration_delta",
+      "source": "trace",
+      "operator_family": "meol_operator",
+      "signal": {
+        "field": "duration",
+        "type": "duration"
+      },
+      "contrast": {
+        "operator": "robust_z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "max"
+      },
+      "selected": true,
+      "synthesized_role": "mutation",
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "latency propagation",
+      "rationale": "Latency shifts are often amplified along dependencies and are treated primarily as propagated symptoms.",
+      "metadata": {
+        "base_operator": "trace_duration_delta",
+        "entity": "service",
+        "required_fields": [
+          "service_name",
+          "duration"
+        ],
+        "original_role_prior": {
+          "mutation": 0.0,
+          "propagation": 1.0,
+          "observability_bias": 0.0,
+          "topology_context": 0.0
+        }
+      }
+    },
+    {
+      "name": "meol::trace_count_rise_shift",
+      "source": "trace",
+      "operator_family": "meol_operator",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_rise",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "retry or traffic amplification",
+      "rationale": "A trace count rise can reflect retries, fan-out, or propagated pressure.",
+      "metadata": {
+        "base_operator": "trace_count_rise_shift",
+        "entity": "service",
+        "required_fields": [
+          "service_name"
+        ],
+        "original_role_prior": {
+          "mutation": 0.0,
+          "propagation": 1.0,
+          "observability_bias": 0.0,
+          "topology_context": 0.0
+        }
+      }
+    },
+    {
+      "name": "meol::trace_count_drop_shift",
+      "source": "trace",
+      "operator_family": "meol_operator",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_drop",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "service hang or request handling failure",
+      "rationale": "A sharp trace activity drop can indicate stopped request handling.",
+      "metadata": {
+        "base_operator": "trace_count_drop_shift",
+        "entity": "service",
+        "required_fields": [
+          "service_name"
+        ],
+        "original_role_prior": {
+          "mutation": 1.0,
+          "propagation": 0.0,
+          "observability_bias": 0.0,
+          "topology_context": 0.0
+        }
+      }
+    },
+    {
+      "name": "meol::log_count_delta",
+      "source": "log",
+      "operator_family": "meol_operator",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "selected": true,
+      "synthesized_role": "mutation",
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "software event volume shift",
+      "rationale": "Log volume changes can indicate local software events or propagated error handling.",
+      "metadata": {
+        "base_operator": "log_count_delta",
+        "entity": "service",
+        "required_fields": [
+          "service_name"
+        ],
+        "original_role_prior": {
+          "mutation": 0.0,
+          "propagation": 1.0,
+          "observability_bias": 0.0,
+          "topology_context": 0.0
+        }
+      }
+    },
+    {
+      "name": "meol::log_template_delta",
+      "source": "log",
+      "operator_family": "meol_operator",
+      "signal": {
+        "field": "template",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": true,
+      "synthesized_role": "mutation",
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "software event distribution shift",
+      "rationale": "A log-template distribution shift indicates changed software behavior that can be local or propagated.",
+      "metadata": {
+        "base_operator": "log_template_delta",
+        "entity": "service",
+        "required_fields": [
+          "service_name",
+          "template"
+        ],
+        "original_role_prior": {
+          "mutation": 0.0,
+          "propagation": 1.0,
+          "observability_bias": 0.0,
+          "topology_context": 0.0
+        }
+      }
+    },
+    {
+      "name": "raw_metric::row_count::count_delta",
+      "source": "metric",
+      "operator_family": "raw_metric_row_count",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_count"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "metric observation-volume shift",
+      "rationale": "Service-level metric row-count shift from raw telemetry.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_metric::row_count::count_rise",
+      "source": "metric",
+      "operator_family": "raw_metric_row_count",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_rise",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_count"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "metric observation-volume shift",
+      "rationale": "Service-level metric row-count shift from raw telemetry.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_metric::row_count::count_drop",
+      "source": "metric",
+      "operator_family": "raw_metric_row_count",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_drop",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_count"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "metric observation-volume shift",
+      "rationale": "Service-level metric row-count shift from raw telemetry.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_trace::row_count::count_delta",
+      "source": "trace",
+      "operator_family": "raw_trace_row_count",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_count"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace observation-volume shift",
+      "rationale": "Service-level trace row-count shift from raw telemetry.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_trace::row_count::count_rise",
+      "source": "trace",
+      "operator_family": "raw_trace_row_count",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_rise",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_count"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace observation-volume shift",
+      "rationale": "Service-level trace row-count shift from raw telemetry.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_trace::row_count::count_drop",
+      "source": "trace",
+      "operator_family": "raw_trace_row_count",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_drop",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_count"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace observation-volume shift",
+      "rationale": "Service-level trace row-count shift from raw telemetry.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_log::row_count::count_delta",
+      "source": "log",
+      "operator_family": "raw_log_row_count",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_count"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "log observation-volume shift",
+      "rationale": "Service-level log row-count shift from raw telemetry.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_log::row_count::count_rise",
+      "source": "log",
+      "operator_family": "raw_log_row_count",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_rise",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_count"
+      },
+      "selected": true,
+      "synthesized_role": "mutation",
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "log observation-volume shift",
+      "rationale": "Service-level log row-count shift from raw telemetry.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_log::row_count::count_drop",
+      "source": "log",
+      "operator_family": "raw_log_row_count",
+      "signal": {
+        "field": "__row_count__",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_drop",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_count"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "log observation-volume shift",
+      "rationale": "Service-level log row-count shift from raw telemetry.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_trace::attr.http.request.method::distribution_shift",
+      "source": "trace",
+      "operator_family": "raw_trace_categorical",
+      "signal": {
+        "field": "attr.http.request.method",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace categorical distribution shift",
+      "rationale": "Service-level categorical trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "attr.http.request.method"
+      }
+    },
+    {
+      "name": "raw_trace::attr.http.response.status_code::distribution_shift",
+      "source": "trace",
+      "operator_family": "raw_trace_categorical",
+      "signal": {
+        "field": "attr.http.response.status_code",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": true,
+      "synthesized_role": "propagation",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace categorical distribution shift",
+      "rationale": "Service-level categorical trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "attr.http.response.status_code"
+      }
+    },
+    {
+      "name": "raw_trace::attr.http.response.status_code::error_rate_delta",
+      "source": "trace",
+      "operator_family": "raw_trace_error_rate",
+      "signal": {
+        "field": "attr.http.response.status_code",
+        "type": "rate"
+      },
+      "contrast": {
+        "operator": "error_rate_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace status error-rate shift",
+      "rationale": "Service-level error-rate delta synthesized from status-like trace fields.",
+      "metadata": {
+        "column": "attr.http.response.status_code"
+      }
+    },
+    {
+      "name": "raw_trace::attr.span_kind::distribution_shift",
+      "source": "trace",
+      "operator_family": "raw_trace_categorical",
+      "signal": {
+        "field": "attr.span_kind",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace categorical distribution shift",
+      "rationale": "Service-level categorical trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "attr.span_kind"
+      }
+    },
+    {
+      "name": "raw_trace::attr.status_code::distribution_shift",
+      "source": "trace",
+      "operator_family": "raw_trace_categorical",
+      "signal": {
+        "field": "attr.status_code",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace categorical distribution shift",
+      "rationale": "Service-level categorical trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "attr.status_code"
+      }
+    },
+    {
+      "name": "raw_trace::attr.status_code::error_rate_delta",
+      "source": "trace",
+      "operator_family": "raw_trace_error_rate",
+      "signal": {
+        "field": "attr.status_code",
+        "type": "rate"
+      },
+      "contrast": {
+        "operator": "error_rate_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "ratio"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace status error-rate shift",
+      "rationale": "Service-level error-rate delta synthesized from status-like trace fields.",
+      "metadata": {
+        "column": "attr.status_code"
+      }
+    },
+    {
+      "name": "raw_trace::span_name::distribution_shift",
+      "source": "trace",
+      "operator_family": "raw_trace_categorical",
+      "signal": {
+        "field": "span_name",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace categorical distribution shift",
+      "rationale": "Service-level categorical trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "span_name"
+      }
+    },
+    {
+      "name": "raw_trace::attr.http.request.content_length::z_shift",
+      "source": "trace",
+      "operator_family": "raw_trace_numeric",
+      "signal": {
+        "field": "attr.http.request.content_length",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_numeric"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace numeric value shift",
+      "rationale": "Service-level numeric trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "attr.http.request.content_length"
+      }
+    },
+    {
+      "name": "raw_trace::attr.http.request.content_length::robust_z_shift",
+      "source": "trace",
+      "operator_family": "raw_trace_numeric",
+      "signal": {
+        "field": "attr.http.request.content_length",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "robust_z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_numeric"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace numeric value shift",
+      "rationale": "Service-level numeric trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "attr.http.request.content_length"
+      }
+    },
+    {
+      "name": "raw_trace::attr.http.request.content_length::mean_delta",
+      "source": "trace",
+      "operator_family": "raw_trace_numeric",
+      "signal": {
+        "field": "attr.http.request.content_length",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "mean_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_numeric"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace numeric value shift",
+      "rationale": "Service-level numeric trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "attr.http.request.content_length"
+      }
+    },
+    {
+      "name": "raw_trace::attr.http.response.content_length::z_shift",
+      "source": "trace",
+      "operator_family": "raw_trace_numeric",
+      "signal": {
+        "field": "attr.http.response.content_length",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_numeric"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace numeric value shift",
+      "rationale": "Service-level numeric trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "attr.http.response.content_length"
+      }
+    },
+    {
+      "name": "raw_trace::attr.http.response.content_length::robust_z_shift",
+      "source": "trace",
+      "operator_family": "raw_trace_numeric",
+      "signal": {
+        "field": "attr.http.response.content_length",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "robust_z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_numeric"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace numeric value shift",
+      "rationale": "Service-level numeric trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "attr.http.response.content_length"
+      }
+    },
+    {
+      "name": "raw_trace::attr.http.response.content_length::mean_delta",
+      "source": "trace",
+      "operator_family": "raw_trace_numeric",
+      "signal": {
+        "field": "attr.http.response.content_length",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "mean_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_numeric"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace numeric value shift",
+      "rationale": "Service-level numeric trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "attr.http.response.content_length"
+      }
+    },
+    {
+      "name": "raw_trace::duration::z_shift",
+      "source": "trace",
+      "operator_family": "raw_trace_numeric",
+      "signal": {
+        "field": "duration",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_numeric"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace numeric value shift",
+      "rationale": "Service-level numeric trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "duration"
+      }
+    },
+    {
+      "name": "raw_trace::duration::robust_z_shift",
+      "source": "trace",
+      "operator_family": "raw_trace_numeric",
+      "signal": {
+        "field": "duration",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "robust_z_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_numeric"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace numeric value shift",
+      "rationale": "Service-level numeric trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "duration"
+      }
+    },
+    {
+      "name": "raw_trace::duration::mean_delta",
+      "source": "trace",
+      "operator_family": "raw_trace_numeric",
+      "signal": {
+        "field": "duration",
+        "type": "value"
+      },
+      "contrast": {
+        "operator": "mean_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_numeric"
+      },
+      "selected": true,
+      "synthesized_role": "mutation",
+      "role_prior": {
+        "mutation": 1.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace numeric value shift",
+      "rationale": "Service-level numeric trace-field shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "duration"
+      }
+    },
+    {
+      "name": "raw_log::message_template::distribution_shift",
+      "source": "log",
+      "operator_family": "raw_log_categorical",
+      "signal": {
+        "field": "__message_template__",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "log categorical distribution shift",
+      "rationale": "Service-level log categorical/template shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "__message_template__"
+      }
+    },
+    {
+      "name": "raw_log::level::distribution_shift",
+      "source": "log",
+      "operator_family": "raw_log_categorical",
+      "signal": {
+        "field": "level",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": true,
+      "synthesized_role": "propagation",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "log categorical distribution shift",
+      "rationale": "Service-level log categorical/template shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "level"
+      }
+    },
+    {
+      "name": "raw_log::message::distribution_shift",
+      "source": "log",
+      "operator_family": "raw_log_categorical",
+      "signal": {
+        "field": "message",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "log categorical distribution shift",
+      "rationale": "Service-level log categorical/template shift synthesized from raw telemetry.",
+      "metadata": {
+        "column": "message"
+      }
+    },
+    {
+      "name": "raw_topology::edge_count::count_delta",
+      "source": "topology",
+      "operator_family": "raw_topology_edge_count",
+      "signal": {
+        "field": "edge_count",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_delta",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_edge_count"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace topology edge-volume shift",
+      "rationale": "Service-level raw trace edge-count shift.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_topology::edge_count::count_rise",
+      "source": "topology",
+      "operator_family": "raw_topology_edge_count",
+      "signal": {
+        "field": "edge_count",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_rise",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_edge_count"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace topology edge-volume shift",
+      "rationale": "Service-level raw trace edge-count shift.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_topology::edge_count::count_drop",
+      "source": "topology",
+      "operator_family": "raw_topology_edge_count",
+      "signal": {
+        "field": "edge_count",
+        "type": "count"
+      },
+      "contrast": {
+        "operator": "count_drop",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "service_edge_count"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace topology edge-volume shift",
+      "rationale": "Service-level raw trace edge-count shift.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_topology::caller_distribution::distribution_shift",
+      "source": "topology",
+      "operator_family": "raw_topology_distribution",
+      "signal": {
+        "field": "caller_distribution",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": true,
+      "synthesized_role": "propagation",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 1.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace topology neighbor distribution shift",
+      "rationale": "Service-level caller/callee distribution shift from raw trace edges.",
+      "metadata": {}
+    },
+    {
+      "name": "raw_topology::callee_distribution::distribution_shift",
+      "source": "topology",
+      "operator_family": "raw_topology_distribution",
+      "signal": {
+        "field": "callee_distribution",
+        "type": "categorical"
+      },
+      "contrast": {
+        "operator": "distribution_shift",
+        "normal_window": "pre_anomaly",
+        "abnormal_window": "post_anomaly"
+      },
+      "aggregation": {
+        "level": "service",
+        "method": "jsd"
+      },
+      "selected": false,
+      "synthesized_role": "disabled",
+      "role_prior": {
+        "mutation": 0.0,
+        "propagation": 0.0,
+        "observability_bias": 0.0,
+        "topology_context": 0.0
+      },
+      "mechanism": "trace topology neighbor distribution shift",
+      "rationale": "Service-level caller/callee distribution shift from raw trace edges.",
+      "metadata": {}
+    }
+  ],
+  "operator_count": 64,
+  "selected_operator_count": 25,
+  "metrics": {
+    "total": 1422,
+    "error": 0,
+    "AC@1": 0.8459915611814346,
+    "MRR": 0.903599419638279,
+    "AC@3": 0.9521800281293952,
+    "AC@5": 0.9760900140646976
+  },
+  "synthesis": {
+    "incident_count": 1422,
+    "error_count": 0,
+    "service_rows": 69684,
+    "max_candidates": 80,
+    "coordinate_passes": 3,
+    "search_workers": 48,
+    "seed_metrics": {
+      "total": 1422,
+      "error": 0,
+      "AC@1": 0.7784810126582279,
+      "MRR": 0.8620489579646737,
+      "AC@3": 0.9381153305203939,
+      "AC@5": 0.9718706047819972
+    },
+    "selected_metrics": {
+      "total": 1422,
+      "error": 0,
+      "AC@1": 0.8459915611814346,
+      "MRR": 0.903599419638279,
+      "AC@3": 0.9521800281293952,
+      "AC@5": 0.9760900140646976
+    },
+    "selected_key": [
+      0.8459915611814346,
+      0.903599419638279,
+      0.9521800281293952,
+      0.9760900140646976,
+      -25.0
+    ],
+    "screened_operator_count": 64,
+    "scoring_mode": "crest_equivalent",
+    "history": [
+      {
+        "stage": "seed",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.7784810126582279,
+          "MRR": 0.8620489579646737,
+          "AC@3": 0.9381153305203939,
+          "AC@5": 0.9718706047819972
+        },
+        "enabled_count": 31
+      },
+      {
+        "stage": "greedy_add",
+        "operator": "raw_log::level::distribution_shift",
+        "role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.7812939521800282,
+          "MRR": 0.8639645606085673,
+          "AC@3": 0.9374120956399438,
+          "AC@5": 0.9725738396624473
+        },
+        "enabled_count": 32
+      },
+      {
+        "stage": "greedy_add",
+        "operator": "raw_trace::attr.http.response.status_code::distribution_shift",
+        "role": "propagation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.7812939521800282,
+          "MRR": 0.8645604680610149,
+          "AC@3": 0.9416315049226441,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 33
+      },
+      {
+        "stage": "greedy_add",
+        "operator": "raw_trace::duration::mean_delta",
+        "role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.7834036568213784,
+          "MRR": 0.8686916741949089,
+          "AC@3": 0.9493670886075949,
+          "AC@5": 0.9760900140646976
+        },
+        "enabled_count": 34
+      },
+      {
+        "stage": "greedy_add",
+        "operator": "raw_trace::attr.http.request.method::distribution_shift",
+        "role": "propagation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.789732770745429,
+          "MRR": 0.872005056164187,
+          "AC@3": 0.9465541490857946,
+          "AC@5": 0.9781997187060478
+        },
+        "enabled_count": 35
+      },
+      {
+        "stage": "greedy_add",
+        "operator": "raw_log::row_count::count_rise",
+        "role": "neutral",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.7953586497890295,
+          "MRR": 0.8746059772777662,
+          "AC@3": 0.9458509142053446,
+          "AC@5": 0.9774964838255977
+        },
+        "enabled_count": 36
+      },
+      {
+        "stage": "greedy_add",
+        "operator": "raw_topology::caller_distribution::distribution_shift",
+        "role": "propagation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8052039381153305,
+          "MRR": 0.8805742139949482,
+          "AC@3": 0.9493670886075949,
+          "AC@5": 0.9753867791842475
+        },
+        "enabled_count": 37
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::metric_max_z",
+        "role": "neutral",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8059071729957806,
+          "MRR": 0.880867228528469,
+          "AC@3": 0.9486638537271449,
+          "AC@5": 0.9753867791842475
+        },
+        "enabled_count": 37
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::metric_anomaly_count",
+        "role": "propagation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8059071729957806,
+          "MRR": 0.8809383716375868,
+          "AC@3": 0.9486638537271449,
+          "AC@5": 0.9753867791842475
+        },
+        "enabled_count": 37
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::metric_count_drop_shift",
+        "role": "propagation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8066104078762306,
+          "MRR": 0.8812298640176867,
+          "AC@3": 0.9479606188466948,
+          "AC@5": 0.9753867791842475
+        },
+        "enabled_count": 37
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::trace_duration_z",
+        "role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8094233473980309,
+          "MRR": 0.8834421139883755,
+          "AC@3": 0.9514767932489452,
+          "AC@5": 0.9760900140646976
+        },
+        "enabled_count": 36
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::trace_duration_delta",
+        "role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8129395218002813,
+          "MRR": 0.8858312000159639,
+          "AC@3": 0.9542897327707455,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 35
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::trace_count_delta",
+        "role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8136427566807314,
+          "MRR": 0.8861749009231781,
+          "AC@3": 0.9542897327707455,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 35
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::trace_count_rise_shift",
+        "role": "neutral",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8136427566807314,
+          "MRR": 0.8862100626672005,
+          "AC@3": 0.9542897327707455,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 35
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::trace_count_drop_shift",
+        "role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8185654008438819,
+          "MRR": 0.8885037518712441,
+          "AC@3": 0.9528832630098453,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 34
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::trace_endpoint_shift",
+        "role": "neutral",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8185654008438819,
+          "MRR": 0.8885204955588738,
+          "AC@3": 0.9528832630098453,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 34
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::trace_error_rate",
+        "role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8185654008438819,
+          "MRR": 0.8885204955588738,
+          "AC@3": 0.9528832630098453,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 33
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::trace_status_code_shift",
+        "role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.820675105485232,
+          "MRR": 0.8889217628525757,
+          "AC@3": 0.9486638537271449,
+          "AC@5": 0.9739803094233473
+        },
+        "enabled_count": 32
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::trace_self_duration_relative_shift",
+        "role": "neutral",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8213783403656821,
+          "MRR": 0.8892715296746942,
+          "AC@3": 0.9486638537271449,
+          "AC@5": 0.9739803094233473
+        },
+        "enabled_count": 32
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "crest::log_error_rate",
+        "role": "propagation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8220815752461322,
+          "MRR": 0.8896231471149193,
+          "AC@3": 0.9486638537271449,
+          "AC@5": 0.9739803094233473
+        },
+        "enabled_count": 32
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "meol::trace_error_rate",
+        "role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8220815752461322,
+          "MRR": 0.8896231471149193,
+          "AC@3": 0.9486638537271449,
+          "AC@5": 0.9739803094233473
+        },
+        "enabled_count": 31
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "meol::trace_endpoint_shift",
+        "role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8241912798874824,
+          "MRR": 0.8900088149005463,
+          "AC@3": 0.9472573839662447,
+          "AC@5": 0.9739803094233473
+        },
+        "enabled_count": 30
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "meol::trace_duration_delta",
+        "role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8241912798874824,
+          "MRR": 0.8900674178072504,
+          "AC@3": 0.9479606188466948,
+          "AC@5": 0.9739803094233473
+        },
+        "enabled_count": 30
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "meol::trace_count_rise_shift",
+        "role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8263009845288326,
+          "MRR": 0.8918441228043574,
+          "AC@3": 0.9479606188466948,
+          "AC@5": 0.9760900140646976
+        },
+        "enabled_count": 29
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "meol::trace_count_drop_shift",
+        "role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8284106891701828,
+          "MRR": 0.8939637456412799,
+          "AC@3": 0.9493670886075949,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 28
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "meol::log_count_delta",
+        "role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8291139240506329,
+          "MRR": 0.8945609800992739,
+          "AC@3": 0.950070323488045,
+          "AC@5": 0.9774964838255977
+        },
+        "enabled_count": 28
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "meol::log_template_delta",
+        "role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.829817158931083,
+          "MRR": 0.8949715823197805,
+          "AC@3": 0.9507735583684951,
+          "AC@5": 0.9774964838255977
+        },
+        "enabled_count": 28
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "raw_log::level::distribution_shift",
+        "role": "propagation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8305203938115331,
+          "MRR": 0.895294735491035,
+          "AC@3": 0.950070323488045,
+          "AC@5": 0.9774964838255977
+        },
+        "enabled_count": 28
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "raw_trace::attr.http.request.method::distribution_shift",
+        "role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8396624472573839,
+          "MRR": 0.8999176363836886,
+          "AC@3": 0.9507735583684951,
+          "AC@5": 0.9774964838255977
+        },
+        "enabled_count": 27
+      },
+      {
+        "stage": "coordinate_pass_1",
+        "operator": "raw_log::row_count::count_rise",
+        "role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8410689170182841,
+          "MRR": 0.9005016092083898,
+          "AC@3": 0.9507735583684951,
+          "AC@5": 0.9774964838255977
+        },
+        "enabled_count": 27
+      },
+      {
+        "stage": "coordinate_pass_2",
+        "operator": "crest::metric_max_z",
+        "role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8424753867791842,
+          "MRR": 0.9012679119789119,
+          "AC@3": 0.950070323488045,
+          "AC@5": 0.9774964838255977
+        },
+        "enabled_count": 27
+      },
+      {
+        "stage": "coordinate_pass_2",
+        "operator": "crest::metric_count_drop_shift",
+        "role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8431786216596343,
+          "MRR": 0.9020118171952433,
+          "AC@3": 0.9514767932489452,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 26
+      },
+      {
+        "stage": "coordinate_pass_2",
+        "operator": "crest::trace_self_duration_relative_shift",
+        "role": "propagation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8431786216596343,
+          "MRR": 0.9020386070954508,
+          "AC@3": 0.9521800281293952,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 26
+      },
+      {
+        "stage": "coordinate_pass_2",
+        "operator": "crest::log_count_delta",
+        "role": "neutral",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8431786216596343,
+          "MRR": 0.9020427930173583,
+          "AC@3": 0.9521800281293952,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 26
+      },
+      {
+        "stage": "coordinate_pass_2",
+        "operator": "crest::log_error_rate",
+        "role": "neutral",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8438818565400844,
+          "MRR": 0.9023944104575834,
+          "AC@3": 0.9521800281293952,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 26
+      },
+      {
+        "stage": "coordinate_pass_2",
+        "operator": "crest::abnormal_metric_rows",
+        "role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8459915611814346,
+          "MRR": 0.9034458330228892,
+          "AC@3": 0.9521800281293952,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 25
+      },
+      {
+        "stage": "coordinate_pass_2",
+        "operator": "meol::metric_max_z",
+        "role": "propagation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8459915611814346,
+          "MRR": 0.9034478892652298,
+          "AC@3": 0.9521800281293952,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 25
+      },
+      {
+        "stage": "coordinate_pass_3",
+        "operator": "crest::metric_value_delta",
+        "role": "propagation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8459915611814346,
+          "MRR": 0.9034646329528594,
+          "AC@3": 0.9521800281293952,
+          "AC@5": 0.9767932489451476
+        },
+        "enabled_count": 25
+      },
+      {
+        "stage": "coordinate_pass_3",
+        "operator": "crest::trace_count_rise_shift",
+        "role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8459915611814346,
+          "MRR": 0.9035458398378637,
+          "AC@3": 0.9521800281293952,
+          "AC@5": 0.9760900140646976
+        },
+        "enabled_count": 25
+      },
+      {
+        "stage": "coordinate_pass_3",
+        "operator": "crest::log_template_delta",
+        "role": "neutral",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.8459915611814346,
+          "MRR": 0.903599419638279,
+          "AC@3": 0.9521800281293952,
+          "AC@5": 0.9760900140646976
+        },
+        "enabled_count": 25
+      }
+    ],
+    "screening_method": "single_feature_rank_proxy",
+    "top_proxy_operators": [
+      {
+        "idx": 57,
+        "name": "raw_log::level::distribution_shift",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.4345991561181435,
+          "MRR": 0.587284363831894,
+          "AC@3": 0.6624472573839663,
+          "AC@5": 0.7946554149085795
+        },
+        "key": [
+          0.4345991561181435,
+          0.587284363831894,
+          0.6624472573839663,
+          0.7946554149085795,
+          -1.0
+        ]
+      },
+      {
+        "idx": 41,
+        "name": "raw_trace::attr.http.response.status_code::distribution_shift",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.4142053445850914,
+          "MRR": 0.54467638778965,
+          "AC@3": 0.6118143459915611,
+          "AC@5": 0.6933895921237694
+        },
+        "key": [
+          0.4142053445850914,
+          0.54467638778965,
+          0.6118143459915611,
+          0.6933895921237694,
+          -1.0
+        ]
+      },
+      {
+        "idx": 42,
+        "name": "raw_trace::attr.http.response.status_code::error_rate_delta",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.4078762306610408,
+          "MRR": 0.5355741576931771,
+          "AC@3": 0.6153305203938115,
+          "AC@5": 0.6835443037974683
+        },
+        "key": [
+          0.4078762306610408,
+          0.5355741576931771,
+          0.6153305203938115,
+          0.6835443037974683,
+          -1.0
+        ]
+      },
+      {
+        "idx": 2,
+        "name": "crest::metric_anomaly_count",
+        "seed_role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.3881856540084388,
+          "MRR": 0.5102925246109933,
+          "AC@3": 0.5562587904360057,
+          "AC@5": 0.639943741209564
+        },
+        "key": [
+          0.3881856540084388,
+          0.5102925246109933,
+          0.5562587904360057,
+          0.639943741209564,
+          -1.0
+        ]
+      },
+      {
+        "idx": 12,
+        "name": "crest::trace_status_code_shift",
+        "seed_role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.3832630098452883,
+          "MRR": 0.5223020234832123,
+          "AC@3": 0.6385372714486639,
+          "AC@5": 0.6736990154711674
+        },
+        "key": [
+          0.3832630098452883,
+          0.5223020234832123,
+          0.6385372714486639,
+          0.6736990154711674,
+          -1.0
+        ]
+      },
+      {
+        "idx": 23,
+        "name": "meol::trace_status_code_shift",
+        "seed_role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.3832630098452883,
+          "MRR": 0.5223020234832123,
+          "AC@3": 0.6385372714486639,
+          "AC@5": 0.6736990154711674
+        },
+        "key": [
+          0.3832630098452883,
+          0.5223020234832123,
+          0.6385372714486639,
+          0.6736990154711674,
+          -1.0
+        ]
+      },
+      {
+        "idx": 44,
+        "name": "raw_trace::attr.status_code::distribution_shift",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.37341772151898733,
+          "MRR": 0.5190323055949913,
+          "AC@3": 0.6160337552742616,
+          "AC@5": 0.6954992967651196
+        },
+        "key": [
+          0.37341772151898733,
+          0.5190323055949913,
+          0.6160337552742616,
+          0.6954992967651196,
+          -1.0
+        ]
+      },
+      {
+        "idx": 45,
+        "name": "raw_trace::attr.status_code::error_rate_delta",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.37341772151898733,
+          "MRR": 0.5102597977153456,
+          "AC@3": 0.6125175808720112,
+          "AC@5": 0.6673699015471167
+        },
+        "key": [
+          0.37341772151898733,
+          0.5102597977153456,
+          0.6125175808720112,
+          0.6673699015471167,
+          -1.0
+        ]
+      },
+      {
+        "idx": 13,
+        "name": "crest::trace_self_duration_relative_shift",
+        "seed_role": "propagation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.369901547116737,
+          "MRR": 0.4839394372866668,
+          "AC@3": 0.5246132208157525,
+          "AC@5": 0.6026722925457103
+        },
+        "key": [
+          0.369901547116737,
+          0.4839394372866668,
+          0.5246132208157525,
+          0.6026722925457103,
+          -1.0
+        ]
+      },
+      {
+        "idx": 1,
+        "name": "crest::metric_mean_z",
+        "seed_role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.3530239099859353,
+          "MRR": 0.5025107441009585,
+          "AC@3": 0.5717299578059072,
+          "AC@5": 0.6870604781997187
+        },
+        "key": [
+          0.3530239099859353,
+          0.5025107441009585,
+          0.5717299578059072,
+          0.6870604781997187,
+          -1.0
+        ]
+      },
+      {
+        "idx": 10,
+        "name": "crest::trace_endpoint_shift",
+        "seed_role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.3466947960618847,
+          "MRR": 0.5077202071794108,
+          "AC@3": 0.5886075949367089,
+          "AC@5": 0.6828410689170182
+        },
+        "key": [
+          0.3466947960618847,
+          0.5077202071794108,
+          0.5886075949367089,
+          0.6828410689170182,
+          -1.0
+        ]
+      },
+      {
+        "idx": 25,
+        "name": "meol::trace_endpoint_shift",
+        "seed_role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.3333333333333333,
+          "MRR": 0.47362556480695367,
+          "AC@3": 0.5154711673699015,
+          "AC@5": 0.6272855133614628
+        },
+        "key": [
+          0.3333333333333333,
+          0.47362556480695367,
+          0.5154711673699015,
+          0.6272855133614628,
+          -1.0
+        ]
+      },
+      {
+        "idx": 55,
+        "name": "raw_trace::duration::mean_delta",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.3333333333333333,
+          "MRR": 0.45283886172843063,
+          "AC@3": 0.4704641350210971,
+          "AC@5": 0.5639943741209564
+        },
+        "key": [
+          0.3333333333333333,
+          0.45283886172843063,
+          0.4704641350210971,
+          0.5639943741209564,
+          -1.0
+        ]
+      },
+      {
+        "idx": 0,
+        "name": "crest::metric_max_z",
+        "seed_role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.30450070323488043,
+          "MRR": 0.45022118633349323,
+          "AC@3": 0.5140646976090014,
+          "AC@5": 0.6188466947960619
+        },
+        "key": [
+          0.30450070323488043,
+          0.45022118633349323,
+          0.5140646976090014,
+          0.6188466947960619,
+          -1.0
+        ]
+      },
+      {
+        "idx": 21,
+        "name": "meol::metric_max_z",
+        "seed_role": "neutral",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.30450070323488043,
+          "MRR": 0.45022118633349323,
+          "AC@3": 0.5140646976090014,
+          "AC@5": 0.6188466947960619
+        },
+        "key": [
+          0.30450070323488043,
+          0.45022118633349323,
+          0.5140646976090014,
+          0.6188466947960619,
+          -1.0
+        ]
+      },
+      {
+        "idx": 46,
+        "name": "raw_trace::span_name::distribution_shift",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.3009845288326301,
+          "MRR": 0.46292838979282136,
+          "AC@3": 0.5309423347398031,
+          "AC@5": 0.6371308016877637
+        },
+        "key": [
+          0.3009845288326301,
+          0.46292838979282136,
+          0.5309423347398031,
+          0.6371308016877637,
+          -1.0
+        ]
+      },
+      {
+        "idx": 54,
+        "name": "raw_trace::duration::robust_z_shift",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.2770745428973277,
+          "MRR": 0.40467029231060814,
+          "AC@3": 0.42053445850914206,
+          "AC@5": 0.5232067510548524
+        },
+        "key": [
+          0.2770745428973277,
+          0.40467029231060814,
+          0.42053445850914206,
+          0.5232067510548524,
+          -1.0
+        ]
+      },
+      {
+        "idx": 53,
+        "name": "raw_trace::duration::z_shift",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.27566807313642755,
+          "MRR": 0.4104817183180731,
+          "AC@3": 0.4345991561181435,
+          "AC@5": 0.5421940928270043
+        },
+        "key": [
+          0.27566807313642755,
+          0.4104817183180731,
+          0.4345991561181435,
+          0.5421940928270043,
+          -1.0
+        ]
+      },
+      {
+        "idx": 5,
+        "name": "crest::trace_duration_z",
+        "seed_role": "propagation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.26933895921237694,
+          "MRR": 0.40515525848071215,
+          "AC@3": 0.4289732770745429,
+          "AC@5": 0.5386779184247539
+        },
+        "key": [
+          0.26933895921237694,
+          0.40515525848071215,
+          0.4289732770745429,
+          0.5386779184247539,
+          -1.0
+        ]
+      },
+      {
+        "idx": 40,
+        "name": "raw_trace::attr.http.request.method::distribution_shift",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.25949367088607594,
+          "MRR": 0.39283905461800306,
+          "AC@3": 0.41139240506329117,
+          "AC@5": 0.5351617440225035
+        },
+        "key": [
+          0.25949367088607594,
+          0.39283905461800306,
+          0.41139240506329117,
+          0.5351617440225035,
+          -1.0
+        ]
+      },
+      {
+        "idx": 3,
+        "name": "crest::metric_value_delta",
+        "seed_role": "mutation",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.2545710267229255,
+          "MRR": 0.3811104206182672,
+          "AC@3": 0.4092827004219409,
+          "AC@5": 0.4767932489451477
+        },
+        "key": [
+          0.2545710267229255,
+          0.3811104206182672,
+          0.4092827004219409,
+          0.4767932489451477,
+          -1.0
+        ]
+      },
+      {
+        "idx": 43,
+        "name": "raw_trace::attr.span_kind::distribution_shift",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.25316455696202533,
+          "MRR": 0.43846416890558604,
+          "AC@3": 0.5576652601969058,
+          "AC@5": 0.6603375527426161
+        },
+        "key": [
+          0.25316455696202533,
+          0.43846416890558604,
+          0.5576652601969058,
+          0.6603375527426161,
+          -1.0
+        ]
+      },
+      {
+        "idx": 38,
+        "name": "raw_log::row_count::count_rise",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.22855133614627285,
+          "MRR": 0.33682640483205134,
+          "AC@3": 0.3832630098452883,
+          "AC@5": 0.4120956399437412
+        },
+        "key": [
+          0.22855133614627285,
+          0.33682640483205134,
+          0.3832630098452883,
+          0.4120956399437412,
+          -1.0
+        ]
+      },
+      {
+        "idx": 63,
+        "name": "raw_topology::callee_distribution::distribution_shift",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.20253164556962025,
+          "MRR": 0.3719361032529849,
+          "AC@3": 0.44163150492264414,
+          "AC@5": 0.5625879043600562
+        },
+        "key": [
+          0.20253164556962025,
+          0.3719361032529849,
+          0.44163150492264414,
+          0.5625879043600562,
+          -1.0
+        ]
+      },
+      {
+        "idx": 37,
+        "name": "raw_log::row_count::count_delta",
+        "seed_role": "disabled",
+        "metrics": {
+          "total": 1422,
+          "error": 0,
+          "AC@1": 0.19971870604781997,
+          "MRR": 0.31208589136442383,
+          "AC@3": 0.3143459915611814,
+          "AC@5": 0.36075949367088606
+        },
+        "key": [
+          0.19971870604781997,
+          0.31208589136442383,
+          0.3143459915611814,
+          0.36075949367088606,
+          -1.0
+        ]
+      }
+    ]
+  },
+  "errors": []
+}

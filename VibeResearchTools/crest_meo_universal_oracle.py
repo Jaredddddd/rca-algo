@@ -15,13 +15,14 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import multiprocessing as mp
 import re
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -45,9 +46,11 @@ from evidencerank.cera import (  # noqa: E402
     _stable_template_id,
 )
 from evidencerank.crest import (  # noqa: E402
+    CREST_DENOISED_CHANNEL_EXCLUDES,
     CREST_COUNTERFACTUAL_MUTATION_FEATURES,
     CREST_COUNTERFACTUAL_PROPAGATION_FEATURES,
     CREST_ROLE_FAMILIES,
+    _apply_counterfactual_explain_away,
     _apply_counterfactual_explain_away_soft,
     _apply_parent_context,
     _robust_case_feature_matrix,
@@ -69,6 +72,14 @@ DEFAULT_SUMMARY = (
     REPO
     / "output/rcabench-platform-v2/crest_meo_oracle/role_synthesis_reference_result_summary.json"
 )
+DEFAULT_CREST_EQUIVALENT_ARTIFACT = (
+    REPO
+    / "output/rcabench-platform-v2/crest_meo_oracle/crest_equivalent_evidence_operators.json"
+)
+DEFAULT_CREST_EQUIVALENT_SUMMARY = (
+    REPO
+    / "output/rcabench-platform-v2/crest_meo_oracle/crest_equivalent_reference_result_summary.json"
+)
 
 FEATURES = tuple(
     feature
@@ -78,15 +89,25 @@ FEATURES = tuple(
 )
 EPS = 1e-12
 ROLE_DISABLED = -1
+ROLE_NEUTRAL = len(ROLE_ORDER)
 ROLE_TO_INDEX = {role: idx for idx, role in enumerate(ROLE_ORDER)}
 INDEX_TO_ROLE = {idx: role for role, idx in ROLE_TO_INDEX.items()}
-ROLE_CHOICES = (
+ROLE_VECTOR_CHOICES = (
     ROLE_DISABLED,
     ROLE_TO_INDEX["mutation"],
     ROLE_TO_INDEX["propagation"],
     ROLE_TO_INDEX["observability_bias"],
     ROLE_TO_INDEX["topology_context"],
 )
+CREST_EQUIVALENT_ROLE_CHOICES = (
+    ROLE_DISABLED,
+    ROLE_TO_INDEX["mutation"],
+    ROLE_TO_INDEX["propagation"],
+    ROLE_NEUTRAL,
+)
+SCORING_MODES = ("crest_equivalent", "role_vector")
+_EVAL_RECORD_CHUNKS: list[list["CaseFeatures"]] = []
+_EVAL_SCORING_MODE = "crest_equivalent"
 
 TRACE_CATEGORICAL_ALIASES = (
     "span_name",
@@ -162,6 +183,8 @@ class CaseFeatures:
     services: tuple[str, ...]
     gt_mask: np.ndarray
     matrix: np.ndarray
+    candidate_names: tuple[str, ...]
+    runtime_feature_names: tuple[str, ...]
     trace_edges: tuple[tuple[str, str], ...]
     explain_edges: tuple[tuple[str, str], ...]
     context_weight: float
@@ -244,6 +267,47 @@ def _raw_seed_role(source: str, signal_field: str, contrast_operator: str) -> in
     if source == "log":
         return ROLE_TO_INDEX["propagation"]
     return ROLE_TO_INDEX["mutation"]
+
+
+def _role_name(role_idx: int) -> str:
+    if int(role_idx) == ROLE_DISABLED:
+        return "disabled"
+    if int(role_idx) == ROLE_NEUTRAL:
+        return "neutral"
+    return INDEX_TO_ROLE.get(int(role_idx), "disabled")
+
+
+def _role_choices(scoring_mode: str) -> tuple[int, ...]:
+    if scoring_mode == "crest_equivalent":
+        return CREST_EQUIVALENT_ROLE_CHOICES
+    return ROLE_VECTOR_CHOICES
+
+
+def _coerce_role_for_scoring(role_idx: int, scoring_mode: str) -> int:
+    role_idx = int(role_idx)
+    if role_idx < 0:
+        return ROLE_DISABLED
+    if scoring_mode != "crest_equivalent":
+        return role_idx
+    if role_idx in (ROLE_TO_INDEX["mutation"], ROLE_TO_INDEX["propagation"]):
+        return role_idx
+    return ROLE_NEUTRAL
+
+
+def _initial_role_for_scoring(spec: CandidateSpec, scoring_mode: str) -> int:
+    if not spec.initially_enabled:
+        return ROLE_DISABLED
+    if scoring_mode == "crest_equivalent" and spec.seed_role < 0:
+        return ROLE_NEUTRAL
+    return _coerce_role_for_scoring(spec.seed_role, scoring_mode)
+
+
+def _runtime_feature_name(spec: CandidateSpec) -> str:
+    if spec.family in {"crest_feature", "meol_operator"}:
+        base_operator = str(spec.metadata.get("base_operator", ""))
+        if base_operator in FEATURES:
+            return base_operator
+    return spec.name
 
 
 def _candidate(
@@ -961,6 +1025,7 @@ def _extract_case_features(
     gt_services: set[str],
     specs: list[CandidateSpec],
     meo_specs: list[EvidenceOperatorSpec],
+    scoring_mode: str,
 ) -> CaseFeatures:
     case_dir = data_root / dataset / datapack
     if not case_dir.exists():
@@ -979,21 +1044,36 @@ def _extract_case_features(
         ALL_MODALITIES,
         normalize=True,
     )
-    crest_case_matrix = _apply_arc_trace_endpoint_support_gate(
-        FEATURES,
-        _robust_case_feature_matrix(crest_matrix),
+
+    historical_gated_crest = (
+        _apply_arc_trace_endpoint_support_gate(
+            FEATURES,
+            _robust_case_feature_matrix(crest_matrix),
+        )
+        if scoring_mode == "role_vector"
+        else None
     )
 
     columns: list[np.ndarray] = []
+    candidate_names: list[str] = []
+    runtime_feature_names: list[str] = []
     for spec in specs:
         try:
             if spec.family == "crest_feature":
                 feature_name = str(spec.metadata["base_operator"])
-                values = crest_case_matrix[:, FEATURES.index(feature_name)]
+                values = (
+                    historical_gated_crest[:, FEATURES.index(feature_name)]
+                    if historical_gated_crest is not None
+                    else crest_matrix[:, FEATURES.index(feature_name)]
+                )
             elif spec.family == "meol_operator":
                 feature_name = str(spec.metadata["base_operator"])
                 values = (
-                    crest_case_matrix[:, FEATURES.index(feature_name)]
+                    (
+                        historical_gated_crest[:, FEATURES.index(feature_name)]
+                        if historical_gated_crest is not None
+                        else crest_matrix[:, FEATURES.index(feature_name)]
+                    )
                     if feature_name in FEATURES
                     else np.zeros(len(services), dtype=np.float64)
                 )
@@ -1002,13 +1082,21 @@ def _extract_case_features(
         except Exception:
             values = np.zeros(len(services), dtype=np.float64)
         columns.append(_finite_nonnegative(values))
+        candidate_names.append(spec.name)
+        runtime_feature_names.append(_runtime_feature_name(spec))
 
     matrix = (
         np.stack(columns, axis=1).astype(np.float32, copy=False)
         if columns
         else np.zeros((len(services), 0), dtype=np.float32)
     )
-    matrix = _robust_case_feature_matrix(matrix).astype(np.float32, copy=False)
+    matrix = _robust_case_feature_matrix(matrix)
+    if scoring_mode == "crest_equivalent":
+        matrix = _apply_arc_trace_endpoint_support_gate(
+            tuple(runtime_feature_names),
+            matrix,
+        )
+    matrix = matrix.astype(np.float32, copy=False)
     services_tuple = tuple(services)
     trace_edges_tuple = tuple(trace_edges)
     explain_edges = tuple(sorted(set(trace_edges_tuple)))
@@ -1017,6 +1105,8 @@ def _extract_case_features(
         services=services_tuple,
         gt_mask=gt_mask,
         matrix=matrix,
+        candidate_names=tuple(candidate_names),
+        runtime_feature_names=tuple(runtime_feature_names),
         trace_edges=trace_edges_tuple,
         explain_edges=explain_edges,
         context_weight=_trace_density_context_weight(services, list(trace_edges_tuple)),
@@ -1024,9 +1114,17 @@ def _extract_case_features(
 
 
 def _worker(
-    args: tuple[Path, str, str, set[str], list[CandidateSpec], list[EvidenceOperatorSpec]],
+    args: tuple[
+        Path,
+        str,
+        str,
+        set[str],
+        list[CandidateSpec],
+        list[EvidenceOperatorSpec],
+        str,
+    ],
 ) -> CaseFeatures | dict[str, Any]:
-    data_root, dataset, datapack, gt_services, specs, meo_specs = args
+    data_root, dataset, datapack, gt_services, specs, meo_specs, scoring_mode = args
     try:
         return _extract_case_features(
             data_root,
@@ -1035,6 +1133,7 @@ def _worker(
             gt_services,
             specs,
             meo_specs,
+            scoring_mode,
         )
     except Exception as exc:
         return {
@@ -1061,7 +1160,7 @@ def _role_vectors(record: CaseFeatures, roles: np.ndarray) -> dict[str, np.ndarr
     return vectors
 
 
-def _score_record(record: CaseFeatures, roles: np.ndarray) -> np.ndarray:
+def _score_record_role_vector(record: CaseFeatures, roles: np.ndarray) -> np.ndarray:
     vectors = _role_vectors(record, roles)
     mutation = vectors["mutation"]
     propagation = vectors["propagation"]
@@ -1093,33 +1192,203 @@ def _score_record(record: CaseFeatures, roles: np.ndarray) -> np.ndarray:
     return _finite_nonnegative(score)
 
 
+def _score_record_crest_equivalent(record: CaseFeatures, roles: np.ndarray) -> np.ndarray:
+    if record.matrix.ndim != 2 or record.matrix.shape[1] == 0:
+        return np.zeros(len(record.services), dtype=np.float64)
+
+    enabled_indices = [
+        idx
+        for idx, role_idx in enumerate(roles)
+        if int(role_idx) >= 0 and idx < record.matrix.shape[1]
+    ]
+    if not enabled_indices:
+        return np.zeros(len(record.services), dtype=np.float64)
+
+    role_matrix = _finite_nonnegative(record.matrix[:, enabled_indices])
+    enabled_features = tuple(record.candidate_names[idx] for idx in enabled_indices)
+    runtime_features = tuple(record.runtime_feature_names[idx] for idx in enabled_indices)
+    local_energy = _finite_nonnegative(np.sum(role_matrix, axis=1, dtype=np.float64))
+    local_abnormality = _saturating_incident_scale(local_energy)
+    if not np.any(local_abnormality > 0.0):
+        return local_abnormality
+
+    mutation_features = frozenset(
+        record.candidate_names[idx]
+        for idx in enabled_indices
+        if int(roles[idx]) == ROLE_TO_INDEX["mutation"]
+    )
+    propagation_features = frozenset(
+        record.candidate_names[idx]
+        for idx in enabled_indices
+        if int(roles[idx]) == ROLE_TO_INDEX["propagation"]
+    )
+
+    structural_energy = _apply_parent_context(
+        record.services,
+        local_energy,
+        record.trace_edges,
+        record.context_weight,
+    )
+    structural_energy = _apply_counterfactual_explain_away(
+        record.services,
+        np.maximum(structural_energy, 0.0),
+        role_matrix,
+        enabled_features,
+        record.explain_edges,
+        mutation_features,
+        propagation_features,
+    )
+    explanatory_power = _saturating_incident_scale(structural_energy)
+
+    denoised_indices = [
+        idx
+        for idx, feature_name in enumerate(runtime_features)
+        if feature_name not in CREST_DENOISED_CHANNEL_EXCLUDES
+    ]
+    denoised_energy = (
+        role_matrix[:, denoised_indices].sum(axis=1).astype(np.float64)
+        if denoised_indices
+        else np.zeros(role_matrix.shape[0], dtype=np.float64)
+    )
+    denoised_structural = _apply_parent_context(
+        record.services,
+        denoised_energy,
+        record.trace_edges,
+        record.context_weight,
+    )
+    denoised_structural = _apply_counterfactual_explain_away(
+        record.services,
+        np.maximum(denoised_structural, 0.0),
+        role_matrix,
+        enabled_features,
+        record.explain_edges,
+        mutation_features,
+        propagation_features,
+    )
+    denoised_support = _saturating_incident_scale(denoised_structural)
+
+    score = local_abnormality * explanatory_power + denoised_support
+    if not np.any(score > 0.0):
+        score = local_abnormality
+    return _finite_nonnegative(score)
+
+
+def _score_record(
+    record: CaseFeatures,
+    roles: np.ndarray,
+    scoring_mode: str,
+) -> np.ndarray:
+    if scoring_mode == "crest_equivalent":
+        return _score_record_crest_equivalent(record, roles)
+    return _score_record_role_vector(record, roles)
+
+
 def _rank_order(services: tuple[str, ...], scores: np.ndarray) -> list[int]:
     clean_scores = _finite_nonnegative(scores)
     return sorted(range(len(services)), key=lambda idx: (-float(clean_scores[idx]), services[idx]))
 
 
-def _case_rank(record: CaseFeatures, roles: np.ndarray) -> tuple[int, str | None]:
+def _case_rank(
+    record: CaseFeatures,
+    roles: np.ndarray,
+    scoring_mode: str,
+) -> tuple[int, str | None]:
     if record.matrix.size == 0 or not np.any(record.gt_mask):
         return 10**9, None
-    ordered = _rank_order(record.services, _score_record(record, roles))
+    ordered = _rank_order(record.services, _score_record(record, roles, scoring_mode))
     for rank, row_idx in enumerate(ordered, start=1):
         if bool(record.gt_mask[row_idx]):
             return rank, record.services[row_idx]
     return 10**9, None
 
 
-def _evaluate_records(records: list[CaseFeatures], roles: np.ndarray) -> dict[str, float | int]:
-    ranks = [float(_case_rank(record, roles)[0]) for record in records]
+def _evaluate_records(
+    records: list[CaseFeatures],
+    roles: np.ndarray,
+    scoring_mode: str,
+) -> dict[str, float | int]:
+    return _metrics_from_stats(_rank_stats(records, roles, scoring_mode))
+
+
+def _rank_stats(
+    records: list[CaseFeatures],
+    roles: np.ndarray,
+    scoring_mode: str,
+) -> tuple[int, int, float, int, int, int]:
+    ranks = [float(_case_rank(record, roles, scoring_mode)[0]) for record in records]
+    return _stats_from_ranks(ranks)
+
+
+def _stats_from_ranks(ranks: list[float]) -> tuple[int, int, float, int, int, int]:
     if not ranks:
+        return (0, 0, 0.0, 0, 0, 0)
+    total = len(ranks)
+    hit1 = sum(1 for rank in ranks if rank <= 1.0)
+    hit3 = sum(1 for rank in ranks if rank <= 3.0)
+    hit5 = sum(1 for rank in ranks if rank <= 5.0)
+    reciprocal = sum(1.0 / rank for rank in ranks)
+    return (total, 0, reciprocal, hit1, hit3, hit5)
+
+
+def _metrics_from_stats(stats: tuple[int, int, float, int, int, int]) -> dict[str, float | int]:
+    total, error, reciprocal, hit1, hit3, hit5 = stats
+    if total <= 0:
         return {"total": 0, "error": 0, "AC@1": 0.0, "MRR": 0.0, "AC@3": 0.0, "AC@5": 0.0}
     return {
-        "total": len(ranks),
-        "error": 0,
-        "AC@1": sum(1 for rank in ranks if rank <= 1.0) / len(ranks),
-        "MRR": sum(1.0 / rank for rank in ranks) / len(ranks),
-        "AC@3": sum(1 for rank in ranks if rank <= 3.0) / len(ranks),
-        "AC@5": sum(1 for rank in ranks if rank <= 5.0) / len(ranks),
+        "total": total,
+        "error": error,
+        "AC@1": float(hit1) / float(total),
+        "MRR": float(reciprocal) / float(total),
+        "AC@3": float(hit3) / float(total),
+        "AC@5": float(hit5) / float(total),
     }
+
+
+def _merge_stats(
+    stats: list[tuple[int, int, float, int, int, int]],
+) -> tuple[int, int, float, int, int, int]:
+    total = sum(item[0] for item in stats)
+    error = sum(item[1] for item in stats)
+    reciprocal = sum(item[2] for item in stats)
+    hit1 = sum(item[3] for item in stats)
+    hit3 = sum(item[4] for item in stats)
+    hit5 = sum(item[5] for item in stats)
+    return (total, error, reciprocal, hit1, hit3, hit5)
+
+
+def _chunk_records(records: list[CaseFeatures], worker_count: int) -> list[list[CaseFeatures]]:
+    worker_count = max(1, min(worker_count, len(records)))
+    chunks = [[] for _idx in range(worker_count)]
+    for idx, record in enumerate(records):
+        chunks[idx % worker_count].append(record)
+    return [chunk for chunk in chunks if chunk]
+
+
+def _init_eval_pool(chunks: list[list[CaseFeatures]], scoring_mode: str) -> None:
+    global _EVAL_RECORD_CHUNKS, _EVAL_SCORING_MODE
+    _EVAL_RECORD_CHUNKS = chunks
+    _EVAL_SCORING_MODE = scoring_mode
+
+
+def _eval_chunk_worker(payload: tuple[int, list[int]]) -> tuple[int, int, float, int, int, int]:
+    chunk_idx, role_values = payload
+    roles = np.asarray(role_values, dtype=np.int16)
+    return _rank_stats(_EVAL_RECORD_CHUNKS[chunk_idx], roles, _EVAL_SCORING_MODE)
+
+
+def _evaluate_records_parallel(
+    executor: ProcessPoolExecutor,
+    chunk_count: int,
+    roles: np.ndarray,
+) -> dict[str, float | int]:
+    role_values = [int(value) for value in roles]
+    stats = list(
+        executor.map(
+            _eval_chunk_worker,
+            ((chunk_idx, role_values) for chunk_idx in range(chunk_count)),
+        )
+    )
+    return _metrics_from_stats(_merge_stats(stats))
 
 
 def _single_feature_proxy_metrics(records: list[CaseFeatures], column_idx: int) -> dict[str, float | int]:
@@ -1162,21 +1431,22 @@ def _enabled_count(roles: np.ndarray) -> int:
 
 
 def _try_best_role(
-    records: list[CaseFeatures],
+    evaluate: Callable[[np.ndarray], dict[str, float | int]],
     roles: np.ndarray,
     idx: int,
     current_key: tuple[float, float, float, float, float],
+    scoring_mode: str,
 ) -> tuple[np.ndarray, dict[str, float | int], tuple[float, float, float, float, float], bool]:
     best_roles = roles
-    best_metrics = _evaluate_records(records, roles)
+    best_metrics = evaluate(roles)
     best_key = current_key
     improved = False
-    for role in ROLE_CHOICES:
+    for role in _role_choices(scoring_mode):
         if int(roles[idx]) == int(role):
             continue
         candidate = roles.copy()
         candidate[idx] = int(role)
-        metrics = _evaluate_records(records, candidate)
+        metrics = evaluate(candidate)
         key = _objective_key(metrics, _enabled_count(candidate))
         if key > best_key:
             best_roles = candidate
@@ -1190,17 +1460,36 @@ def _synthesize_roles(
     records: list[CaseFeatures],
     specs: list[CandidateSpec],
     *,
+    scoring_mode: str,
+    search_workers: int,
     max_candidates: int,
     coordinate_passes: int,
 ) -> tuple[np.ndarray, dict[str, Any]]:
+    search_executor: ProcessPoolExecutor | None = None
+    search_chunk_count = 0
+    if search_workers > 1 and records:
+        chunks = _chunk_records(records, search_workers)
+        search_chunk_count = len(chunks)
+        search_executor = ProcessPoolExecutor(
+            max_workers=search_chunk_count,
+            mp_context=mp.get_context("fork"),
+            initializer=_init_eval_pool,
+            initargs=(chunks, scoring_mode),
+        )
+
+    def evaluate(candidate_roles: np.ndarray) -> dict[str, float | int]:
+        if search_executor is None:
+            return _evaluate_records(records, candidate_roles, scoring_mode)
+        return _evaluate_records_parallel(search_executor, search_chunk_count, candidate_roles)
+
     seed_roles = np.asarray(
         [
-            spec.seed_role if spec.initially_enabled and spec.seed_role >= 0 else ROLE_DISABLED
+            _initial_role_for_scoring(spec, scoring_mode)
             for spec in specs
         ],
         dtype=np.int16,
     )
-    seed_metrics = _evaluate_records(records, seed_roles)
+    seed_metrics = evaluate(seed_roles)
     seed_key = _objective_key(seed_metrics, _enabled_count(seed_roles))
     print(
         "synthesis seed "
@@ -1223,7 +1512,7 @@ def _synthesize_roles(
             {
                 "idx": idx,
                 "name": spec.name,
-                "seed_role": INDEX_TO_ROLE.get(int(spec.seed_role), "disabled"),
+                "seed_role": _role_name(_initial_role_for_scoring(spec, scoring_mode)),
                 "metrics": metrics,
                 "key": key,
             }
@@ -1253,14 +1542,20 @@ def _synthesize_roles(
     for screen_pos, idx in enumerate(screened_indices, start=1):
         if int(roles[idx]) >= 0:
             continue
-        best_roles, best_metrics, best_key, improved = _try_best_role(records, roles, idx, key)
+        best_roles, best_metrics, best_key, improved = _try_best_role(
+            evaluate,
+            roles,
+            idx,
+            key,
+            scoring_mode,
+        )
         if improved:
             roles, metrics, key = best_roles, best_metrics, best_key
             history.append(
                 {
                     "stage": "greedy_add",
                     "operator": specs[idx].name,
-                    "role": INDEX_TO_ROLE.get(int(roles[idx]), "disabled"),
+                    "role": _role_name(int(roles[idx])),
                     "metrics": metrics,
                     "enabled_count": _enabled_count(roles),
                 }
@@ -1275,7 +1570,13 @@ def _synthesize_roles(
     for pass_idx in range(max(0, coordinate_passes)):
         pass_improved = False
         for coord_pos, idx in enumerate(candidate_indices, start=1):
-            best_roles, best_metrics, best_key, improved = _try_best_role(records, roles, idx, key)
+            best_roles, best_metrics, best_key, improved = _try_best_role(
+                evaluate,
+                roles,
+                idx,
+                key,
+                scoring_mode,
+            )
             if improved:
                 roles, metrics, key = best_roles, best_metrics, best_key
                 pass_improved = True
@@ -1283,7 +1584,7 @@ def _synthesize_roles(
                     {
                         "stage": f"coordinate_pass_{pass_idx + 1}",
                         "operator": specs[idx].name,
-                        "role": INDEX_TO_ROLE.get(int(roles[idx]), "disabled"),
+                        "role": _role_name(int(roles[idx])),
                         "metrics": metrics,
                         "enabled_count": _enabled_count(roles),
                     }
@@ -1302,7 +1603,7 @@ def _synthesize_roles(
     for prune_pos, idx in enumerate(selected_before_prune, start=1):
         candidate = roles.copy()
         candidate[idx] = ROLE_DISABLED
-        prune_metrics = _evaluate_records(records, candidate)
+        prune_metrics = evaluate(candidate)
         prune_key = _objective_key(prune_metrics, _enabled_count(candidate))
         if prune_key >= key:
             roles, metrics, key = candidate, prune_metrics, prune_key
@@ -1326,10 +1627,14 @@ def _synthesize_roles(
         "selected_metrics": metrics,
         "selected_key": list(key),
         "screened_operator_count": len(screened_indices),
+        "scoring_mode": scoring_mode,
+        "search_workers": search_chunk_count or 1,
         "history": history,
         "screening_method": "single_feature_rank_proxy",
         "top_proxy_operators": proxy_scores[:25],
     }
+    if search_executor is not None:
+        search_executor.shutdown()
     return roles, summary
 
 
@@ -1340,7 +1645,7 @@ def _role_prior(role_idx: int) -> dict[str, float]:
 
 
 def _operator_record(spec: CandidateSpec, role_idx: int) -> dict[str, Any]:
-    role_name = INDEX_TO_ROLE.get(int(role_idx), "disabled")
+    role_name = _role_name(int(role_idx))
     return {
         "name": spec.name,
         "source": spec.source,
@@ -1368,10 +1673,10 @@ def _operator_record(spec: CandidateSpec, role_idx: int) -> dict[str, Any]:
 
 
 def _role_families(specs: list[CandidateSpec], roles: np.ndarray) -> dict[str, list[str]]:
-    families = {role: [] for role in ROLE_ORDER}
+    families = {role: [] for role in (*ROLE_ORDER, "neutral")}
     for spec, role_idx in zip(specs, roles, strict=True):
-        role_name = INDEX_TO_ROLE.get(int(role_idx))
-        if role_name is not None:
+        role_name = _role_name(int(role_idx))
+        if role_name != "disabled":
             families[role_name].append(spec.name)
     return families
 
@@ -1379,11 +1684,12 @@ def _role_families(specs: list[CandidateSpec], roles: np.ndarray) -> dict[str, l
 def _write_case_output(
     record: CaseFeatures,
     roles: np.ndarray,
+    scoring_mode: str,
     dataset: str,
     algorithm: str,
     target: Path,
 ) -> dict[str, Any]:
-    scores = _score_record(record, roles)
+    scores = _score_record(record, roles, scoring_mode)
     order = _rank_order(record.services, scores)
     ordered_services = [record.services[idx] for idx in order]
     hits = [bool(record.gt_mask[idx]) for idx in order]
@@ -1483,10 +1789,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--labels", type=Path, default=DEFAULT_LABELS)
     parser.add_argument("--meol-path", type=Path, default=DEFAULT_MEOL_PATH)
-    parser.add_argument("--artifact", type=Path, default=DEFAULT_ARTIFACT)
+    parser.add_argument(
+        "--scoring-mode",
+        choices=SCORING_MODES,
+        default="crest_equivalent",
+        help=(
+            "crest_equivalent uses the deployable CREST-MEO scoring semantics; "
+            "role_vector preserves the historical soft role-vector Oracle ablation."
+        ),
+    )
+    parser.add_argument("--artifact", type=Path, default=None)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
-    parser.add_argument("--summary", type=Path, default=DEFAULT_SUMMARY)
-    parser.add_argument("--algorithm", default="crest_meo_oracle_role_synthesis")
+    parser.add_argument("--summary", type=Path, default=None)
+    parser.add_argument("--algorithm", default=None)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--max-scan-cases", type=int, default=120)
@@ -1494,6 +1809,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-case-coverage", type=int, default=3)
     parser.add_argument("--max-candidates", type=int, default=80)
     parser.add_argument("--coordinate-passes", type=int, default=3)
+    parser.add_argument(
+        "--search-workers",
+        type=int,
+        default=None,
+        help=(
+            "Workers for offline objective evaluation. Defaults to --workers "
+            "for crest_equivalent scoring and 1 for the historical role_vector ablation."
+        ),
+    )
     parser.add_argument(
         "--exclude-raw-metric",
         action="store_true",
@@ -1521,9 +1845,29 @@ def main(argv: list[str] | None = None) -> None:
     data_root = _repo_path(args.data_root)
     labels_path = _repo_path(args.labels)
     meol_path = _repo_path(args.meol_path)
-    artifact_path = _repo_path(args.artifact)
     output_root = _repo_path(args.output_root)
-    summary_path = _repo_path(args.summary)
+    scoring_mode = str(args.scoring_mode)
+    artifact_path = _repo_path(
+        args.artifact
+        or (
+            DEFAULT_CREST_EQUIVALENT_ARTIFACT
+            if scoring_mode == "crest_equivalent"
+            else DEFAULT_ARTIFACT
+        )
+    )
+    summary_path = _repo_path(
+        args.summary
+        or (
+            DEFAULT_CREST_EQUIVALENT_SUMMARY
+            if scoring_mode == "crest_equivalent"
+            else DEFAULT_SUMMARY
+        )
+    )
+    algorithm = args.algorithm or (
+        "crest_meo_oracle_crest_equivalent"
+        if scoring_mode == "crest_equivalent"
+        else "crest_meo_oracle_role_synthesis"
+    )
 
     gt_by_datapack = _load_labels(labels_path, args.dataset)
     datapacks = sorted(gt_by_datapack)
@@ -1549,13 +1893,26 @@ def main(argv: list[str] | None = None) -> None:
         specs = [spec for spec in specs if not spec.name.startswith("raw_metric::")]
 
     worker_args = [
-        (data_root, args.dataset, datapack, gt_by_datapack[datapack], specs, meo_specs)
+        (
+            data_root,
+            args.dataset,
+            datapack,
+            gt_by_datapack[datapack],
+            specs,
+            meo_specs,
+            scoring_mode,
+        )
         for datapack in datapacks
     ]
 
     records: list[CaseFeatures] = []
     errors: list[dict[str, Any]] = []
     workers = max(1, int(args.workers))
+    search_workers = (
+        max(1, int(args.search_workers))
+        if args.search_workers is not None
+        else (workers if scoring_mode == "crest_equivalent" else 1)
+    )
     if workers == 1:
         for idx, item in enumerate(worker_args, start=1):
             result = _worker(item)
@@ -1585,6 +1942,8 @@ def main(argv: list[str] | None = None) -> None:
     roles, synthesis_summary = _synthesize_roles(
         records,
         specs,
+        scoring_mode=scoring_mode,
+        search_workers=search_workers,
         max_candidates=int(args.max_candidates),
         coordinate_passes=int(args.coordinate_passes),
     )
@@ -1596,8 +1955,8 @@ def main(argv: list[str] | None = None) -> None:
     case_summaries: list[dict[str, Any]] = []
     if args.no_reference:
         for record in records:
-            rank, _top_gt = _case_rank(record, roles)
-            scores = _score_record(record, roles)
+            rank, _top_gt = _case_rank(record, roles, scoring_mode)
+            scores = _score_record(record, roles, scoring_mode)
             top1_idx = _rank_order(record.services, scores)[0]
             case_summaries.append(
                 {
@@ -1611,8 +1970,17 @@ def main(argv: list[str] | None = None) -> None:
             )
     else:
         for idx, record in enumerate(records, start=1):
-            target = output_root / args.dataset / record.datapack / args.algorithm
-            case_summaries.append(_write_case_output(record, roles, args.dataset, args.algorithm, target))
+            target = output_root / args.dataset / record.datapack / algorithm
+            case_summaries.append(
+                _write_case_output(
+                    record,
+                    roles,
+                    scoring_mode,
+                    args.dataset,
+                    algorithm,
+                    target,
+                )
+            )
             if idx % 100 == 0:
                 print(f"wrote {idx}/{len(records)}", flush=True)
 
@@ -1620,6 +1988,7 @@ def main(argv: list[str] | None = None) -> None:
     artifact = {
         "artifact_name": "crest-meo-oracle-raw-telemetry-role-synthesis-rcabench-v1",
         "artifact_type": "oracle_raw_telemetry_operator_synthesis",
+        "scoring_mode": scoring_mode,
         "dataset": args.dataset,
         "created_at": datetime.now(UTC).isoformat(),
         "policy": {
@@ -1645,6 +2014,13 @@ def main(argv: list[str] | None = None) -> None:
         },
         "oracle_scope": "global_raw_telemetry_operator_and_role_synthesis",
         "objective": "maximize AC@1, then MRR, AC@3, AC@5, and fewer enabled operators",
+        "scoring_semantics": (
+            "CREST-equivalent MEOL membership path: selected operators contribute "
+            "to local/denoised CREST energy; mutation and propagation memberships "
+            "only choose dynamic counterfactual explain-away sets."
+            if scoring_mode == "crest_equivalent"
+            else "Historical soft role-vector Oracle ablation."
+        ),
         "candidate_space": {
             "crest_feature_count": len(FEATURES),
             "meol_operator_count": len(meo_specs),
@@ -1669,6 +2045,7 @@ def main(argv: list[str] | None = None) -> None:
             "service_rows": int(sum(len(record.services) for record in records)),
             "max_candidates": int(args.max_candidates),
             "coordinate_passes": int(args.coordinate_passes),
+            "search_workers": int(search_workers),
             **synthesis_summary,
         },
         "errors": errors,
@@ -1681,8 +2058,9 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     summary = {
-        "algorithm": args.algorithm,
+        "algorithm": algorithm,
         "dataset": args.dataset,
+        "scoring_mode": scoring_mode,
         "artifact": _relative(artifact_path),
         "output_root": _relative(output_root),
         "metrics": metrics,

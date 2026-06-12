@@ -2372,9 +2372,33 @@ fault 名或任何 per-incident GT 规则。
 AC@1 -> MRR -> AC@3 -> AC@5 -> fewer selected operators
 ```
 
-Oracle 工具内部可以使用更自由的 role-vector scoring 语义，以估计“如果离线
-operator/role synthesis 也被 GT 选择，理论上限能到哪里”。这一路径与默认
-在线 `CRESTMEO` 隔离，不代表 deployable scoring：
+当前 Oracle 工具支持两种 scoring semantics：
+
+1. `crest_equivalent`：默认实验路径。它与当前在线 CREST-MEO 主线一致，把
+   `role_prior` 解释为 mutation / propagation / neutral membership。selected
+   operators 共同参与 CREST local energy 和 denoised support；mutation /
+   propagation 只决定动态 counterfactual explain-away feature sets。
+2. `role_vector`：历史 ablation 路径。它把 operator role 解释为连续四角色投影，
+   用来估计更自由的 soft role-vector 上限；它不代表 deployable CREST-MEO
+   scoring。
+
+`crest_equivalent` scoring 伪代码为：
+
+```text
+selected_matrix = feature_matrix[:, selected_operators]
+local_energy = sum(selected_matrix)
+local_abnormality = saturating(local_energy)
+structural_energy = parent_context(local_energy)
+structural_energy = hard_counterfactual_explain_away(
+  selected_matrix,
+  mutation_features,
+  propagation_features
+)
+denoised_support = CREST denoised channel energy + parent context + hard explain-away
+score = local_abnormality * saturating(structural_energy) + denoised_support
+```
+
+历史 `role_vector` scoring 为：
 
 ```text
 mutation = feature_matrix @ role_weight_matrix[:, mutation]
@@ -2385,16 +2409,14 @@ local_abnormality = saturating(mutation + propagation + observability_bias + top
 score = local_abnormality * explanatory_power + denoised_support
 ```
 
-其中 `explanatory_power` 使用当前 CREST parent-context 和 MEO soft counterfactual
-explain-away 逻辑。GT 只用于比较不同全局配置的 hit@k，不参与任何 incident 的
-feature value 计算。
+GT 只用于比较不同全局配置的 hit@k，不参与任何 incident 的 feature value 计算。
 
 ### 20.5 主 Artifact 语义
 
 默认输出：
 
 ```text
-output/rcabench-platform-v2/crest_meo_oracle/oracle_evidence_operators.json
+output/rcabench-platform-v2/crest_meo_oracle/crest_equivalent_evidence_operators.json
 ```
 
 文件类型：

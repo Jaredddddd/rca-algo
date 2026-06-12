@@ -1104,6 +1104,155 @@ Generic-template Oracle:
    层，例如把 `k8s.pod.filesystem.usage` 归入
    `resource_filesystem_pressure_shift`，而不是直接把原始 metric name 写入在线默认库。
 
+## CREST-Equivalent Oracle Experiment
+
+在 CREST-MEO 默认路径被修正为“MEOL 配置化 CREST scoring”之后，Oracle 也需要区分
+两种不同语义：
+
+1. `role_vector`：早期 Oracle 语义。operator 被分配到
+   `mutation / propagation / observability_bias / topology_context` 四个连续角色，
+   然后做 soft role-vector projection 和 soft explain-away。这是一个更自由的
+   ablation，不再代表当前在线 CREST-MEO。
+2. `crest_equivalent`：当前主线 Oracle 语义。operator 只被分为
+   `mutation / propagation / neutral`。所有 selected operators 都进入 CREST local
+   energy 和 denoised support；只有 mutation / propagation membership 用于动态
+   counterfactual explain-away。也就是说，它模拟的是“LLM/Oracle 能生成更好的
+   MEOL operator library，但在线 scoring 仍完全复刻 CREST”。
+
+因此，当 `crest_meo_builtin` 与 `crest` 完全等价后，Oracle 的变化不是“失效”，而是：
+
+```text
+Oracle 从 soft role-vector 上限
+改成 CREST-equivalent operator/membership synthesis 上限。
+```
+
+本次实验命令：
+
+```bash
+uv run --package evidencerank python VibeResearchTools/crest_meo_universal_oracle.py \
+  --dataset rcabench \
+  --scoring-mode crest_equivalent \
+  --workers 48 \
+  --search-workers 48 \
+  --no-reference
+```
+
+新增输出：
+
+```text
+output/rcabench-platform-v2/crest_meo_oracle/crest_equivalent_evidence_operators.json
+output/rcabench-platform-v2/crest_meo_oracle/crest_equivalent_reference_result_summary.json
+```
+
+结果：
+
+```text
+scoring_mode=crest_equivalent
+total=1422
+error=0
+AC@1=0.902250
+MRR=0.938118
+AC@3=0.969761
+AC@5=0.984529
+selected_operator_count=27
+```
+
+对比旧 role-vector Oracle：
+
+```text
+旧 role_vector Oracle:
+  AC@1=0.890999
+  MRR=0.931160
+  AC@3=0.969058
+  AC@5=0.988748
+  selected_operator_count=24
+
+新 crest_equivalent Oracle:
+  AC@1=0.902250
+  MRR=0.938118
+  AC@3=0.969761
+  AC@5=0.984529
+  selected_operator_count=27
+```
+
+解释：
+
+1. `AC@1` 和 `MRR` 变高，说明严格复刻 CREST 的 hard counterfactual explain-away
+   和 denoised support 并没有降低 Oracle 上限，反而更贴合当前 CREST-MEO 主线。
+2. `AC@5` 略低于旧 role-vector Oracle，说明旧 soft role-vector 对尾部 top-k
+   召回有一些额外自由度；但目标函数优先级是 `AC@1 -> MRR -> AC@3 -> AC@5`，
+   所以新结果更符合当前实验目标。
+3. 角色空间从四角色变成三类 membership 后，选中 operator 分布为：
+
+```text
+mutation=9
+propagation=9
+neutral=9
+```
+
+4. `neutral` 不是 disabled。它表示该 operator 参与 local/denoised CREST evidence，
+   但不进入 mutation/propagation explain-away set。这正好对应当前 CREST-MEO 的
+   设计：LLM 更容易判断“这是 mutation / propagation / neutral”，不需要产生连续
+   四维权重。
+
+5. 新 artifact 仍然是 research-only upper bound。GT label 只用于离线选择
+   operator/membership，不进入任何在线 scoring 或 feature value 计算。
+
+
+
+## crest_equivalent_generic_template_reference_result_summary
+
+ljw@R740-3:~/paper/aegis/rca-algo-contrib$ uv run --package evidencerank python VibeResearchTools/crest_meo_universal_oracle.py \
+  --dataset rcabench \
+  --scoring-mode crest_equivalent \
+  --exclude-raw-metric-values \
+  --workers 48 \
+  --search-workers 48 \
+  --no-reference \
+  --artifact output/rcabench-platform-v2/crest_meo_oracle/crest_equivalent_generic_template_evidence_operators.json \
+  --summary output/rcabench-platform-v2/crest_meo_oracle/crest_equivalent_generic_template_reference_result_summary.json
+
+processed 100/1422
+processed 200/1422
+processed 300/1422
+processed 400/1422
+processed 500/1422
+processed 600/1422
+processed 700/1422
+processed 800/1422
+processed 900/1422
+processed 1000/1422
+processed 1100/1422
+processed 1200/1422
+processed 1300/1422
+processed 1400/1422
+synthesis seed {"AC@1": 0.7784810126582279, "MRR": 0.8620489579646737, "enabled": 31}
+synthesis screened 64 operators; coordinate candidates=64
+synthesis greedy 20/64 AC@1=0.789733 selected=35
+synthesis greedy 40/64 AC@1=0.805204 selected=37
+synthesis greedy 50/64 AC@1=0.805204 selected=37
+synthesis coordinate pass=1 20/64 AC@1=0.822082 selected=32
+synthesis coordinate pass=1 40/64 AC@1=0.830520 selected=28
+synthesis coordinate pass=1 60/64 AC@1=0.841069 selected=27
+synthesis coordinate pass=1 64/64 AC@1=0.841069 selected=27
+synthesis coordinate pass=2 20/64 AC@1=0.845992 selected=25
+synthesis coordinate pass=2 40/64 AC@1=0.845992 selected=25
+synthesis coordinate pass=2 60/64 AC@1=0.845992 selected=25
+synthesis coordinate pass=2 64/64 AC@1=0.845992 selected=25
+synthesis coordinate pass=3 20/64 AC@1=0.845992 selected=25
+synthesis coordinate pass=3 40/64 AC@1=0.845992 selected=25
+synthesis coordinate pass=3 60/64 AC@1=0.845992 selected=25
+synthesis coordinate pass=3 64/64 AC@1=0.845992 selected=25
+synthesis prune 20/25 AC@1=0.845992 selected=25
+synthesis prune 25/25 AC@1=0.845992 selected=25
+saved output/rcabench-platform-v2/crest_meo_oracle/crest_equivalent_generic_template_evidence_operators.json
+saved output/rcabench-platform-v2/crest_meo_oracle/crest_equivalent_generic_template_reference_result_summary.json
+{"AC@1": 0.8459915611814346, "AC@3": 0.9521800281293952, "AC@5": 0.9760900140646976, "MRR": 0.903599419638279, "error": 0, "total": 1422}
+
+
+
+
+
 ## Deprecated Variants
 
 The earlier case-indicator artifact is only a pipeline sanity check. It writes
