@@ -2,6 +2,20 @@
 
 本文件是本仓库内 Codex / coding agent 的项目级工作契约。除非用户在当前对话中明确覆盖，否则所有自动化研究、代码修改、评估和文档更新都必须遵守这里的规则。
 
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked as local markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The repo uses the default five-label triage vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a multi-context algorithm repository; engineering skills should use the relevant context docs for the algorithm area being changed. See `docs/agents/domain.md`.
+
 ## 基础约束
 
 - 除非用户明确要求，不要使用 SuperPower 相关 skill。
