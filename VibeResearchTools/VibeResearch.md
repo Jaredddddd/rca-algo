@@ -9,6 +9,7 @@ This is the main page for EvidenceRank vibe research. Keep long-lived research c
 - Iteration docs: `docs/EvidRank_evolve/`
 - EvidRank-ARC docs: `docs/EvidRank-ARC-Evolve/`
 - CREST docs: `algorithms/crest/docs/crest_meo/`, `algorithms/crest/docs/root_notes/`
+- CREST root notes: `algorithms/crest/docs/root_notes/ockham_simplified_crest_experiment.md`, `algorithms/crest/docs/root_notes/crest_feature_subset_minimality_experiment.md`
 - Feature-priority weight study: `docs/feature_weight.md`
 - Tool CLI: `VibeResearchTools/evidrank_lab.py`
 - Labels for offline analysis only: `data/rcabench-platform-v2/meta/rcabench-csv/labels.csv`
@@ -784,7 +785,7 @@ V7 做了 `trace_endpoint_shift`，把 raw trace 的 endpoint/span-name 分布�
 - The generated index is bounded by `VIBE-INDEX` comments. Edit outside those comments for persistent notes.
 
 <!-- VIBE-INDEX:START -->
-_Last refreshed: 2026-06-11T02:00:26+08:00_
+_Last refreshed: 2026-06-14T23:59:40+08:00_
 
 ## EvidenceRank Document Index
 
@@ -899,6 +900,7 @@ _Last refreshed: 2026-06-11T02:00:26+08:00_
 | summary | [docs/EvidRank_evolve/CREST_RESIDUAL_ARBITRATION_summary.md](../docs/EvidRank_evolve/CREST_RESIDUAL_ARBITRATION_summary.md) | 2026-06-11T00:43:54+08:00 |
 | summary | [docs/EvidRank_evolve/CREST_RESIDUAL_ETA1_summary.md](../docs/EvidRank_evolve/CREST_RESIDUAL_ETA1_summary.md) | 2026-06-10T23:29:05+08:00 |
 | summary | [docs/EvidRank_evolve/CREST_RESIDUAL_STRUCTURAL_ARBITRATION_summary.md](../docs/EvidRank_evolve/CREST_RESIDUAL_STRUCTURAL_ARBITRATION_summary.md) | 2026-06-11T01:57:59+08:00 |
+| summary | [docs/EvidRank_evolve/FEATURE_SUBSET_MIN7_FULL_summary.md](../docs/EvidRank_evolve/FEATURE_SUBSET_MIN7_FULL_summary.md) | 2026-06-14T23:10:10+08:00 |
 | iteration | [docs/EvidRank_evolve/FW_FEATURE_ABLATION_iteration.md](../docs/EvidRank_evolve/FW_FEATURE_ABLATION_iteration.md) | 2026-06-04T02:32:02+08:00 |
 | summary | [docs/EvidRank_evolve/FW_NUMERIC_BASELINE_summary.md](../docs/EvidRank_evolve/FW_NUMERIC_BASELINE_summary.md) | 2026-06-03T23:08:56+08:00 |
 | iteration | [docs/EvidRank_evolve/FW_PRIORITY_COMPREHENSIVE_SEARCH_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_COMPREHENSIVE_SEARCH_iteration.md) | 2026-06-04T11:13:40+08:00 |
@@ -911,6 +913,12 @@ _Last refreshed: 2026-06-11T02:00:26+08:00_
 | iteration | [docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_iteration.md](../docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_iteration.md) | 2026-06-04T02:04:32+08:00 |
 | summary | [docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_summary.md](../docs/EvidRank_evolve/FW_PRIORITY_SYNTH_LADDER_summary.md) | 2026-06-04T02:05:18+08:00 |
 | note | [docs/EvidRank_evolve/FW_PRIORITY_VARIANTS_CASE_MOVEMENT.md](../docs/EvidRank_evolve/FW_PRIORITY_VARIANTS_CASE_MOVEMENT.md) | 2026-06-04T13:46:57+08:00 |
+| summary | [docs/EvidRank_evolve/OCKHAM_DROP_NOISE_summary.md](../docs/EvidRank_evolve/OCKHAM_DROP_NOISE_summary.md) | 2026-06-14T20:54:08+08:00 |
+| summary | [docs/EvidRank_evolve/OCKHAM_MECHANISM_CORE_summary.md](../docs/EvidRank_evolve/OCKHAM_MECHANISM_CORE_summary.md) | 2026-06-14T20:54:34+08:00 |
+| summary | [docs/EvidRank_evolve/OCKHAM_MIN_BASIS_summary.md](../docs/EvidRank_evolve/OCKHAM_MIN_BASIS_summary.md) | 2026-06-14T20:55:26+08:00 |
+| summary | [docs/EvidRank_evolve/OCKHAM_PRE_SPLIT_BASE_summary.md](../docs/EvidRank_evolve/OCKHAM_PRE_SPLIT_BASE_summary.md) | 2026-06-14T20:22:47+08:00 |
+| summary | [docs/EvidRank_evolve/OCKHAM_PROTOCOL_CORE_summary.md](../docs/EvidRank_evolve/OCKHAM_PROTOCOL_CORE_summary.md) | 2026-06-14T20:55:52+08:00 |
+| summary | [docs/EvidRank_evolve/OCKHAM_ROLE_BASIS_summary.md](../docs/EvidRank_evolve/OCKHAM_ROLE_BASIS_summary.md) | 2026-06-14T20:55:00+08:00 |
 | summary | [docs/EvidRank_evolve/PV_CREST1_BASE_AIOPS25_SERVICE_summary.md](../docs/EvidRank_evolve/PV_CREST1_BASE_AIOPS25_SERVICE_summary.md) | 2026-06-10T16:16:17+08:00 |
 | summary | [docs/EvidRank_evolve/PV_CREST1_BASE_RCABENCH_FRESH_summary.md](../docs/EvidRank_evolve/PV_CREST1_BASE_RCABENCH_FRESH_summary.md) | 2026-06-10T16:16:27+08:00 |
 | summary | [docs/EvidRank_evolve/PV_CREST1_PARTIAL_AIOPS25_SERVICE_summary.md](../docs/EvidRank_evolve/PV_CREST1_PARTIAL_AIOPS25_SERVICE_summary.md) | 2026-06-10T17:14:51+08:00 |
@@ -1000,6 +1008,12 @@ _Last refreshed: 2026-06-11T02:00:26+08:00_
 | compare | [docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_LINEAR_0_7.md](../docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_LINEAR_0_7.md) | 2026-06-04T00:46:16+08:00 |
 | compare | [docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_POWER2_TIER.md](../docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_POWER2_TIER.md) | 2026-06-04T00:46:36+08:00 |
 | compare | [docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_SYNTH_LADDER.md](../docs/EvidRank_evolve/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_SYNTH_LADDER.md) | 2026-06-04T02:05:08+08:00 |
+| compare | [docs/EvidRank_evolve/compare_OCKHAM_PRE_SPLIT_BASE_vs_FEATURE_SUBSET_MIN7_AS_CREST.md](../docs/EvidRank_evolve/compare_OCKHAM_PRE_SPLIT_BASE_vs_FEATURE_SUBSET_MIN7_AS_CREST.md) | 2026-06-14T23:10:53+08:00 |
+| compare | [docs/EvidRank_evolve/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_DROP_NOISE_VALID.md](../docs/EvidRank_evolve/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_DROP_NOISE_VALID.md) | 2026-06-14T21:00:55+08:00 |
+| compare | [docs/EvidRank_evolve/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_MECHANISM_CORE_VALID.md](../docs/EvidRank_evolve/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_MECHANISM_CORE_VALID.md) | 2026-06-14T21:01:17+08:00 |
+| compare | [docs/EvidRank_evolve/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_MIN_BASIS_VALID.md](../docs/EvidRank_evolve/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_MIN_BASIS_VALID.md) | 2026-06-14T21:02:02+08:00 |
+| compare | [docs/EvidRank_evolve/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_PROTOCOL_CORE_VALID.md](../docs/EvidRank_evolve/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_PROTOCOL_CORE_VALID.md) | 2026-06-14T21:02:25+08:00 |
+| compare | [docs/EvidRank_evolve/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_ROLE_BASIS_VALID.md](../docs/EvidRank_evolve/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_ROLE_BASIS_VALID.md) | 2026-06-14T21:01:40+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V10_vs_V11.md](../docs/EvidRank_evolve/compare_V10_vs_V11.md) | 2026-06-02T14:37:14+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V10_vs_V11_trial_span008.md](../docs/EvidRank_evolve/compare_V10_vs_V11_trial_span008.md) | 2026-06-02T14:29:32+08:00 |
 | compare | [docs/EvidRank_evolve/compare_V11_vs_V13.md](../docs/EvidRank_evolve/compare_V11_vs_V13.md) | 2026-06-02T18:11:00+08:00 |
@@ -1125,11 +1139,25 @@ _Last refreshed: 2026-06-11T02:00:26+08:00_
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/CREST_RESIDUAL_ARBITRATION_PRE_STRUCTURAL` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/CREST_RESIDUAL_ETA1` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/CREST_RESIDUAL_STRUCTURAL_ARBITRATION` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/FEATURE_SUBSET_MIN7_AS_CREST` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/FEATURE_SUBSET_MIN7_FULL` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_NUMERIC_BASELINE` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_PRIORITY_LINEAR_0_7` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_PRIORITY_POWER2_TIER` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_PRIORITY_PRIOR` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/FW_PRIORITY_SYNTH_LADDER` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/OCKHAM_DROP_NOISE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/OCKHAM_DROP_NOISE_AS_CREST` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/OCKHAM_MECHANISM_CORE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/OCKHAM_MECHANISM_CORE_AS_CREST` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/OCKHAM_MIN_BASIS` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/OCKHAM_MIN_BASIS_AS_CREST` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/OCKHAM_PRE_CLEAR_PRESERVE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/OCKHAM_PRE_SPLIT_BASE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/OCKHAM_PROTOCOL_CORE` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/OCKHAM_PROTOCOL_CORE_AS_CREST` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/OCKHAM_ROLE_BASIS` |
+| snapshot | `output/rcabench-platform-v2/evolve_snapshots/OCKHAM_ROLE_BASIS_AS_CREST` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_BASE_AIOPS25` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_BASE_AIOPS25_SERVICE` |
 | snapshot | `output/rcabench-platform-v2/evolve_snapshots/PV_CREST1_BASE_FINAL_AIOPS25` |
@@ -1262,11 +1290,18 @@ _Last refreshed: 2026-06-11T02:00:26+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/CREST_RESIDUAL_ARBITRATION` |
 | report | `output/rcabench-platform-v2/evolve_reports/CREST_RESIDUAL_ETA1` |
 | report | `output/rcabench-platform-v2/evolve_reports/CREST_RESIDUAL_STRUCTURAL_ARBITRATION` |
+| report | `output/rcabench-platform-v2/evolve_reports/FEATURE_SUBSET_MIN7_FULL` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_NUMERIC_BASELINE` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_PRIORITY_LINEAR_0_7` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_PRIORITY_POWER2_TIER` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_PRIORITY_PRIOR` |
 | report | `output/rcabench-platform-v2/evolve_reports/FW_PRIORITY_SYNTH_LADDER` |
+| report | `output/rcabench-platform-v2/evolve_reports/OCKHAM_DROP_NOISE` |
+| report | `output/rcabench-platform-v2/evolve_reports/OCKHAM_MECHANISM_CORE` |
+| report | `output/rcabench-platform-v2/evolve_reports/OCKHAM_MIN_BASIS` |
+| report | `output/rcabench-platform-v2/evolve_reports/OCKHAM_PRE_SPLIT_BASE` |
+| report | `output/rcabench-platform-v2/evolve_reports/OCKHAM_PROTOCOL_CORE` |
+| report | `output/rcabench-platform-v2/evolve_reports/OCKHAM_ROLE_BASIS` |
 | report | `output/rcabench-platform-v2/evolve_reports/PV_CREST1_BASE_AIOPS25_SERVICE` |
 | report | `output/rcabench-platform-v2/evolve_reports/PV_CREST1_BASE_RCABENCH_FRESH` |
 | report | `output/rcabench-platform-v2/evolve_reports/PV_CREST1_PARTIAL_AIOPS25_SERVICE` |
@@ -1359,6 +1394,12 @@ _Last refreshed: 2026-06-11T02:00:26+08:00_
 | report | `output/rcabench-platform-v2/evolve_reports/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_LINEAR_0_7` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_POWER2_TIER` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_FW_PRIORITY_PRIOR_vs_FW_PRIORITY_SYNTH_LADDER` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_OCKHAM_PRE_SPLIT_BASE_vs_FEATURE_SUBSET_MIN7_AS_CREST` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_DROP_NOISE_VALID` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_MECHANISM_CORE_VALID` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_MIN_BASIS_VALID` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_PROTOCOL_CORE_VALID` |
+| report | `output/rcabench-platform-v2/evolve_reports/compare_OCKHAM_PRE_SPLIT_BASE_vs_OCKHAM_ROLE_BASIS_VALID` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V10_vs_V11` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V10_vs_V11_trial_span008` |
 | report | `output/rcabench-platform-v2/evolve_reports/compare_V11_vs_V12` |
