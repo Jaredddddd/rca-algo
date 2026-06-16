@@ -436,7 +436,7 @@ class GraphGenerator:
         start_nodes = [node for node in G_total.nodes if start_server in node]
 
         # Get connected subgraph
-        G = get_connected_graph(G_total, start_nodes)
+        G = get_connected_graph(G_total, start_nodes) if start_nodes else G_total.copy()
 
         # Add edge attributes (anomaly scores, similarity, data)
         for fro, to in G.edges:
@@ -515,10 +515,13 @@ class GraphGenerator:
             if data.get(ano_score_key, 0) != 0:
                 G_ano.add_edge(fro, to, **data)
 
+        if len(G_ano.edges) == 0:
+            return G.copy()
+
         # Get connected component containing alarm item
         start_server = self.case.alarm_item
         start_nodes = [node for node in G_ano.nodes if start_server in node]
-        return get_connected_graph(G_ano, start_nodes)
+        return get_connected_graph(G_ano, start_nodes) if start_nodes else G_ano.copy()
 
     @timeit("Building calling node graph")
     def _build_calling_node_graph(

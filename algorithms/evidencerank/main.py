@@ -28,6 +28,7 @@ from src.evidencerank.cera import (
 )
 from crest.algorithm import (
     CREST,
+    CRESTAIOPS25Generic,
     CRESTLog,
     CRESTLogTrace,
     CRESTLocal,
@@ -65,6 +66,7 @@ if __name__ == "__main__":
     registry["crest_log_trace"] = CRESTLogTrace
     registry["crest_local"] = CRESTLocal
     registry["crest_nocf"] = CRESTNoCF
+    registry["crest_aiops25_generic"] = CRESTAIOPS25Generic
     registry["crest_meo"] = CRESTMEO
     registry["crest_meo_builtin"] = CRESTMEOBuiltIn
 

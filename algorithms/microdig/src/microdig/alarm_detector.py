@@ -6,6 +6,7 @@ based on the severity of issues detected in different services.
 """
 
 import json
+import math
 import re
 from pathlib import Path
 from typing import Dict, Optional
@@ -79,6 +80,27 @@ class AlarmDetector:
         }
         return url_to_service
 
+    @staticmethod
+    def _normalize_service_name(service_name: str) -> Optional[str]:
+        """Normalize service identifiers to the RCABench service label style."""
+        if not service_name:
+            return None
+
+        normalized = service_name.strip().strip("/")
+        if not normalized:
+            return None
+
+        normalized = normalized.split(":", 1)[0]
+        normalized = normalized.replace("_", "-")
+        normalized = normalized.lower()
+        if normalized.startswith("hipstershop."):
+            normalized = normalized.rsplit(".", 1)[-1]
+
+        if normalized == "redis":
+            return "redis-cart"
+
+        return normalized
+
     def _extract_service_from_span(self, span_name: str) -> Optional[str]:
         """
         Extract service name from span name using URL mapping.
@@ -92,10 +114,12 @@ class AlarmDetector:
         if not span_name:
             return None
 
-        # Extract URL path from span name
+        text = span_name.strip()
+
+        # Extract URL path from Train Ticket span names.
         # Pattern: "HTTP METHOD http://host:port/path"
         url_pattern = r"HTTP\s+\w+\s+http://[^:]+:\d+(/api/v1/[^/]+)"
-        match = re.search(url_pattern, span_name)
+        match = re.search(url_pattern, text)
 
         if match:
             api_path = match.group(1)
@@ -105,10 +129,51 @@ class AlarmDetector:
                 return service_name
             else:
                 logger.warning(f"No service mapping found for {api_path}")
-        else:
-            logger.warning(f"Could not extract API path from span: {span_name}")
+
+        # Extract service names from AIOps/HipsterShop gRPC-style names, such as:
+        # "hipstershop.CartService/AddItem", "/hipstershop.CartService/GetCart",
+        # "hipstershop.Frontend/Recv.", or "POST /hipstershop.CartService/AddItem".
+        service_match = re.search(
+            r"(?:^|\s|/)(?:[A-Za-z0-9_-]+\.)?([A-Za-z0-9_-]+Service|Frontend)(?:/|$)",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if service_match:
+            return self._normalize_service_name(service_match.group(1))
+
+        logger.debug(f"Could not extract service from span: {span_name}")
 
         return None
+
+    def _calculate_row_fallback_score(self, row: Dict) -> float:
+        """Score a conclusion row when explicit issue JSON is absent."""
+        score = 0.0
+
+        normal_success = row.get("NormalSuccRate")
+        abnormal_success = row.get("AbnormalSuccRate")
+        if isinstance(normal_success, (int, float)) and isinstance(
+            abnormal_success, (int, float)
+        ):
+            score += max(0.0, float(normal_success) - float(abnormal_success)) * 1000
+
+        normal_duration = row.get("NormalAvgDuration")
+        abnormal_duration = row.get("AbnormalAvgDuration")
+        if (
+            isinstance(normal_duration, (int, float))
+            and isinstance(abnormal_duration, (int, float))
+            and math.isfinite(float(normal_duration))
+            and math.isfinite(float(abnormal_duration))
+        ):
+            if float(normal_duration) > 0:
+                score += max(
+                    0.0,
+                    (float(abnormal_duration) - float(normal_duration))
+                    / float(normal_duration),
+                ) * 10
+            elif float(abnormal_duration) > 0:
+                score += float(abnormal_duration) * 10
+
+        return score
 
     def _parse_issues(self, issues_str: str) -> Dict[str, dict]:
         """
@@ -209,7 +274,7 @@ class AlarmDetector:
                 )
                 return None
 
-            service_severities = []
+            service_severity_map = {}
 
             # Process each row
             for row in df.iter_rows(named=True):
@@ -223,18 +288,28 @@ class AlarmDetector:
 
                 # Parse issues
                 issues = self._parse_issues(issues_str)
-                if not issues:
-                    continue
-
-                # Calculate severity
-                severity = self._calculate_severity_score(issues)
+                severity = (
+                    self._calculate_severity_score(issues)
+                    if issues
+                    else self._calculate_row_fallback_score(row)
+                )
                 if severity > 0:
-                    service_severities.append(
-                        (service_name, severity, len(issues), issues)
+                    current = service_severity_map.get(
+                        service_name, (0.0, 0, {})
+                    )
+                    service_severity_map[service_name] = (
+                        current[0] + severity,
+                        current[1] + len(issues),
+                        issues or current[2],
                     )
                     logger.info(
                         f"Service {service_name}: severity {severity:.2f}, {len(issues)} issues"
                     )
+
+            service_severities = [
+                (service, severity, num_issues, issues)
+                for service, (severity, num_issues, issues) in service_severity_map.items()
+            ]
 
             if not service_severities:
                 logger.warning("No services with issues found")

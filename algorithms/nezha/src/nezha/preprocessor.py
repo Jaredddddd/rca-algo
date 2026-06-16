@@ -41,6 +41,8 @@ class NezhaPreprocessor:
         self.encoder = None
         self.service_mapping = None
         self.performance_thresholds = {}
+        self.normal_trace_data_list: Optional[List[TraceData]] = None
+        self.abnormal_trace_data_list: Optional[List[TraceData]] = None
 
         # Statistics
         self.processing_metrics = None
@@ -107,7 +109,6 @@ class NezhaPreprocessor:
             if "parent_span_id" in trace_spans_df.columns
             else [None] * len(span_ids)
         )
-        service_names = trace_spans_df.get_column("service_name").to_list()
 
         # Build children map in O(n)
         children_map: Dict[Optional[str], List[str]] = defaultdict(list)
@@ -115,10 +116,10 @@ class NezhaPreprocessor:
             if pid and pid != "":
                 children_map[pid].append(sid)
 
-        # Identify roots: loadgenerator with no parent
+        # Identify roots from trace topology instead of a benchmark-specific service.
         roots: List[str] = []
-        for sid, pid, sname in zip(span_ids, parent_ids, service_names):
-            if sname == "loadgenerator" and (not pid or pid == ""):
+        for sid, pid in zip(span_ids, parent_ids):
+            if not pid or pid == "":
                 roots.append(sid)
                 span_depths[sid] = 0
 
@@ -331,11 +332,10 @@ class NezhaPreprocessor:
         # Determine root service
         root_service = "unknown"
         root_spans = trace_df.filter(
-            (pl.col("service_name") == "loadgenerator")
-            & (pl.col("parent_span_id").is_null() | (pl.col("parent_span_id") == ""))
+            pl.col("parent_span_id").is_null() | (pl.col("parent_span_id") == "")
         )
         if not root_spans.is_empty():
-            root_service = "loadgenerator"
+            root_service = str(root_spans.get_column("service_name")[0])
 
         return TraceData(
             trace_id=trace_id,
@@ -344,6 +344,55 @@ class NezhaPreprocessor:
             total_spans=total_spans,
             error_count=error_count,
             performance_score=performance_score,
+        )
+
+    def _process_trace_dataframe(
+        self, traces_df: pl.DataFrame, logs_df: Optional[pl.DataFrame] = None
+    ) -> List[TraceData]:
+        """Process traces with the already-initialized encoding system."""
+        trace_groups = traces_df.partition_by("trace_id", as_dict=True)
+
+        log_groups = {}
+        if logs_df is not None:
+            log_groups = logs_df.partition_by("trace_id", as_dict=True)
+
+        trace_data_list = []
+
+        logger.info(f"Processing {len(trace_groups)} traces...")
+
+        for (trace_id,), trace_df in trace_groups.items():
+            if not trace_id:
+                continue
+
+            trace_logs = log_groups.get((trace_id,), None)
+            trace_data = self.process_single_trace(trace_df, trace_logs)
+
+            if trace_data:
+                trace_data_list.append(trace_data)
+
+        return trace_data_list
+
+    def _build_processing_metrics(
+        self,
+        trace_data_list: List[TraceData],
+        total_traces: int,
+        processing_time: float,
+    ) -> ProcessingMetrics:
+        total_patterns = sum(
+            len(trace_data.enhanced_patterns) for trace_data in trace_data_list
+        )
+
+        all_patterns = set()
+        for trace_data in trace_data_list:
+            for pattern in trace_data.enhanced_patterns:
+                all_patterns.add(pattern.pattern)
+
+        return ProcessingMetrics(
+            total_traces=total_traces,
+            processed_traces=len(trace_data_list),
+            total_patterns=total_patterns,
+            unique_patterns=len(all_patterns),
+            processing_time_seconds=processing_time,
         )
 
     def process_all_traces(
@@ -368,48 +417,14 @@ class NezhaPreprocessor:
         # Create service mapping
         self.create_service_mapping(traces_df)
 
-        # Group traces by trace_id
-        trace_groups = traces_df.partition_by("trace_id", as_dict=True)
+        trace_data_list = self._process_trace_dataframe(traces_df, logs_df)
 
-        # Group logs by trace_id if available
-        log_groups = {}
-        if logs_df is not None:
-            log_groups = logs_df.partition_by("trace_id", as_dict=True)
-
-        # Process each trace
-        trace_data_list = []
-        total_patterns = 0
-
-        logger.info(f"Processing {len(trace_groups)} traces...")
-
-        for (trace_id,), trace_df in trace_groups.items():
-            if not trace_id:
-                continue
-
-            # Get logs for this trace
-            trace_logs = log_groups.get((trace_id,), None)
-
-            # Process trace
-            trace_data = self.process_single_trace(trace_df, trace_logs)
-
-            if trace_data:
-                trace_data_list.append(trace_data)
-                total_patterns += len(trace_data.enhanced_patterns)
-
-        # Calculate unique patterns
-        all_patterns = set()
-        for trace_data in trace_data_list:
-            for pattern in trace_data.enhanced_patterns:
-                all_patterns.add(pattern.pattern)
-
-        # Create processing metrics
         processing_time = time.time() - start_time
-        self.processing_metrics = ProcessingMetrics(
-            total_traces=len(trace_groups),
-            processed_traces=len(trace_data_list),
-            total_patterns=total_patterns,
-            unique_patterns=len(all_patterns),
-            processing_time_seconds=processing_time,
+        total_traces = traces_df.select("trace_id").n_unique()
+        self.processing_metrics = self._build_processing_metrics(
+            trace_data_list=trace_data_list,
+            total_traces=total_traces,
+            processing_time=processing_time,
         )
 
         self.processing_metrics.log_summary()
@@ -431,29 +446,58 @@ class NezhaPreprocessor:
         # Load data from input folder and process it.
         # Note: rcabench_platform serde functions would be used if needed
 
+        start_time = time.time()
+
         # Load traces (always needed)
         normal_traces = pl.read_parquet(self.input_folder / "normal_traces.parquet")
         abnormal_traces = pl.read_parquet(self.input_folder / "abnormal_traces.parquet")
-        traces_df = pl.concat([normal_traces, abnormal_traces])
+        traces_df = pl.concat([normal_traces, abnormal_traces], how="diagonal_relaxed")
 
         logger.info(f"Loaded {len(traces_df)} trace records")
 
         # Load logs if needed
         logs_df = None
+        normal_logs = None
+        abnormal_logs = None
         if need_logs:
             try:
                 normal_logs = pl.read_parquet(self.input_folder / "normal_logs.parquet")
                 abnormal_logs = pl.read_parquet(
                     self.input_folder / "abnormal_logs.parquet"
                 )
-                logs_df = pl.concat([normal_logs, abnormal_logs])
+                logs_df = pl.concat([normal_logs, abnormal_logs], how="diagonal_relaxed")
                 logger.info(f"Loaded {len(logs_df)} log records")
             except Exception as e:
                 logger.warning(f"Failed to load logs: {e}")
                 logs_df = None
+                normal_logs = None
+                abnormal_logs = None
 
-        # Process all traces
-        return self.process_all_traces(traces_df, logs_df)
+        # Initialize once on the full datapack so event IDs are comparable across phases.
+        self.initialize_encoding_system(traces_df)
+        self.create_service_mapping(traces_df)
+
+        self.normal_trace_data_list = self._process_trace_dataframe(
+            normal_traces, normal_logs
+        )
+        self.abnormal_trace_data_list = self._process_trace_dataframe(
+            abnormal_traces, abnormal_logs
+        )
+
+        trace_data_list = self.normal_trace_data_list + self.abnormal_trace_data_list
+        processing_time = time.time() - start_time
+        total_traces = (
+            normal_traces.select("trace_id").n_unique()
+            + abnormal_traces.select("trace_id").n_unique()
+        )
+        self.processing_metrics = self._build_processing_metrics(
+            trace_data_list=trace_data_list,
+            total_traces=total_traces,
+            processing_time=processing_time,
+        )
+        self.processing_metrics.log_summary()
+
+        return trace_data_list, self.processing_metrics
 
 
 def create_pattern_support(trace_data_list: List[TraceData]) -> PatternSupport:

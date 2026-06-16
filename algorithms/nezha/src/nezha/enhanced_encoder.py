@@ -115,12 +115,11 @@ class NezhaEventEncoder:
         """
         # Check for root span
         root_spans_df = trace_spans_df.filter(
-            #(pl.col("service_name") == "loadgenerator")&
             (pl.col("parent_span_id").is_null() | (pl.col("parent_span_id") == ""))
         )
 
         if root_spans_df.height == 0:
-            logger.debug("No loadgenerator root span found, skipping trace")
+            logger.debug("No root span found, skipping trace")
             return {}
 
         # Build span hierarchy

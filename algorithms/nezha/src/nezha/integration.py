@@ -57,6 +57,11 @@ class NezhaIntegrator:
         # Store service mapping
         self.service_mapping = self.preprocessor.service_mapping
 
+        if self.preprocessor.normal_trace_data_list is not None:
+            self.normal_traces = self.preprocessor.normal_trace_data_list
+        if self.preprocessor.abnormal_trace_data_list is not None:
+            self.abnormal_traces = self.preprocessor.abnormal_trace_data_list
+
         logger.info(f"Preprocessed {len(self.trace_data_list)} traces")
 
     def separate_normal_abnormal_traces(
@@ -73,14 +78,19 @@ class NezhaIntegrator:
             # TODO: Implement time-based separation when trace timestamps are available
             logger.warning("Time-based separation not yet implemented, using ratio")
 
-        # For now, use simple ratio-based separation
-        split_point = int(len(self.trace_data_list) * normal_ratio)
-
-        # Sort traces by trace_id for consistent splitting
-        sorted_traces = sorted(self.trace_data_list, key=lambda x: x.trace_id)
-
-        self.normal_traces = sorted_traces[:split_point]
-        self.abnormal_traces = sorted_traces[split_point:]
+        # Prefer the datapack-provided split if preprocessing loaded it.
+        if (
+            self.preprocessor.normal_trace_data_list is not None
+            and self.preprocessor.abnormal_trace_data_list is not None
+        ):
+            self.normal_traces = list(self.preprocessor.normal_trace_data_list)
+            self.abnormal_traces = list(self.preprocessor.abnormal_trace_data_list)
+        else:
+            # Fallback for legacy datasets that do not provide explicit split files.
+            split_point = int(len(self.trace_data_list) * normal_ratio)
+            sorted_traces = sorted(self.trace_data_list, key=lambda x: x.trace_id)
+            self.normal_traces = sorted_traces[:split_point]
+            self.abnormal_traces = sorted_traces[split_point:]
 
         logger.info(
             f"Separated into {len(self.normal_traces)} normal "
@@ -144,6 +154,10 @@ class NezhaIntegrator:
             "processing_time_seconds": result.processing_time_seconds,
             "top_k_accuracy": result.top_k_accuracy or {},
         }
+
+        if self.service_mapping is not None:
+            results_dict["service_mapping"] = self.service_mapping.service_to_id
+            results_dict["service_id_to_name"] = self.service_mapping.id_to_service
 
         return results_dict
 

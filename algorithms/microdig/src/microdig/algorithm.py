@@ -7,6 +7,7 @@ to identify root causes in microservice failures.
 """
 
 import time
+import re
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -66,14 +67,51 @@ class MicroDigAlgorithm:
         if not name:
             return None
 
+        def normalize_service(value: str) -> Optional[str]:
+            service = value.strip().strip("/")
+            if not service:
+                return None
+
+            service = service.split(":", 1)[0]
+            service = service.replace("_", "-").lower()
+
+            if service == "redis":
+                return "redis-cart"
+
+            if service.startswith("hipstershop."):
+                service = service.split(".", 1)[1]
+
+            method_match = re.search(
+                r"(?:^|\s|/)(?:[A-Za-z0-9_-]+\.)?([A-Za-z0-9_-]+Service|Frontend)(?:/|$)",
+                service,
+                flags=re.IGNORECASE,
+            )
+            if method_match:
+                return method_match.group(1).lower()
+
+            non_service_values = {
+                "get",
+                "post",
+                "put",
+                "delete",
+                "head",
+                "options",
+                "patch",
+                "set",
+                "hget",
+                "hmset",
+            }
+            if service in non_service_values:
+                return None
+
+            return service or None
+
         # If the name already looks like a Train Ticket service, return it directly
         if name.startswith("ts-") and "|" not in name:
             return name
 
         # Extract service name from API paths like "/api/v1/travelplanservice/..."
         if "/api/v1/" in name:
-            import re
-
             # Extract service name from path
             match = re.search(r"/api/v1/([a-zA-Z0-9_]+)(?:service)?(?:/|$)", name)
             if match:
@@ -240,11 +278,14 @@ class MicroDigAlgorithm:
             # Apply same extraction logic to potential service
             if potential_service and potential_service.startswith("ts-"):
                 return potential_service
+            return normalize_service(potential_service or "")
         else:
             # No separators, treat as direct service/server name
             # But still check if it's a valid service name
             if name.startswith("ts-"):
                 return name
+
+            return normalize_service(name)
 
         return None
 
@@ -375,6 +416,7 @@ class MicroDigAlgorithm:
                                 )
 
                     if service_name:
+                        service_name = self._extract_service_name(service_name, "alg5")
                         # Aggregate scores by service (take maximum score)
                         if (
                             service_name not in service_scores

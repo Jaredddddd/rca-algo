@@ -135,19 +135,19 @@ echo "CLEAR: $CLEAR"
 echo "DRY_RUN: $DRY_RUN"
 echo "Excluded: art, eadro, diagfusion, RUN, causalrca"
 
-run_eval_batch "crest family" "evidencerank" "algorithms/evidencerank/main.py" \
-  crest \
-  crest_local \
-  crest_nocf \
-  crest_metric \
-  crest_trace \
-  crest_log \
-  crest_metric_trace \
-  crest_metric_log \
-  crest_log_trace 
+# run_eval_batch "crest family" "evidencerank" "algorithms/evidencerank/main.py" \
+#   crest \
+#   crest_local \
+#   crest_nocf \
+#   crest_metric \
+#   crest_trace \
+#   crest_log \
+#   crest_metric_trace \
+#   crest_metric_log \
+#   crest_log_trace 
 
-run_eval_batch "baro" "baro" "algorithms/baro/main.py" \
-  baro
+# run_eval_batch "baro" "baro" "algorithms/baro/main.py" \
+#   baro
 
 run_eval_batch "nezha" "nezha" "algorithms/nezha/main.py" \
   nezha

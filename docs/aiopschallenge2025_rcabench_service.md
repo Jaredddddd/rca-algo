@@ -246,3 +246,26 @@ Key finding after the rebuild: status/error preservation and unobservable-label 
 but aiops2025 trace is still much less root-aligned than RCABench trace. Full CREST remains weaker
 than `crest_metric_log` because trace/topology support often promotes `frontend` or other propagation
 services on resource, JVM, pod, and port-misconfig cases.
+
+## MicroDig Compatibility
+
+MicroDig originally assumed Train Ticket span names and `ts-*` service labels. The AIOpsChallenge2025
+service dataset uses HipsterShop-style names such as `hipstershop.CartService/AddItem`,
+`hipstershop.Frontend/Recv.`, and labels such as `cartservice` and `frontend`.
+
+Current MicroDig compatibility fixes:
+
+- parse HipsterShop/gRPC-style span names from `conclusion.parquet`
+- normalize `redis` to `redis-cart`
+- use `Abnormal*`/`Normal*` conclusion statistics as an alarm-service fallback when `Issues` is `{}`
+- allow non-`ts-*` service names in final rankings
+- fall back to the base service graph when no non-zero anomaly edge survives filtering
+
+Expected remaining warning:
+
+```text
+metrics_sli.parquet not found, skipping SLI data loading
+```
+
+The converted dataset does not currently write `metrics_sli.parquet`; MicroDig falls back to
+trace-derived calling patterns in that case.
