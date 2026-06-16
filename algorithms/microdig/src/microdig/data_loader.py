@@ -63,6 +63,11 @@ def replace_enum_values(column: str, enum_values: list, start: int = 0) -> pl.Ex
     return mapping_expr.cast(pl.Int32)
 
 
+def cast_optional_float(column: str) -> pl.Expr:
+    """Cast optional numeric columns while treating empty strings as missing."""
+    return pl.col(column).cast(pl.Float64, strict=False)
+
+
 def load_inject_time(input_folder: Path) -> datetime.datetime:
     """Load injection time from environment configuration"""
     env = load_json(path=input_folder / "env.json")
@@ -190,9 +195,9 @@ def load_traces(input_folder: Path) -> pl.LazyFrame:
 
     lf = lf.with_columns(
         pl.col("duration").cast(pl.Float64),
-        pl.col("attr.http.response.status_code").cast(pl.Float64),
-        pl.col("attr.http.request.content_length").cast(pl.Float64),
-        pl.col("attr.http.response.content_length").cast(pl.Float64),
+        cast_optional_float("attr.http.response.status_code"),
+        cast_optional_float("attr.http.request.content_length"),
+        cast_optional_float("attr.http.response.content_length"),
     )
 
     # Apply UI span name parsing

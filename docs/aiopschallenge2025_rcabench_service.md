@@ -100,6 +100,17 @@ meta/aiopschallenge2025_rcabench_service/labels.parquet
 meta/aiopschallenge2025_rcabench_service/conversion_report.json
 ```
 
+## Trace Schema Compatibility
+
+The dataset is RCABench-shaped, but some optional trace fields preserve source-level missing values
+as empty strings instead of using RCABench's numeric parquet types. In particular,
+`attr.http.response.status_code` can be a string column with many `""` values; optional content
+length columns may also be absent.
+
+Algorithm loaders that cast optional HTTP numeric fields should treat empty strings as nulls before
+or during numeric conversion. ShapleyIQ family and MicroDig now do this with non-strict `Float64`
+casts after adding any missing optional HTTP columns.
+
 ## Label Policy
 
 The default dataset is service-only:
