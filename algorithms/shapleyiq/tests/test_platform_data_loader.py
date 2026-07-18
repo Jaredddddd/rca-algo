@@ -1,6 +1,21 @@
 import polars as pl
 
 from shapleyiq.platform.data_loader import load_traces
+from shapleyiq.platform.alarm_detector import detect_anomalous_services
+from shapleyiq.platform.adapters import _match_service_to_node
+from shapleyiq.platform.algorithms import (
+    MicroHECL,
+    MicroRCA,
+    MicroRank,
+    ShapleyRCA,
+    TON,
+)
+
+
+def test_shapley_family_disables_parallel_batch_execution():
+    algorithms = [ShapleyRCA(), MicroHECL(), MicroRCA(), TON(), MicroRank()]
+
+    assert all(algorithm.needs_cpu_count() is None for algorithm in algorithms)
 
 
 def test_load_traces_treats_empty_optional_http_numbers_as_null(tmp_path):
@@ -36,3 +51,28 @@ def test_load_traces_treats_empty_optional_http_numbers_as_null(tmp_path):
     ]
     assert traces.get_column("attr.http.request.content_length").null_count() == 4
     assert traces.get_column("attr.http.response.content_length").null_count() == 4
+
+
+def test_alarm_detection_uses_common_conclusion_contract(tmp_path):
+    pl.DataFrame(
+        {
+            "SpanName": ["GET /api/v1/auth/login"],
+            "Issues": ['{"latency": {"change_rate": 3.0, "slo_violated": true}}'],
+        }
+    ).write_parquet(tmp_path / "conclusion.parquet")
+
+    assert detect_anomalous_services(tmp_path) == ["ts-auth-service"]
+
+
+def test_alarm_detection_has_no_metric_fallback(tmp_path):
+    assert detect_anomalous_services(tmp_path) == []
+
+
+def test_alarm_service_is_mapped_to_operation_node():
+    nodes = ["frontend:GET /", "checkoutservice:POST /checkout"]
+
+    assert (
+        _match_service_to_node("checkoutservice", nodes)
+        == "checkoutservice:POST /checkout"
+    )
+    assert _match_service_to_node(nodes[0], nodes) == nodes[0]

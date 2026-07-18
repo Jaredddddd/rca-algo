@@ -55,6 +55,23 @@ def aggregate_to_service_level(operation_results: Dict[str, float]) -> Dict[str,
     return service_scores
 
 
+def _match_service_to_node(
+    candidate: Optional[str],
+    node_ids: List[str],
+) -> Optional[str]:
+    """Resolve a service-level alarm seed to an operation-level graph node."""
+
+    if not candidate:
+        return None
+    if candidate in node_ids:
+        return candidate
+    service = candidate.split(":", 1)[0]
+    return next(
+        (node_id for node_id in node_ids if node_id.split(":", 1)[0] == service),
+        None,
+    )
+
+
 def convert_polars_traces_to_rca_data(
     traces_lf: pl.LazyFrame,
     metrics_lf: Optional[pl.LazyFrame] = None,
@@ -523,13 +540,18 @@ class MicroHECLAdapter:
             traces_lf, metrics_sli_lf=metrics_sli_lf
         )
 
-        # MicroHECL只使用第一个异常服务，如果有的话
-        if not initial_anomalous_node and anomalous_services:
-            # 在trace数据中查找匹配的节点
-            for node_id in rca_data.node_ids:
-                if anomalous_services[0] in node_id:
-                    initial_anomalous_node = node_id
-                    break
+        seed_candidates = [
+            initial_anomalous_node,
+            *(anomalous_services or []),
+        ]
+        mapped_seeds = [
+            _match_service_to_node(candidate, rca_data.node_ids)
+            for candidate in seed_candidates
+        ]
+        initial_anomalous_node = next(
+            (node_id for node_id in mapped_seeds if node_id is not None),
+            None,
+        )
 
         # 使用传入的初始异常节点，如果没有提供则使用默认逻辑
         if not initial_anomalous_node:
@@ -668,13 +690,18 @@ class MicroRankAdapter:
             traces_lf, metrics_sli_lf=metrics_sli_lf
         )
 
-        # MicroRank也可以使用第一个异常服务
-        if not initial_anomalous_node and anomalous_services:
-            # 在trace数据中查找匹配的节点
-            for node_id in rca_data.node_ids:
-                if anomalous_services[0] in node_id:
-                    initial_anomalous_node = node_id
-                    break
+        seed_candidates = [
+            initial_anomalous_node,
+            *(anomalous_services or []),
+        ]
+        mapped_seeds = [
+            _match_service_to_node(candidate, rca_data.node_ids)
+            for candidate in seed_candidates
+        ]
+        initial_anomalous_node = next(
+            (node_id for node_id in mapped_seeds if node_id is not None),
+            None,
+        )
 
         # 使用原版算法运行分析 - MicroRank支持initial_anomalous_node
         results = self.algorithm.analyze(

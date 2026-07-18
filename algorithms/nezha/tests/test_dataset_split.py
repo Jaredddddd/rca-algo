@@ -5,6 +5,11 @@ from pathlib import Path
 import polars as pl
 
 from nezha.integration import NezhaIntegrator
+from nezha.rcabench_adapter import NezhaAlgorithm
+
+
+def test_nezha_disables_parallel_batch_execution():
+    assert NezhaAlgorithm().needs_cpu_count() is None
 
 
 def _write_trace_pack(root: Path) -> None:
@@ -100,3 +105,16 @@ def test_run_analysis_returns_service_mapping(tmp_path: Path):
     assert "service_id_to_name" in results
     assert results["service_mapping"]["frontend"] == 0
     assert results["service_id_to_name"][0] == "frontend"
+
+
+def test_missing_metrics_sli_derives_thresholds_from_normal_traces(
+    tmp_path: Path,
+):
+    _write_trace_pack(tmp_path)
+
+    integrator = NezhaIntegrator(tmp_path)
+    integrator.load_and_preprocess(need_logs=False)
+
+    thresholds = integrator.preprocessor.performance_thresholds
+    assert thresholds["frontend_HTTP"] >= 11_000_000
+    assert thresholds["frontend_HTTP"] < 12_000_000

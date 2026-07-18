@@ -94,7 +94,7 @@ class AlarmDetector:
 
         # Extract URL path from span name
         # Pattern: "HTTP METHOD http://host:port/path"
-        url_pattern = r"HTTP\s+\w+\s+http://[^:]+:\d+(/api/v1/[^/]+)"
+        url_pattern = r"(/api/v1/[^/]+)"
         match = re.search(url_pattern, span_name)
 
         if match:
@@ -193,7 +193,6 @@ class AlarmDetector:
         if not self.conclusion_file.exists():
             logger.error(f"Conclusion file not found: {self.conclusion_file}")
             return []
-
         try:
             # Load conclusion data
             logger.info(f"Loading conclusion data from {self.conclusion_file}")
@@ -202,28 +201,23 @@ class AlarmDetector:
             if df.is_empty():
                 logger.warning("Conclusion data is empty")
                 return []
-
             if "SpanName" not in df.columns or "Issues" not in df.columns:
                 logger.error(
                     "Required columns (SpanName, Issues) not found in conclusion data"
                 )
                 return []
-
             service_severities = []
 
             # Process each row
             for row in df.iter_rows(named=True):
-                span_name = row.get("SpanName", "")
-                issues_str = row.get("Issues", "{}")  # Note: capital 'I'
-
-                # Extract service name
-                service_name = self._extract_service_from_span(span_name)
-                if not service_name:
-                    continue
-
-                # Parse issues
+                issues_str = row.get("Issues", "{}")
                 issues = self._parse_issues(issues_str)
                 if not issues:
+                    continue
+
+                span_name = row.get("SpanName", "")
+                service_name = self._extract_service_from_span(span_name)
+                if not service_name:
                     continue
 
                 # Calculate severity
@@ -239,7 +233,6 @@ class AlarmDetector:
             if not service_severities:
                 logger.warning("No services with issues found")
                 return []
-
             # Sort by severity (descending)
             service_severities.sort(key=lambda x: x[1], reverse=True)
 

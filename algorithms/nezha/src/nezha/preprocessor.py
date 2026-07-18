@@ -47,7 +47,11 @@ class NezhaPreprocessor:
         # Statistics
         self.processing_metrics = None
 
-    def initialize_encoding_system(self, traces_df: pl.DataFrame) -> None:
+    def initialize_encoding_system(
+        self,
+        traces_df: pl.DataFrame,
+        normal_traces_df: Optional[pl.DataFrame] = None,
+    ) -> None:
         """Initialize event encoding system from rcabench_platform."""
         logger.info("Initializing enhanced event encoding system...")
 
@@ -58,6 +62,8 @@ class NezhaPreprocessor:
         # Extract span names and load performance thresholds
         self.event_manager.extract_span_names_from_traces(traces_df)
         self.encoder.load_performance_thresholds(self.input_folder)
+        if not self.encoder.performance_thresholds and normal_traces_df is not None:
+            self.encoder.derive_performance_thresholds(normal_traces_df)
 
         # Store performance thresholds
         self.performance_thresholds = self.encoder.performance_thresholds.copy()
@@ -201,7 +207,6 @@ class NezhaPreprocessor:
                         log_event_id = get_log_id(template_id)
                         event_to_span[log_event_id] = span_id
                         event_to_service[log_event_id] = service_name
-
 
         # Since event_pair_frequencies is a dict, we use the actual frequencies
         pattern_info = {}
@@ -465,7 +470,9 @@ class NezhaPreprocessor:
                 abnormal_logs = pl.read_parquet(
                     self.input_folder / "abnormal_logs.parquet"
                 )
-                logs_df = pl.concat([normal_logs, abnormal_logs], how="diagonal_relaxed")
+                logs_df = pl.concat(
+                    [normal_logs, abnormal_logs], how="diagonal_relaxed"
+                )
                 logger.info(f"Loaded {len(logs_df)} log records")
             except Exception as e:
                 logger.warning(f"Failed to load logs: {e}")
@@ -474,7 +481,7 @@ class NezhaPreprocessor:
                 abnormal_logs = None
 
         # Initialize once on the full datapack so event IDs are comparable across phases.
-        self.initialize_encoding_system(traces_df)
+        self.initialize_encoding_system(traces_df, normal_traces)
         self.create_service_mapping(traces_df)
 
         self.normal_trace_data_list = self._process_trace_dataframe(

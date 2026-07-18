@@ -43,9 +43,7 @@ class NezhaEventEncoder:
         else:
             inject_time = abnormal_start
 
-        inject_time = datetime.datetime.fromtimestamp(
-            inject_time
-        )
+        inject_time = datetime.datetime.fromtimestamp(inject_time)
         logger.debug(f"inject_time=`{inject_time}`")
 
         return inject_time
@@ -56,7 +54,7 @@ class NezhaEventEncoder:
             metrics_sli_path = input_folder / "metrics_sli.parquet"
             if not metrics_sli_path.exists():
                 logger.warning(
-                    "metrics_sli.parquet not found, performance degradation detection disabled"
+                    "metrics_sli.parquet not found; trying normal-trace p90 fallback"
                 )
                 return
 
@@ -103,6 +101,46 @@ class NezhaEventEncoder:
 
         except Exception as e:
             logger.warning(f"Failed to load performance thresholds: {e}")
+
+    def derive_performance_thresholds(
+        self,
+        normal_traces_df: pl.DataFrame,
+    ) -> None:
+        """Derive label-free p90 thresholds from the explicit normal split."""
+
+        required = {"service_name", "span_name", "duration"}
+        if normal_traces_df.is_empty() or not required.issubset(
+            normal_traces_df.columns
+        ):
+            return
+        normal = (
+            normal_traces_df.select(
+                pl.col("service_name").cast(pl.String),
+                pl.col("span_name").cast(pl.String),
+                pl.col("duration").cast(pl.Float64, strict=False),
+            )
+            .drop_nulls()
+            .filter(pl.col("duration") > 0.0)
+        )
+        if normal.is_empty():
+            return
+
+        thresholds = normal.group_by(["service_name", "span_name"]).agg(
+            pl.col("duration")
+            .quantile(0.9, interpolation="nearest")
+            .alias("p90_threshold")
+        )
+        for row in thresholds.iter_rows(named=True):
+            threshold = row["p90_threshold"]
+            if threshold is None or not math.isfinite(float(threshold)):
+                continue
+            service_span_name = f"{row['service_name']}_{row['span_name']}"
+            self.performance_thresholds[service_span_name] = float(threshold)
+
+        logger.info(
+            f"Derived {len(self.performance_thresholds)} "
+            "performance thresholds from normal traces"
+        )
 
     def encode_trace_events_detailed(
         self, trace_spans_df: pl.DataFrame, trace_logs_df: Optional[pl.DataFrame] = None
@@ -248,8 +286,6 @@ class NezhaEventIDManager(EventIDManager):
         # Dynamic special events mapping: (service_span_name, event_type) -> event_id
         self.service_special_events: Dict[Tuple[str, str], int] = {}
 
-    
-
     def get_service_special_event_id(
         self, event_type: str, service_span_name: str
     ) -> int:
@@ -267,10 +303,9 @@ class NezhaEventIDManager(EventIDManager):
             raise ValueError(f"Unsupported service special event type: {event_type}")
         if event_type == "status_error":
             return self.get_status_error_id(service_span_name)
-            
+
         if event_type == "perf_degradation":
             return self.get_perf_degradation_id(service_span_name)
-
 
     def get_event_type(self, event_id: int) -> str:
         """

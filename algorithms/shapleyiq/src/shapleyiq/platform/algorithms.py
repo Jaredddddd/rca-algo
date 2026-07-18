@@ -29,7 +29,7 @@ class ShapleyRCA(Algorithm):
         )
 
     def needs_cpu_count(self) -> int | None:
-        return 4
+        return None
 
     def __call__(self, args: AlgorithmArgs) -> List[AlgorithmAnswer]:
         # 转换数据
@@ -62,7 +62,7 @@ class MicroHECL(Algorithm):
         self.adapter = MicroHECLAdapter(time_window=time_window)
 
     def needs_cpu_count(self) -> int | None:
-        return 4
+        return None
 
     def __call__(self, args: AlgorithmArgs) -> List[AlgorithmAnswer]:
         # 转换数据
@@ -93,11 +93,11 @@ class MicroRCA(Algorithm):
         self.adapter = MicroRCAAdapter(time_window=time_window)
 
     def needs_cpu_count(self) -> int | None:
-        return 4
+        return None
 
     def __call__(self, args: AlgorithmArgs) -> List[AlgorithmAnswer]:
         # 转换数据
-        data = PlatformDataConverter.from_rcabench_args(args,need_metrics=True)
+        data = PlatformDataConverter.from_rcabench_args(args, need_metrics=True)
 
         if data.traces is None:
             return []
@@ -125,11 +125,11 @@ class TON(Algorithm):
         self.adapter = TONAdapter(time_window=time_window)
 
     def needs_cpu_count(self) -> int | None:
-        return 4
+        return None
 
     def __call__(self, args: AlgorithmArgs) -> List[AlgorithmAnswer]:
         # 转换数据
-        data = PlatformDataConverter.from_rcabench_args(args,need_metrics=True)
+        data = PlatformDataConverter.from_rcabench_args(args, need_metrics=True)
 
         if data.traces is None:
             return []
@@ -157,7 +157,7 @@ class MicroRank(Algorithm):
         self.adapter = MicroRankAdapter(n_sigma=n_sigma)
 
     def needs_cpu_count(self) -> int | None:
-        return 4
+        return None
 
     def __call__(self, args: AlgorithmArgs) -> List[AlgorithmAnswer]:
         # 转换数据

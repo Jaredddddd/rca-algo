@@ -23,7 +23,8 @@ class NezhaAlgorithm(Algorithm):
     """Nezha algorithm implementation for rcabench platform"""
 
     def needs_cpu_count(self) -> Optional[int]:
-        return 4  # Nezha can benefit from parallel processing
+        # Trace mining is memory-bound; None forces sequential batch execution.
+        return None
 
     def __call__(self, args: AlgorithmArgs) -> List[AlgorithmAnswer]:
         """Execute Nezha algorithm and return service-level rankings"""
@@ -33,8 +34,6 @@ class NezhaAlgorithm(Algorithm):
         try:
             # Extract parameters from args
             input_folder = Path(args.input_folder)
-
-
 
             # Run Nezha analysis
             results = run_nezha_pipeline(

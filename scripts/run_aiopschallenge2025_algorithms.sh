@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run local non-trainable/non-excluded algorithms on AIOpsChallenge2025 RCABench data.
+# Run local non-trainable/non-excluded algorithms on an RCABench v2 dataset.
 #
 # Excluded by design: art, eadro, diagfusion, RUN.
 
@@ -14,11 +14,11 @@ Default dataset:
   aiopschallenge2025_rcabench_service
 
 Environment variables:
-  CPUS=16                         Number of workers passed to eval batch.
+  CPUS=1                         Number of workers passed to eval batch.
   CLEAR=1                         Use --clear before each algorithm run. Set CLEAR=0 to resume.
   SAMPLE=                         Optional sample size passed to eval batch.
   FAIL_FAST=0                     Set to 1 to stop at the first failed group.
-  INCLUDE_CAUSALRCA=1             Set to 0 to skip CausalRCA.
+  INCLUDE_CAUSALRCA=0             Set to 1 to include CausalRCA.
   SYNC_CAUSALRCA=0                Set to 1 to run uv sync --frozen for CausalRCA first.
   RUN_COMBINED_REPORT=1           Set to 0 to skip the final combined report.
   SORT_BY=MRR                     Sort column for scripts/combined_report.py.
@@ -27,7 +27,7 @@ Environment variables:
 
 Examples:
   scripts/run_aiopschallenge2025_algorithms.sh
-  CPUS=32 CLEAR=0 scripts/run_aiopschallenge2025_algorithms.sh
+  CPUS=1 CLEAR=0 scripts/run_aiopschallenge2025_algorithms.sh
   INCLUDE_CAUSALRCA=0 SAMPLE=10 scripts/run_aiopschallenge2025_algorithms.sh
 USAGE
 }
@@ -41,26 +41,39 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 DATASET="${1:-${DATASET:-aiopschallenge2025_rcabench_service}}"
-CPUS="${CPUS:-32}"
+CPUS="${CPUS:-1}"
 CLEAR="${CLEAR:-1}"
 SAMPLE="${SAMPLE:-}"
 FAIL_FAST="${FAIL_FAST:-0}"
 INCLUDE_CAUSALRCA="${INCLUDE_CAUSALRCA:-0}"
-SYNC_CAUSALRCA="${SYNC_CAUSALRCA:-2}"
+SYNC_CAUSALRCA="${SYNC_CAUSALRCA:-0}"
 RUN_COMBINED_REPORT="${RUN_COMBINED_REPORT:-1}"
 SORT_BY="${SORT_BY:-MRR}"
 DRY_RUN="${DRY_RUN:-0}"
+
+if [[ ! "$CPUS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "CPUS must be a positive integer: $CPUS" >&2
+  exit 2
+fi
+if (( CPUS > 1 )); then
+  echo "warning: CPUS=$CPUS can exhaust memory on large trace datasets; 1 is the tested safe value" >&2
+fi
 
 export DATA_ROOT="${DATA_ROOT:-$ROOT_DIR/data/rcabench-platform-v2}"
 export OUTPUT_ROOT="${OUTPUT_ROOT:-$ROOT_DIR/output/rcabench-platform-v2}"
 export TEMP_ROOT="${TEMP_ROOT:-$ROOT_DIR/temp}"
 export LOGURU_COLORIZE="${LOGURU_COLORIZE:-0}"
 export LOGURU_LEVEL="${LOGURU_LEVEL:-WARNING}"
+export POLARS_MAX_THREADS="${POLARS_MAX_THREADS:-1}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
+export MKL_NUM_THREADS="${MKL_NUM_THREADS:-1}"
+export NUMEXPR_NUM_THREADS="${NUMEXPR_NUM_THREADS:-1}"
+export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-2}"
 
 if [[ ! -f "$DATA_ROOT/meta/$DATASET/index.parquet" || ! -f "$DATA_ROOT/meta/$DATASET/labels.parquet" ]]; then
   echo "Dataset metadata not found for '$DATASET' under $DATA_ROOT/meta/$DATASET" >&2
-  echo "Build it first with:" >&2
-  echo "  uv run --package evidencerank python scripts/build_aiopschallenge2025_rcabench.py --overwrite" >&2
+  echo "Build or convert this dataset first; see HowToLocalRun.md for dataset-specific commands." >&2
   exit 2
 fi
 
@@ -91,12 +104,13 @@ run_step() {
     return 0
   fi
 
-  if "$@"; then
+  local rc
+  "$@"
+  rc=$?
+  if (( rc == 0 )); then
     echo "=== $name: done ==="
     return 0
   fi
-
-  local rc=$?
   echo "=== $name: failed with exit code $rc ===" >&2
   FAILURES+=("$name:$rc")
 
@@ -133,7 +147,7 @@ echo "TEMP_ROOT: $TEMP_ROOT"
 echo "CPUS: $CPUS"
 echo "CLEAR: $CLEAR"
 echo "DRY_RUN: $DRY_RUN"
-echo "Excluded: art, eadro, diagfusion, RUN, causalrca"
+echo "Excluded: art, eadro, diagfusion, RUN"
 
 # run_eval_batch "crest family" "evidencerank" "algorithms/evidencerank/main.py" \
 #   crest \
@@ -146,8 +160,8 @@ echo "Excluded: art, eadro, diagfusion, RUN, causalrca"
 #   crest_metric_log \
 #   crest_log_trace 
 
-# run_eval_batch "baro" "baro" "algorithms/baro/main.py" \
-#   baro
+run_eval_batch "baro" "baro" "algorithms/baro/main.py" \
+  baro
 
 run_eval_batch "nezha" "nezha" "algorithms/nezha/main.py" \
   nezha

@@ -417,6 +417,62 @@ output/rcabench-platform-v2/data/<dataset>/<datapack>/<algorithm>/
 └── .finished
 ```
 
+## 在 RCAEval RE2 迁移数据上运行已有算法
+
+RCAEval V1 的 RE2-OB、RE2-SS、RE2-TT 已转换为 RCABench-platform v2。
+所有算法继续使用统一的 `eval batch`/`eval single` CLI；`crest_rcaeval_oracle8` 声明 RCAEval 自己的 8-feature profile，并复用 canonical CREST，不是 RCABench Min8。
+当前 profile 不使用数据集权重，只相对上一版替换一项：删除
+`metric_mean_z`，加入 RCABench Min8 也使用的 `trace_status_code_shift`，其余 7 项保留。
+
+数据集名：
+
+```text
+rcabench_rcaeval_re2
+rcabench_rcaeval_re2_ob
+rcabench_rcaeval_re2_ss
+rcabench_rcaeval_re2_tt
+```
+
+正式 270 个 datapack 已是 conversion v3；公共 metric 输入等价于原始 `main.py --length 20`。以下命令用于幂等校验或重新构建，默认 1 个 worker：
+
+```bash
+cd /home/ljw/paper/aegis/rca-algo-contrib
+POLARS_MAX_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 MALLOC_ARENA_MAX=2 \
+  uv run --package crest python scripts/build_rcaeval_rcabench.py --workers 1
+```
+
+运行当前 oracle8 基线，或选择模态/模块消融：
+
+```bash
+# 默认 OB、SS、TT；每次按数据集串行，1 个进程，支持断点续跑
+algorithms/crest/run_rcaeval_experiments.sh --groups baseline
+
+# 模态消融 + 模块消融，只跑 OB/TT
+algorithms/crest/run_rcaeval_experiments.sh \
+  --datasets ob,tt --groups modalities,modules --cpus 1
+
+# 先查看注册名和实际命令
+algorithms/crest/run_rcaeval_experiments.sh --list
+algorithms/crest/run_rcaeval_experiments.sh --datasets ss --groups modules --dry-run
+```
+
+三个完整基线均为 90/90、0 error；AC@1 为 OB `0.944444`、SS
+`0.933333`、TT `0.977778`，总体为 `257/270 = 0.951852`。三者都高于
+90%，且与固定 8-feature 离线搜索的预测逐项一致。
+
+抽样检查其他无需训练算法：
+
+```bash
+CPUS=1 SAMPLE=1 INCLUDE_CAUSALRCA=0 \
+  scripts/run_aiopschallenge2025_algorithms.sh rcabench_rcaeval_re2
+```
+
+RCAEval trace 很大。不要沿用下文 RCABench/AIOPS 示例中的高并发；默认只用 1 个 worker，并保持 Polars/BLAS/OpenMP 单线程。Nezha 与 ShapleyIQ family 的批量调度也强制串行。RE2-SS 原始数据没有 trace，因此 trace 算法会正常结束但无候选；ShapleyIQ family 只读取 v3 的 label-free `conclusion.parquet`，Nezha 缺少 `metrics_sli` 时从正常 trace 推导 p90。
+
+完整转换规则、专用 8 feature、全量结果、内存诊断和算法兼容性矩阵见
+[`docs/rcaeval_rcabench_migration.md`](docs/rcaeval_rcabench_migration.md)。
+
 ## 在 AIOpsChallenge2025 上运行已有算法
 
 本地已经把 AIOpsChallenge2025 转成了 RCABench v2 的 service-only 数据集，数据集名是：
@@ -611,6 +667,23 @@ uv run --package evidencerank python algorithms/evidencerank/main.py \
   -d "$DATASET" \
   --clear \
   --use-cpus "$CPUS"
+```
+
+AIOPS2025 自己的 generic8 baseline、六个模态消融和两个当前模块消融使用以下注册名；不要换成 RCABench Min8：
+
+```bash
+uv run --package crest python algorithms/crest/main.py \
+  eval batch \
+  -a crest_aiops25_generic \
+  -a crest_aiops25_generic_metric \
+  -a crest_aiops25_generic_trace \
+  -a crest_aiops25_generic_log \
+  -a crest_aiops25_generic_metric_trace \
+  -a crest_aiops25_generic_metric_log \
+  -a crest_aiops25_generic_log_trace \
+  -a crest_aiops25_generic_local \
+  -a crest_aiops25_generic_nocf \
+  -d "$DATASET" --clear --use-cpus "$CPUS"
 ```
 
 如果要跑 CREST 消融：
